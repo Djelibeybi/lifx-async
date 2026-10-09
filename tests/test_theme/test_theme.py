@@ -533,6 +533,11 @@ class TestThemeEffectModesAndTags:
         with pytest.raises(TypeError, match="not a single string"):
             Theme([Colors.RED], tags="Calm")
 
+    @pytest.mark.parametrize("tags", [[1, 2], ["Calm", None], [b"Calm"]])
+    def test_non_string_tags_raise(self, tags: list[object]) -> None:
+        with pytest.raises(TypeError, match="only strings"):
+            Theme([Colors.RED], tags=tags)  # type: ignore[arg-type]
+
     @pytest.mark.parametrize(
         ("static_mode", "dynamic_mode", "expected"),
         [

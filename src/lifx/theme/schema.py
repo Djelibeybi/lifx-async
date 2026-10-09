@@ -284,6 +284,12 @@ def _validate_tags(line_number: int, record: dict[str, Any]) -> None:
     for tag in tags:
         if type(tag) is not str or not tag:
             raise _fail(line_number, record, f"tag {tag!r} is not a non-empty string")
+        if tag != tag.strip() or not tag.isprintable():
+            raise _fail(
+                line_number,
+                record,
+                f"tag {tag!r} has surrounding whitespace or non-printable characters",
+            )
         if not tag.isascii():
             raise _fail(
                 line_number, record, f"tag {tag!r} contains non-ASCII characters"

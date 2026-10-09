@@ -1092,7 +1092,7 @@ class TestModesAndTagsEmission:
         with pytest.raises(RuntimeError, match="emit-time check failed: bad mode"):
             emit_data_module(_pairs(record))
 
-    @pytest.mark.parametrize("tag", ["", 3, "Café"])
+    @pytest.mark.parametrize("tag", ["", 3, "Café", "Calm ", " Calm", "Ca\tlm"])
     def test_emit_time_backstop_rejects_a_bad_tag(self, tag: object) -> None:
         record = _record(tags=[tag])
 

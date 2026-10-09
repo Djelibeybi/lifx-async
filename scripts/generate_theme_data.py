@@ -219,7 +219,13 @@ def emit_data_module(records: list[tuple[int, dict[str, Any]]]) -> str:
                 f"emit-time check failed: bad tags {raw_tags!r} on record {slug!r}"
             )
         for tag in raw_tags:
-            if not (type(tag) is str and tag and tag.isascii()):
+            if not (
+                type(tag) is str
+                and tag
+                and tag.isascii()
+                and tag == tag.strip()
+                and tag.isprintable()
+            ):
                 raise RuntimeError(
                     f"emit-time check failed: bad tag {tag!r} on record {slug!r}"
                 )

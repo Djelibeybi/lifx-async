@@ -121,6 +121,12 @@ def test_each_tag_must_be_a_non_empty_string(tag: object) -> None:
         validate_records([(1, _valid_record(tags=[tag]))])
 
 
+@pytest.mark.parametrize("tag", ["Calm ", " Calm", "Ca\tlm", "Calm\n"])
+def test_tags_must_be_trimmed_and_printable(tag: str) -> None:
+    with pytest.raises(RuntimeError, match="surrounding whitespace or non-printable"):
+        validate_records([(1, _valid_record(tags=[tag]))])
+
+
 def test_tags_must_be_ascii() -> None:
     with pytest.raises(RuntimeError, match="non-ASCII"):
         validate_records([(1, _valid_record(tags=["Café"]))])

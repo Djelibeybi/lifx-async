@@ -61,8 +61,8 @@ class Theme:
     Note:
         ``shuffled()`` returns an identity-less copy: slug, name, category,
         disposition, replaced_by, static_mode, dynamic_mode and tags do not
-        propagate. This is a known
-        deferred limitation of the identity round-trip guarantee.
+        propagate. This is a known deferred limitation of the identity
+        round-trip guarantee.
         (``random()`` returns a single ``HSBK``, not a Theme, so it carries
         no identity to begin with.)
 
@@ -150,6 +150,9 @@ class Theme:
             # A str is itself an iterable of str; storing it letter by letter
             # would be silent nonsense.
             raise TypeError("tags must be an iterable of tags, not a single string")
+        tags = tuple(tags)
+        if not all(type(tag) is str for tag in tags):
+            raise TypeError("tags must contain only strings")
         if colors and len(colors) > 0:
             # Copied, never aliased: a Theme built over a caller's list would
             # otherwise mutate that list through add_color(), and a Theme
@@ -167,7 +170,7 @@ class Theme:
         self.replaced_by = replaced_by
         self.static_mode: StaticMode | None = static_mode
         self.dynamic_mode: DynamicMode | None = dynamic_mode
-        self.tags: tuple[str, ...] = tuple(tags)
+        self.tags: tuple[str, ...] = tags
 
     def add_color(self, color: HSBK) -> None:
         """Add a color to the theme.
@@ -310,11 +313,12 @@ class Theme:
     def palette_equals(self, other: Theme) -> bool:
         """Check whether two themes carry the same palette.
 
-        Order is never compared because the app shuffles palette order on
-        every application, so two orderings of one palette are the same
-        palette. Identity (slug, name, category, disposition and
-        replaced_by) is excluded too: an identity-bearing library theme and
-        a caller-built theme with the same colors have the same palette.
+        This compares palettes, not layouts, so order is never compared: two
+        orderings of one palette are the same palette. For an ordered
+        comparison, use ``a.colors == b.colors``. Identity (slug, name,
+        category, disposition and replaced_by) is excluded too: an
+        identity-bearing library theme and a caller-built theme with the
+        same colors have the same palette.
         Colors compare at uint16 (protocol) granularity via HSBK equality,
         and duplicate counts matter — a multiset comparison, not a set
         comparison.

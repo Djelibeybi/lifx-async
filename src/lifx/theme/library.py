@@ -2,12 +2,12 @@
 
 The theme data is generated from ``data/themes.jsonl`` by
 ``scripts/generate_theme_data.py``, synced from the LIFX app via hardware capture on
-2026-08-14. The library carries 168 resolvable names: 138 app theme slugs,
-28 pre-6.3.0 keys with no app counterpart (category ``Library``), and 2
-rename aliases (``forest`` and ``aurora_borealis``) that resolve to their
-renamed targets. Every name reports its fate in ``disposition``, including
-the two aliases, which carry ``"renamed"`` and name the canonical key in
-``replaced_by``.
+2026-08-14. The library carries 169 resolvable names: 138 app theme slugs,
+28 pre-6.3.0 keys with no app counterpart (category ``Library``), and 3
+rename aliases (``forest``, ``aurora_borealis`` and ``energizing``) that
+resolve to their renamed targets. Every name reports its fate in
+``disposition``, including the three aliases, which carry ``"renamed"`` and
+name the canonical key in ``replaced_by``.
 
 Colours are stored in source order. For most themes the order carries no
 meaning, but for a grid or stripe theme it is the layout, so it is never
@@ -54,11 +54,12 @@ class ThemeLibrary:
         categories = ThemeLibrary.get_categories()
         holidays = ThemeLibrary.get_by_category("Holidays")
 
-        # Find themes by tag, category and effect mode
-        calm = ThemeLibrary.get_by_tag("Calm")
-        cosy_grids = ThemeLibrary.find(
-            tags=["Calm", "Cozy"], match="any", static_mode="grid_static"
-        )
+        # Find themes by tag, category and effect mode. Tags arrive with a
+        # catalogue resync, so check what exists first.
+        tags = ThemeLibrary.get_tags()
+        if "Calm" in tags:
+            calm = ThemeLibrary.get_by_tag("Calm")
+        blended = ThemeLibrary.find(static_mode="blended")
 
         # Apply to a light
         await light.apply_theme(evening_theme, power_on=True)
@@ -154,7 +155,7 @@ class ThemeLibrary:
         """Collect the slugs of every record whose category normalises to key.
 
         The slug rule is applied to the *distinct* category names (nine
-        today), never once per record: a 168-record scan would run 168
+        today), never once per record: a 169-record scan would run 169
         regex substitutions to answer a question with nine possible
         answers.
 
@@ -253,16 +254,17 @@ class ThemeLibrary:
             ValueError: If ``tag`` is not a string or matches no tag.
         """
         available = cls.get_tags()
+        listing = ", ".join(available) or "(none)"
         if type(tag) is not str:
             raise ValueError(
                 f"Tag must be a string, got {type(tag).__name__}. "
-                f"Available tags: {', '.join(available)}"
+                f"Available tags: {listing}"
             )
         key = derive_slug(tag)
         matching = {t for t in available if derive_slug(t) == key}
         if not matching:
             raise ValueError(
-                f"Tag '{tag}' is not recognised. Available tags: {', '.join(available)}"
+                f"Tag '{tag}' is not recognised. Available tags: {listing}"
             )
         return {r.slug for r in cls._records() if matching.intersection(r.tags)}
 
@@ -321,7 +323,10 @@ class ThemeLibrary:
             ```python
             from lifx.theme import ThemeLibrary
 
-            calm_grids = ThemeLibrary.find(tags=["Calm"], static_mode="grid_static")
+            tags = ThemeLibrary.get_tags()
+            if "Calm" in tags:
+                calm = ThemeLibrary.find(tags=["Calm"])
+            blended = ThemeLibrary.find(static_mode="blended")
             ```
         """
         if isinstance(tags, str):
@@ -346,7 +351,7 @@ class ThemeLibrary:
             if static_mode not in modes:
                 raise ValueError(
                     f"static_mode '{static_mode}' is not recognised. "
-                    f"Available static modes: {', '.join(modes)}"
+                    f"Available static modes: {', '.join(modes) or '(none)'}"
                 )
             selected &= {r.slug for r in records if r.static_mode == static_mode}
         return {slug: cls.get(slug) for slug in sorted(selected)}

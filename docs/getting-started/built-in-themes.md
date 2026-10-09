@@ -77,9 +77,10 @@ Tags and effect modes come from the LIFX app. Themes the app does not ship
 carry no tags and use the `blended` static mode. Tags and the non-`blended`
 static modes arrive with a catalogue resync: today every shipped theme is
 `blended` with no tags, so `get_tags()` returns an empty list. An unknown tag,
-category or static mode (such as `grid_static` today) raises `ValueError`, so check `get_tags()` first. Tags
-are spelt as the app spells them (for example `Cozy`) and are matched ignoring
-case and punctuation.
+category or static mode (such as `grid_static` today) raises `ValueError`.
+Check `get_tags()` for tags or `get_categories()` for categories first; today
+only `find(static_mode="blended")` matches. Tags are spelt as the app spells
+them (for example `Cozy`) and are matched ignoring case and punctuation.
 
 ## Compatibility and fidelity
 

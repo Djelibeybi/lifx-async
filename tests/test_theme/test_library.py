@@ -819,6 +819,18 @@ class TestTagDiscovery:
     def test_get_tags_on_an_empty_library(self) -> None:
         assert EmptyLibrary.get_tags() == []
 
+    def test_unknown_tag_on_an_empty_library_says_none(self) -> None:
+        with pytest.raises(ValueError, match=r"Available tags: \(none\)$"):
+            EmptyLibrary.get_by_tag("calm")
+
+    def test_non_string_tag_on_an_empty_library_says_none(self) -> None:
+        with pytest.raises(ValueError, match=r"Available tags: \(none\)$"):
+            EmptyLibrary.get_by_tag(3)  # type: ignore[arg-type]
+
+    def test_unknown_static_mode_on_an_empty_library_says_none(self) -> None:
+        with pytest.raises(ValueError, match=r"Available static modes: \(none\)$"):
+            EmptyLibrary.find(static_mode="blended")
+
     @pytest.mark.parametrize(
         "tag", ["Date night", "date night", "DATE NIGHT", "date_night"]
     )
