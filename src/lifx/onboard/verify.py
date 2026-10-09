@@ -164,7 +164,7 @@ class LanVerification:
         try:
             try:
                 await bounded(self._watcher.__aenter__(), timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raise VerifyTimeoutError(_timed_out(self._serial, timeout)) from None
             return await self._wait(max(0.0, deadline - time.monotonic()))
         finally:
@@ -174,7 +174,7 @@ class LanVerification:
     async def _wait(self, timeout: float) -> LanSighting:
         try:
             await bounded(self._seen.wait(), timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise VerifyTimeoutError(_timed_out(self._serial, timeout)) from None
         finally:
             self.close()

@@ -12,7 +12,6 @@ import asyncio
 from unittest.mock import AsyncMock
 
 from lifx.api import DeviceGroup
-from lifx.const import TIMEOUT_ERRORS
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
@@ -257,7 +256,7 @@ class TestDeviceGroupApplyTheme:
             # (will fail at connection level, but our method works)
             try:
                 await asyncio.wait_for(group.apply_theme(theme), timeout=0.1)
-            except TIMEOUT_ERRORS:
+            except TimeoutError:
                 # Expected - no real devices
                 pass
 

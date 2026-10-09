@@ -202,7 +202,7 @@ class SoftApConnection:
                 ),
                 timeout,
             )
-        except (OSError, asyncio.TimeoutError) as error:
+        except (TimeoutError, OSError) as error:
             raise SoftApUnreachableError(
                 f"No SoftAP reachable at {self._address}:{self._port}: "
                 f"{type(error).__name__}"
@@ -228,7 +228,7 @@ class SoftApConnection:
                 ),
                 self._dial_timeout,
             )
-        except (OSError, asyncio.TimeoutError) as error:
+        except (TimeoutError, OSError) as error:
             raise SoftApDialError(
                 f"Could not dial SoftAP at {self._address}:{self._port} within "
                 f"{self._dial_timeout}s: {type(error).__name__}"

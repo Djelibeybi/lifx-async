@@ -10,13 +10,9 @@ noticed. These two checks close that gap from both ends: the declaration in
 
 from __future__ import annotations
 
+import tomllib
 from importlib.metadata import requires
 from pathlib import Path
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10 lacks the stdlib tomllib module.
-    import tomli as tomllib
 
 DISTRIBUTION = "lifx-async"
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
