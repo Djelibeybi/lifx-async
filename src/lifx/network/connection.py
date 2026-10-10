@@ -129,7 +129,7 @@ class DeviceConnection:
         serial: str,
         ip: str,
         port: int = LIFX_UDP_PORT,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
     ) -> None:
         """Initialize device connection.
@@ -142,11 +142,13 @@ class DeviceConnection:
             ip: Device IP address
             port: Device UDP port (default LIFX_UDP_PORT)
             max_retries: Maximum number of retransmits within the timeout
-                (default: 8). Total transmissions are at most
-                max_retries + 1; after the cap is reached the request keeps
-                listening for a reply until the timeout expires instead of
-                failing early. Whichever of the retransmit cap and the
-                timeout is reached first wins.
+                (default: None, no cap). With no cap the request keeps
+                retransmitting on the gap schedule until the timeout, so a
+                device that wakes late in the budget is still asked again.
+                With a cap, total transmissions are at most max_retries + 1;
+                after the cap is reached the request keeps listening for a
+                reply until the timeout expires instead of failing early.
+                0 sends once and never retransmits.
             timeout: Default timeout for requests in seconds (default: 16.0).
                 The timeout is an overall limit on the whole request: all
                 waiting -- transmissions, retransmit gaps, and the final
@@ -827,11 +829,13 @@ class DeviceConnection:
         single ``asyncio.wait_for`` call -- there is no blind
         ``asyncio.sleep()`` anywhere in this loop.
 
-        ``max_retries`` interaction rule: it caps the number of
-        *retransmits* after the initial send (total transmissions at most
-        ``max_retries + 1``). The deadline caps *time*. Whichever
-        binds first wins -- after the retransmit cap is reached the request
-        keeps listening until the deadline rather than failing early.
+        ``max_retries`` interaction rule: ``None`` (the default) sets no
+        count cap, so retransmits continue on the final gap until the
+        deadline. An integer caps the number of *retransmits* after the
+        initial send (total transmissions at most ``max_retries + 1``). The
+        deadline caps *time*. Whichever binds first wins -- after the
+        retransmit cap is reached the request keeps listening until the
+        deadline rather than failing early.
 
         Correlation contract: one source per logical request, a fresh
         sequence per transmission, all transmissions share ONE response
@@ -879,6 +883,8 @@ class DeviceConnection:
         if timeout is None:
             timeout = self.timeout  # pragma: no cover
 
+        # None here means "use the connection's setting", which may itself
+        # be None: no retransmit cap
         if max_retries is None:
             max_retries = self.max_retries
 
@@ -938,7 +944,9 @@ class DeviceConnection:
             ensure_current_session()
             tx_count = 1
             next_tx_at: float | None = (
-                time.monotonic() + next(gaps, last_gap) if max_retries > 0 else None
+                time.monotonic() + next(gaps, last_gap)
+                if max_retries is None or max_retries > 0
+                else None
             )
 
             while True:
@@ -974,10 +982,15 @@ class DeviceConnection:
                 # whole multi-response set.
                 if next_tx_at is not None and not has_yielded and now >= next_tx_at:
                     ensure_current_session()
-                    sequence = tx_count  # fresh sequence per retransmit
+                    # Fresh sequence per retransmit, wrapping within the
+                    # header's uint8. After a wrap the key is already
+                    # registered against the same queue, so it is not
+                    # tracked twice
+                    sequence = tx_count % 256
                     key = (request_source, sequence, self._serial)
                     self._pending_requests[key] = response_queue  # SAME queue
-                    correlation_keys.append(key)
+                    if tx_count < 256:
+                        correlation_keys.append(key)
                     try:
                         await self.send_packet(
                             request,
@@ -996,7 +1009,7 @@ class DeviceConnection:
                     tx_count += 1
                     next_tx_at = (
                         time.monotonic() + next(gaps, last_gap)
-                        if tx_count <= max_retries
+                        if max_retries is None or tx_count <= max_retries
                         else None
                     )
                     _LOGGER.debug(

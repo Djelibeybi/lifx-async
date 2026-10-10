@@ -42,14 +42,15 @@ DISCOVERY_REBROADCAST_GAPS: Final[tuple[float, ...]] = (0.6, 1.2, 1.8, 2.0, 2.0)
 DEFAULT_REQUEST_TIMEOUT: Final[float] = 16.0
 STATE_REFRESH_DEBOUNCE_MS: Final[int] = 300
 
-# Default maximum number of retry attempts for failed requests
-DEFAULT_MAX_RETRIES: Final[int] = 8
+# Default cap on retransmits per request. None means no count cap: like
+# Photons, a request keeps retransmitting on the gap schedule until its wall
+# deadline, so a device that wakes late in the budget is still asked again
+DEFAULT_MAX_RETRIES: Final[int | None] = None
 
 # Photons-shaped gaps in seconds between successive request transmissions;
 # the first gap floors the first-attempt window (an acked bulb answers
-# within 200 ms); after exhaustion the final gap repeats; retransmits are
-# capped by max_retries and by the caller's wall-time budget, whichever
-# binds first.
+# within 200 ms); after exhaustion the final gap repeats until the caller's
+# wall-time budget runs out, or until max_retries when a caller sets one.
 REQUEST_RETRANSMIT_GAPS: Final[tuple[float, ...]] = (
     0.2,
     0.3,

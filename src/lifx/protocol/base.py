@@ -65,8 +65,8 @@ def _coerce_enum(enum_class: type, raw: int) -> Any:
     """Coerce a raw integer to an enum member, tolerating unknown values.
 
     LIFX devices running firmware newer than the bundled protocol
-    specification can report enum values this library does not yet define
-    (for example a ``DeviceService`` other than ``UDP``). The protocol's
+    specification can report enum values this library does not yet define.
+    The protocol's
     guidance is to ignore unrecognised values rather than fail, so we fall
     back to the raw integer instead of raising ``ValueError``. Equality
     comparisons against known members (e.g. ``service == DeviceService.UDP``)

@@ -889,7 +889,7 @@ class _LifxRecordCache:
 def _create_device_from_record(
     record: _LifxServiceRecord,
     timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> Light | None:
     """Create appropriate device class based on product ID from mDNS record.
 
@@ -1333,7 +1333,7 @@ async def _verify_mdns_candidate(
     *,
     deadline: float,
     device_timeout: float,
-    max_retries: int,
+    max_retries: int | None,
     failure_sink: _MdnsFailureSink | None = None,
 ) -> Device | None:
     """Verify one advertisement with a current correlated LIFX response."""
@@ -1478,7 +1478,7 @@ async def _discover_verified_devices_mdns(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
     failure_sink: _MdnsFailureSink | None = None,
     *,
     _deadline: float | None = None,
@@ -1584,7 +1584,7 @@ async def discover_devices_mdns(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Light, None]:
     """Discover LIFX devices via mDNS and yield device instances.
 

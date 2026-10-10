@@ -334,11 +334,10 @@ async def test_pulse_does_not_filter_white_lights(
 
     # Start effect with mixed lights
     await conductor.start(effect, [mock_light, mock_white_light])
-    await asyncio.sleep(0.05)
 
     # Both lights should have waveform called
-    assert mock_light.set_waveform.called
-    assert mock_white_light.set_waveform.called
+    await wait_for_mock_called(mock_light.set_waveform)
+    await wait_for_mock_called(mock_white_light.set_waveform)
 
     await conductor.stop([mock_light, mock_white_light])
 
@@ -352,7 +351,8 @@ async def test_effect_with_powered_off_light(conductor, mock_light) -> None:
     effect = EffectPulse(mode="blink", cycles=1, period=0.1)
 
     await conductor.start(effect, [mock_light])
-    await asyncio.sleep(0.05)
+    # The effect powers the light on before its first waveform
+    await wait_for_mock_called(mock_light.set_waveform)
 
     # Verify light was powered on
     assert any(call[0][0] is True for call in mock_light.set_power.call_args_list)
@@ -467,11 +467,9 @@ async def test_multiple_lights_parallel(conductor, mock_light) -> None:
 
     # Start effect on all lights
     await conductor.start(effect, lights)
-    await asyncio.sleep(0.05)
-
     # All lights should have waveform called
     for light in lights:
-        assert light.set_waveform.called
+        await wait_for_mock_called(light.set_waveform)
 
     await conductor.stop(lights)
 
