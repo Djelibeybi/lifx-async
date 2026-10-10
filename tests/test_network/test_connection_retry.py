@@ -301,28 +301,34 @@ class TestRetransmitSchedule:
 
     async def test_sequence_wraps_within_uint8(self) -> None:
         """More than 256 transmissions in one request wrap the sequence
-        number rather than overflowing the header's uint8 field."""
-        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=1.5)
+        number rather than overflowing the header's uint8 field.
+
+        A zero gap and a send count, not a short gap and a wall-clock budget,
+        decide how many transmissions happen: Windows timers are too coarse
+        to fit 256 millisecond gaps into any reasonable timeout."""
+        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=30.0)
         sequences: list[int] = []
-        real_send = conn.send_packet
+
+        class _EnoughSendsError(Exception):
+            pass
 
         async def _record(*args: Any, **kwargs: Any) -> None:
             sequences.append(kwargs["sequence"])
-            await real_send(*args, **kwargs)
+            if len(sequences) == 300:
+                raise _EnoughSendsError
 
         try:
             await conn.open()
             with (
                 patch.object(conn, "send_packet", side_effect=_record),
-                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.001,)),
-                pytest.raises(LifxTimeoutError),
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.0,)),
+                pytest.raises(_EnoughSendsError),
             ):
-                await conn.request(Device.GetPower(), timeout=1.5)
+                await conn.request(Device.GetPower(), timeout=30.0)
         finally:
             await conn.close()
-        assert len(sequences) > 256
-        assert max(sequences) == 255
-        assert sequences[256] == 0
+        assert sequences[:256] == list(range(256))
+        assert sequences[256:] == list(range(44))
 
     async def test_direct_impl_call_explicit_max_retries_zero(self) -> None:
         """Direct ``_request_stream_impl`` call with ``max_retries=0``:
