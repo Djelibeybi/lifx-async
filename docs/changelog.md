@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.10.1 (2026-10-10)
+
+### Bug Fixes
+
+- **network**: Keep retransmitting until the request deadline
+  ([#290](https://github.com/Djelibeybi/lifx-async/pull/290),
+  [`403c9ea`](https://github.com/Djelibeybi/lifx-async/commit/403c9ea8ce41e270aa5a90db7962b167eba2a8e4))
+
+
 ## v7.10.0 (2026-10-09)
 
 ### Features
