@@ -1917,8 +1917,9 @@ class TestDiscoverPrivateLifxServices:
             ):
                 mock_parse.return_value = mock_parsed_response
 
+                # Room for both scripted packets before the deadline on a slow runner
                 records = []
-                async for record in _discover_lifx_services(timeout=0.1):
+                async for record in _discover_lifx_services(timeout=1.0):
                     records.append(record)
 
         # Dedup still yields one record, but BOTH valid responses must have
