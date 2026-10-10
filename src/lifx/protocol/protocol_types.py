@@ -19,6 +19,16 @@ class DeviceService(IntEnum):
 
     UDP = 1
 
+    @classmethod
+    def _missing_(cls, value: object) -> DeviceService | None:
+        """Represent a value the protocol does not document."""
+        if not isinstance(value, int) or not 0 <= value <= 0xFF:
+            return None
+        member = int.__new__(cls, value)
+        member._name_ = f"UNKNOWN_{value}"
+        member._value_ = value
+        return member
+
 
 class Direction(IntEnum):
     """Auto-generated enum."""

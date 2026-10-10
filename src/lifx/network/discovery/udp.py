@@ -536,9 +536,9 @@ async def _discover_with_packet(
                 # GetService discovery: a device advertises one StateService per
                 # service it supports, but only UDP carries an address we can
                 # talk to. Ignore the others so they neither claim the serial
-                # (first-wins dedup) nor supply a non-UDP port. The deserialiser
-                # tolerates service values from newer firmware (falls back to a
-                # raw int), so the comparison stays correct for unknown values.
+                # (first-wins dedup) nor supply a non-UDP port. DeviceService is
+                # an open enum, so a reserved or undocumented service unpacks to
+                # a pseudo-member and the comparison stays correct.
                 if isinstance(response_packet, DevicePackets.StateService):
                     if response_packet.service != DeviceService.UDP:
                         _LOGGER.debug(

@@ -267,6 +267,10 @@ def apply_tile_effect_parameter_quirk(
 #: legitimately sent.
 OPEN_ENUMS: frozenset[str] = frozenset(
     {
+        # Bulbs advertise the reserved services 2-5 alongside UDP in every
+        # StateService reply. Discovery keeps only UDP, so any other value is
+        # expected and dropped, never worth logging as unknown.
+        "DeviceService",
         # LIFX say effect replies are polymorphic by effect type and should not
         # be relied on until they rebuild the effect messages, so an effect
         # reply must never raise on a value the protocol does not list.

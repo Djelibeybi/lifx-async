@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 from unittest.mock import patch
 
+import pytest
+
 from lifx.protocol import packets
 from lifx.protocol.base import Packet
 from lifx.protocol.protocol_types import DeviceService
@@ -32,13 +34,19 @@ class _ArrayEnumPacket(Packet):
 class TestArrayEnumDeserialisation:
     """Array-of-enums fields tolerate values outside the known enum."""
 
-    def test_unpack_array_of_enums_tolerates_unknown(self) -> None:
-        # Two service bytes: UDP(1) known, 5 unknown.
-        pkt = _ArrayEnumPacket.unpack(b"\x01\x05")
+    def test_unpack_array_of_enums_tolerates_unknown(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Two service bytes: UDP(1) known, and 5, which the protocol reserves
+        # and bulbs advertise in every StateService reply.
+        with caplog.at_level(logging.DEBUG, logger="lifx.protocol.base"):
+            pkt = _ArrayEnumPacket.unpack(b"\x01\x05")
         assert isinstance(pkt, _ArrayEnumPacket)
         assert pkt.services[0] == DeviceService.UDP
-        # Unknown value falls back to the raw int instead of raising.
+        # DeviceService is open: the value becomes a pseudo-member silently
         assert pkt.services[1] == 5
+        assert isinstance(pkt.services[1], DeviceService)
+        assert "Unknown" not in caplog.text
 
 
 class TestPacketUnpackDebugGuard:
