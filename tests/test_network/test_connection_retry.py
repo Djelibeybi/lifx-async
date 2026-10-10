@@ -237,6 +237,93 @@ class TestRetransmitSchedule:
             gap = send_times[i] - send_times[i - 1]
             assert 0.03 <= gap <= 0.3
 
+    async def test_default_retransmits_until_deadline(self) -> None:
+        """With no max_retries the schedule runs to the wall deadline, so the
+        last transmission lands within one final gap of it rather than the
+        request sitting out the end of its budget in silence."""
+        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.5)
+        send_times: list[float] = []
+        try:
+            await conn.open()
+            start = time.monotonic()
+            with (
+                patch.object(
+                    conn, "send_packet", side_effect=_send_spy(conn, send_times)
+                ),
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.02,)),
+                pytest.raises(LifxTimeoutError),
+            ):
+                await conn.request(Device.GetPower(), timeout=0.5)
+        finally:
+            await conn.close()
+        assert len(send_times) > 10
+        assert send_times[-1] - start >= 0.4
+
+    async def test_device_silent_past_early_schedule_still_answered(self) -> None:
+        """A device that drops everything for longer than the early gaps, then
+        answers the next request it hears, completes within the budget.
+
+        This is the shape of home-assistant/core#185628: with a retransmit cap
+        every send went out in the first few gaps and a bulb that came back
+        later was never asked again, so the request timed out unanswered."""
+        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=1.0)
+        silence = 0.6
+        real_send = conn.send_packet
+        start = time.monotonic()
+
+        async def _wakes_late(*args: Any, **kwargs: Any) -> None:
+            await real_send(*args, **kwargs)
+            if time.monotonic() - start < silence:
+                return
+            key = (kwargs["source"], kwargs["sequence"], conn._serial)
+            header = _header(
+                source=kwargs["source"],
+                sequence=kwargs["sequence"],
+                target=bytes.fromhex(conn.serial) + b"\x00\x00",
+                pkt_type=_STATE_POWER_PKT_TYPE,
+                payload_len=len(_STATE_POWER_PAYLOAD),
+            )
+            conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
+
+        try:
+            await conn.open()
+            start = time.monotonic()
+            with (
+                patch.object(conn, "send_packet", side_effect=_wakes_late),
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.05,)),
+            ):
+                response = await conn.request(Device.GetPower(), timeout=1.0)
+            elapsed = time.monotonic() - start
+        finally:
+            await conn.close()
+        assert hasattr(response, "level")
+        assert silence <= elapsed < 0.9
+
+    async def test_sequence_wraps_within_uint8(self) -> None:
+        """More than 256 transmissions in one request wrap the sequence
+        number rather than overflowing the header's uint8 field."""
+        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=1.5)
+        sequences: list[int] = []
+        real_send = conn.send_packet
+
+        async def _record(*args: Any, **kwargs: Any) -> None:
+            sequences.append(kwargs["sequence"])
+            await real_send(*args, **kwargs)
+
+        try:
+            await conn.open()
+            with (
+                patch.object(conn, "send_packet", side_effect=_record),
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.001,)),
+                pytest.raises(LifxTimeoutError),
+            ):
+                await conn.request(Device.GetPower(), timeout=1.5)
+        finally:
+            await conn.close()
+        assert len(sequences) > 256
+        assert max(sequences) == 255
+        assert sequences[256] == 0
+
     async def test_direct_impl_call_explicit_max_retries_zero(self) -> None:
         """Direct ``_request_stream_impl`` call with ``max_retries=0``:
         exactly 1 send, single-shot semantics."""

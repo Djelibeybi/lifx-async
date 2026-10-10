@@ -582,7 +582,7 @@ class Device(Generic[StateT]):
         ip: str,
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
         fetch_thread_info: bool = False,
@@ -596,7 +596,8 @@ class Device(Generic[StateT]):
             ip: Device IP address
             port: Device UDP port
             timeout: Overall timeout for network requests in seconds
-            max_retries: Maximum number of retry attempts for network requests
+            max_retries: Maximum number of retransmits per network request
+                (default: None, retransmit until the timeout)
             fetch_wifi_info: Query the device for WiFi signal strength whenever
                 state is initialized or refreshed. When False (the default),
                 ``state.wifi_info`` has None for signal and rssi, but rssi_unit
@@ -730,7 +731,7 @@ class Device(Generic[StateT]):
         port: int = LIFX_UDP_PORT,
         serial: str | None = None,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
         fetch_thread_info: bool = False,
@@ -834,7 +835,7 @@ class Device(Generic[StateT]):
         serial: str | None = None,
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
         fetch_thread_info: bool = False,

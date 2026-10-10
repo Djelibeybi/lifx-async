@@ -71,7 +71,7 @@ class ComponentMatrixLight(MatrixLight):
         ip: str,
         port: int = LIFX_UDP_PORT,
         timeout: float = DEFAULT_REQUEST_TIMEOUT,
-        max_retries: int = DEFAULT_MAX_RETRIES,
+        max_retries: int | None = DEFAULT_MAX_RETRIES,
         *,
         fetch_wifi_info: bool = False,
         fetch_thread_info: bool = False,

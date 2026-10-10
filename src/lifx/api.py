@@ -1156,7 +1156,7 @@ async def discover(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices and yield them as they are found.
 
@@ -1306,7 +1306,7 @@ async def discover_udp(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via UDP and yield them as they are found.
 
@@ -1362,7 +1362,7 @@ async def discover_mdns(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via mDNS and yield them as they are found.
 
@@ -1437,7 +1437,7 @@ async def _race_serial_sources(
     max_response_time: float,
     idle_timeout_multiplier: float,
     device_timeout: float,
-    max_retries: int,
+    max_retries: int | None,
 ) -> Device | None:
     """Return the first exact serial match after both source legs are reaped."""
     validate_address(broadcast_address)
@@ -1555,7 +1555,7 @@ async def find_by_serial(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> Device | None:
     """Find a specific device by serial number.
 
@@ -1619,7 +1619,7 @@ async def find_by_ip(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> Device | None:
     """Find a LIFX device by IP address.
 
@@ -1692,7 +1692,7 @@ async def find_by_label(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[Device]:
     """Find LIFX devices by label (name).
 

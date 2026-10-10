@@ -104,7 +104,7 @@ class DiscoveredDevice:
     ip: str
     port: int = LIFX_UDP_PORT
     timeout: float = DEFAULT_REQUEST_TIMEOUT
-    max_retries: int = DEFAULT_MAX_RETRIES
+    max_retries: int | None = DEFAULT_MAX_RETRIES
     first_seen: float = field(default_factory=time.time)
     response_time: float = 0.0
     _construction_connections: dict[asyncio.Task[Any], DeviceConnection] = field(
@@ -693,7 +693,7 @@ async def discover_devices(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
 ) -> AsyncGenerator[DiscoveredDevice, None]:
     """Discover LIFX devices on the local network.
 
@@ -780,7 +780,7 @@ async def discover_devices_shared(
     max_response_time: float = MAX_RESPONSE_TIME,
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
-    max_retries: int = DEFAULT_MAX_RETRIES,
+    max_retries: int | None = DEFAULT_MAX_RETRIES,
     *,
     _caller_deadline: float | None = None,
     _observer: _DiscoveryObserver | None = None,
