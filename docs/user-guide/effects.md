@@ -93,17 +93,17 @@ async def main():
 asyncio.run(main())
 ```
 
-Each step lasts `period * change / 360` seconds: 1.67 seconds in the example above. A colour
+Each step lasts `period * change / 360` seconds: 1.67 seconds in the example above. A color
 loop writes each light once per step, with the step as the transition, and the light fades
 between steps itself. With the defaults that is one packet every 3.3 seconds per light, far less
-traffic than an effect that draws frames, so a colour loop runs on Thread lights without
+traffic than an effect that draws frames, so a color loop runs on Thread lights without
 `enable_thread`. `change` must be more than 0 and less than 180, because the firmware fades hue
-the short way round the colour wheel.
+the short way round the color wheel.
 
-On one light component of a Ceiling or Mirror, a colour loop writes the same way while it has the
+On one light component of a Ceiling or Mirror, a color loop writes the same way while it has the
 light to itself. The two light components share one tile. While another effect draws on the other
-light component, that effect's frames carry the colour loop's colour, and the colour loop sends
-nothing itself. While a fade you asked of the other light component runs, the colour loop draws
+light component, that effect's frames carry the color loop's color, and the color loop sends
+nothing itself. While a fade you asked of the other light component runs, the color loop draws
 frames so the fade shows. On a Thread light it goes on writing once per step, and each write
 carries the other light component as far through its fade as it will be when the step ends, so the
 firmware follows that fade a step at a time.
@@ -140,7 +140,7 @@ asyncio.run(main())
 ```
 
 !!! info "On a Mirror ring"
-    The rainbow closes on itself round a Mirror ring: the pixel before the ring origin (top centre by default) is one step of hue short of it, so there is
+    The rainbow closes on itself round a Mirror ring: the pixel before the ring origin (top center by default) is one step of hue short of it, so there is
     no seam and it keeps circulating.
 
 ### Flicker Effect
@@ -168,7 +168,7 @@ await conductor.stop(lights)
 ```
 
 !!! info "On a Mirror ring"
-    Each flicker wave holds a whole number of cycles round a Mirror ring, so the ring origin (top centre by default) flickers in step with
+    Each flicker wave holds a whole number of cycles round a Mirror ring, so the ring origin (top center by default) flickers in step with
     zone 24 and there is no seam.
 
 ### Aurora Effect
@@ -192,11 +192,11 @@ await conductor.stop(lights)
 
 !!! info "On a Mirror ring"
     The brightness bands hold two whole cycles round a Mirror ring instead of one and a half, so the bands
-    meet at the ring origin (top centre by default) with no seam. Strips and matrix lights keep the original pattern.
+    meet at the ring origin (top center by default) with no seam. Strips and matrix lights keep the original pattern.
 
 ### Progress Bar Effect
 
-The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams) and on a Mirror. The filled region has a traveling bright spot, and you update the position at any time. On a Mirror, whole or either ring alone, progress keeps a seam at the ring origin (top centre by default): the bar fills from the ring origin exactly as it does on a strip.
+The `EffectProgress` creates an animated progress bar on multizone lights (strips/beams) and on a Mirror. The filled region has a traveling bright spot, and you update the position at any time. On a Mirror, whole or either ring alone, progress keeps a seam at the ring origin (top center by default): the bar fills from the ring origin exactly as it does on a strip.
 
 ```python
 from lifx.effects import EffectProgress
@@ -639,7 +639,7 @@ await conductor.stop(lights)
 **Key parameters:** `speed` (seconds per sweep), `width` (eye width in bulbs), `hue`, `trail` (decay factor 0-1)
 
 !!! info "On a Mirror ring"
-    The eye bounces between the ring origin (top centre by default) and the ring's last pixel exactly as on a strip, keeping a seam at the ring origin.
+    The eye bounces between the ring origin (top center by default) and the ring's last pixel exactly as on a strip, keeping a seam at the ring origin.
 
 
 ### Wave
@@ -664,7 +664,7 @@ await conductor.start(effect, lights)
 
 !!! info "On a Mirror ring"
     A standing wave on a ring has an even number of nodes, so an odd `nodes` is raised by one and the
-    zones are spaced evenly round the ring. The wave has no seam at the ring origin (top centre by default).
+    zones are spaced evenly round the ring. The wave has no seam at the ring origin (top center by default).
 
 
 ### Sine
@@ -689,7 +689,7 @@ await conductor.start(effect, lights)
 
 !!! info "On a Mirror ring"
     The wave holds a whole number of cycles round the ring (the nearest to `1 / wavelength`, at least one), so
-    the humps roll on past the ring origin (top centre by default) with no seam. A `hue2` gradient runs out from the ring origin and back, so it closes too.
+    the humps roll on past the ring origin (top center by default) with no seam. A `hue2` gradient runs out from the ring origin and back, so it closes too.
 
 
 ### Spectrum Sweep
@@ -729,7 +729,7 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (rotation period), `bulb_offset` (per-zone hue shift for shimmer)
 
 !!! info "On a Mirror ring"
-    The palette closes without repeating a colour and the shimmer folds about the ring origin (top centre by default), so there is no seam.
+    The palette closes without repeating a color and the shimmer folds about the ring origin (top center by default), so there is no seam.
 
 
 ### Twinkle
@@ -753,7 +753,7 @@ await conductor.start(effect, lights)
 **Key parameters:** `speed` (fade duration), `density` (sparkle probability per frame), `hue`, `saturation`
 
 !!! info "On a Mirror ring"
-    Each zone sparkles on its own and never looks at its neighbours, so a ring has no seam to hide.
+    Each zone sparkles on its own and never looks at its neighbors, so a ring has no seam to hide.
 
 
 ### Embers
@@ -762,7 +762,7 @@ await conductor.start(effect, lights)
 
 Fire simulation via 1D heat diffusion — heat injected at the bottom, diffuses upward with cooling and turbulence.
 
-On a Mirror, whole or either ring alone, embers is seamless: heat that rises off the last zone comes round to the ring origin (top centre by default) and spreads across the join. Any other matrix light is still refused.
+On a Mirror, whole or either ring alone, embers is seamless: heat that rises off the last zone comes round to the ring origin (top center by default) and spreads across the join. Any other matrix light is still refused.
 
 ```python
 from lifx.effects import EffectEmbers
@@ -779,7 +779,7 @@ await conductor.start(effect, lights)
 
 Plasma ball — bright core pulsing at center with electric tendrils crackling outward. Tendrils random-walk and fork.
 
-On a Mirror, whole or either ring alone, plasma is seamless: the glow is measured the short way round and a tendril that reaches one end lights the other side of the join, so the colour field closes on itself. Any other matrix light is still refused.
+On a Mirror, whole or either ring alone, plasma is seamless: the glow is measured the short way round and a tendril that reaches one end lights the other side of the join, so the color field closes on itself. Any other matrix light is still refused.
 
 ```python
 from lifx.effects import EffectPlasma
@@ -801,7 +801,7 @@ await conductor.start(effect, lights)
 
 Pendulums with linearly varying periods drift in and out of phase, creating traveling waves, standing waves, and chaos before realigning.
 
-On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from the ring origin (top centre by default). The pattern is then mirror-symmetric about it and meets itself with no jump. The default, `seamless=False`, draws as on a strip, with a seam at the ring origin. The option is ignored on a strip or bulb.
+On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from the ring origin (top center by default). The pattern is then mirror-symmetric about it and meets itself with no jump. The default, `seamless=False`, draws as on a strip, with a seam at the ring origin. The option is ignored on a strip or bulb.
 
 ```python
 from lifx.effects import EffectPendulumWave
@@ -818,7 +818,7 @@ await conductor.start(effect, lights)
 
 Young's double slit interference — two coherent wave sources create constructive/destructive interference fringes that shift as wavelength breathes.
 
-On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from the ring origin (top centre by default). The fringes are then mirror-symmetric about it and meet themselves with no jump. The default, `seamless=False`, draws as on a strip, with a seam at the ring origin. The option is ignored on a strip or bulb.
+On a Mirror, whole or either ring alone, pass `seamless=True` to draw each pixel at its ring distance from the ring origin (top center by default). The fringes are then mirror-symmetric about it and meet themselves with no jump. The default, `seamless=False`, draws as on a strip, with a seam at the ring origin. The option is ignored on a strip or bulb.
 
 ```python
 from lifx.effects import EffectDoubleSlit
@@ -835,7 +835,7 @@ await conductor.start(effect, lights)
 
 Wolfram's Rule 30 cellular automaton — generates chaotic/pseudo-random patterns. Configurable seed modes: center, random, or all.
 
-On a Mirror, whole or either ring alone, rule30 is seamless: the automaton treats the ring as periodic, so there is no edge at the ring origin (top centre by default).
+On a Mirror, whole or either ring alone, rule30 is seamless: the automaton treats the ring as periodic, so there is no edge at the ring origin (top center by default).
 
 ```python
 from lifx.effects import EffectRule30
@@ -857,7 +857,7 @@ await conductor.start(effect, lights)
 
 Three independent cellular automata running at irrational speed ratios, blended via Oklab. Produces evolving color interference patterns.
 
-On a Mirror, whole or either ring alone, rule trio is seamless: each automaton treats the ring as periodic, so there is no edge at the ring origin (top centre by default).
+On a Mirror, whole or either ring alone, rule trio is seamless: each automaton treats the ring as periodic, so there is no edge at the ring origin (top center by default).
 
 ```python
 from lifx.effects import EffectRuleTrio
@@ -874,7 +874,7 @@ await conductor.start(effect, lights)
 
 Rockets launch from both ends, ascend with easing, and burst into expanding gaussian halos. Color evolves from white through chemical colors to orange.
 
-On a Mirror, whole or either ring alone, fireworks is seamless: bursts and trails take the short way round, so a burst near the ring origin (top centre by default) spreads onto the pixel before it.
+On a Mirror, whole or either ring alone, fireworks is seamless: bursts and trails take the short way round, so a burst near the ring origin (top center by default) spreads onto the pixel before it.
 
 ```python
 from lifx.effects import EffectFireworks
@@ -891,7 +891,7 @@ await conductor.start(effect, lights)
 
 Ripple tank — raindrops hit a water surface, launching wavefronts that propagate, reflect, and interfere. Displacement maps to color via Oklab.
 
-On a Mirror, whole or either ring alone, ripple is seamless: the surface closes on itself, so waves travel round the ring and cross the ring origin (top centre by default) with no jump. On a strip the ends stay fixed and waves reflect off them.
+On a Mirror, whole or either ring alone, ripple is seamless: the surface closes on itself, so waves travel round the ring and cross the ring origin (top center by default) with no jump. On a strip the ends stay fixed and waves reflect off them.
 
 ```python
 from lifx.effects import EffectRipple
@@ -908,7 +908,7 @@ await conductor.start(effect, lights)
 
 Electric arcs drift along the strip with flickering, crackling spikes, and electrode glows. Inspired by Frankenstein lab props.
 
-On a Mirror, whole or either ring alone, Jacob's Ladder keeps a seam at the ring origin (top centre by default): the arcs climb from it as they do on a strip.
+On a Mirror, whole or either ring alone, Jacob's Ladder keeps a seam at the ring origin (top center by default): the arcs climb from it as they do on a strip.
 
 ```python
 from lifx.effects import EffectJacobsLadder
@@ -925,7 +925,7 @@ await conductor.start(effect, lights)
 
 Newton's cradle momentum transfer — steel balls swing alternately with Phong sphere shading and specular highlights.
 
-On a Mirror, whole or either ring alone, Newton's Cradle keeps a seam at the ring origin (top centre by default): the end balls stay at the ends, as on a strip.
+On a Mirror, whole or either ring alone, Newton's Cradle keeps a seam at the ring origin (top center by default): the end balls stay at the ends, as on a strip.
 
 ```python
 from lifx.effects import EffectNewtonsCradle
@@ -942,7 +942,7 @@ await conductor.start(effect, lights)
 
 Sonar/radar pulses bounce off drifting obstacles. Wavefronts emit from sources, reflect off obstacles, and decay with tails.
 
-On a Mirror, whole or either ring alone, sonar keeps a seam at the ring origin (top centre by default): pings start from it as they do on a strip.
+On a Mirror, whole or either ring alone, sonar keeps a seam at the ring origin (top center by default): pings start from it as they do on a strip.
 
 ```python
 from lifx.effects import EffectSonar
@@ -996,15 +996,15 @@ All ported effects run indefinitely until stopped via `conductor.stop()`.
 ## Firmware Move effect
 
 Move runs on the strip's own firmware: the library sends one packet and the strip animates
-itself, so there is no Conductor and no Animator involved. Move rotates whichever colours are
+itself, so there is no Conductor and no Animator involved. Move rotates whichever colors are
 already on the strip rather than carrying a palette of its own.
 
-`set_move_effect()` gives a single-colour strip something to move. When every zone shows one
-colour, it generates a three-colour palette and passes it to `apply_theme()` before Move starts.
-A strip that already shows more than one colour is left as it is. A `palette=` argument you
-supply is passed to `apply_theme()` unchanged, without first reading the strip's own colours
+`set_move_effect()` gives a single-color strip something to move. When every zone shows one
+color, it generates a three-color palette and passes it to `apply_theme()` before Move starts.
+A strip that already shows more than one color is left as it is. A `palette=` argument you
+supply is passed to `apply_theme()` unchanged, without first reading the strip's own colors
 through `get_all_color_zones()`. `apply_theme()` shuffles the palette and blends between its
-colours across the zones, so the strip shows a blend of the palette rather than each colour in
+colors across the zones, so the strip shows a blend of the palette rather than each color in
 the order given.
 
 Both examples below assume a connected `MultiZoneLight` bound to `light`. The one-call typed

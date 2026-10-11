@@ -21,9 +21,9 @@ async def apply_evening_mode():
 
 ### One Theme, Per-Device-Type Rendering
 
-`group.lights` holds every colour-capable device, including strips and matrix
+`group.lights` holds every color-capable device, including strips and matrix
 devices, and `apply_theme()` dispatches polymorphically: single-zone lights get
-a random colour, multizone lights get distributed colours, and matrix and
+a random color, multizone lights get distributed colors, and matrix and
 ceiling devices get a smooth interpolation. Painting `group.multizone_lights`
 or `group.matrix_lights` as well would paint those devices a second time.
 
@@ -265,7 +265,7 @@ async def activate_scene(scene: str):
         room_lights = groups[room]
         theme = ThemeLibrary.get(theme_name)
 
-        # Every colour-capable device in the room, painted exactly once
+        # Every color-capable device in the room, painted exactly once
         await room_lights.apply_theme(theme, power_on=True, duration=1.5)
 
 # Usage:
@@ -308,8 +308,8 @@ Moods use the app's own timings and rules:
 - The change fades in over 0.3 seconds.
 - `apply_mood()` powers lights on only when every targeted light is off.
   `animate_mood()` turns on every light it targets.
-- The mood is rescaled so its brightest colour matches the light's
-  brightness. So are the colours an animation steps through; bulbs in one
+- The mood is rescaled so its brightest color matches the light's
+  brightness. So are the colors an animation steps through; bulbs in one
   `DeviceGroup` share a loop rescaled to the brightest of them.
 - Calling `apply_mood()` on a light that is already running a mood effect
   restarts that effect with the new theme.
@@ -318,8 +318,8 @@ Moods use the app's own timings and rules:
 
 What a mood does depends on the light:
 
-- **Bulbs** show one of the theme's colours. Animated, they run a Colour Loop
-  through the theme's colours, and bulbs in one `DeviceGroup` share one loop.
+- **Bulbs** show one of the theme's colors. Animated, they run a Color Loop
+  through the theme's colors, and bulbs in one `DeviceGroup` share one loop.
 - **Strips** show the mood across their zones. Animated, they run firmware
   MOVE after painting the still image.
 - **Matrix lights** show the mood's image. Animated, a MORPH mood runs
@@ -328,7 +328,7 @@ What a mood does depends on the light:
 - **Spot, Path and the Mirror** use firmware MORPH for every mood. The Mirror
   is painted as a single matrix light over its 4x13 buffer, not ring by ring.
 - **Every Candle, the Tube and the Mirror** paint stripe moods as bands along
-  the long axis, with the first colour at the bottom. On every Candle and the
+  the long axis, with the first color at the bottom. On every Candle and the
   Tube, a MOVE stripe mood scrolls the bands down the light; blended and grid
   moods scroll sideways. The Mirror runs MORPH instead.
 - **A Tile chain** is painted and scrolled as one canvas in chain order,
