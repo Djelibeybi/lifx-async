@@ -85,6 +85,24 @@ the effect on either light component; stopping a light component stops only
 that light component's effect. _Avoid_: cancelling (that leaves the prior
 state unrestored).
 
+**Theme**:
+A palette of colours, either named in the theme library or built by the caller.
+Painting a theme blends its colours across the light.
+
+**Mood**:
+A theme painted the way the LIFX app paints it: the theme chooses the recipe,
+and the colours are scaled to the light's brightness. Animating a mood starts
+the effect the app's Dynamic toggle starts.
+
+**Current theme**, **current mood**:
+The theme a light was last painted with as a theme, or as a mood, for as long as
+the light still shows exactly the colours it was painted with. A light has at
+most one of the two, and only as a whole light, never per light component.
+Turning the light off keeps it. A software effect playing the mood keeps it
+while it runs, and so does firmware Morph between its colours. Firmware Move
+ends it, because the light no longer reports what it shows in a form that can
+be checked.
+
 **Brightness inference**:
 Choosing turn-on brightness when no colour is supplied: use suitable stored
 brightness first, otherwise the other light component's brightness, then the
