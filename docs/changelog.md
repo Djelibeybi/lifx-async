@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.11.0 (2026-10-11)
+
+### Features
+
+- **themes**: Track the current theme and mood on strips and matrix lights
+  ([#299](https://github.com/Djelibeybi/lifx-async/pull/299),
+  [`fd24578`](https://github.com/Djelibeybi/lifx-async/commit/fd24578e68c983fe8dcbc1696c38ebe14f5774c8))
+
+
 ## v7.10.1 (2026-10-10)
 
 ### Bug Fixes
