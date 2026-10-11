@@ -83,6 +83,9 @@ class FakeRunner:
     def runs_mood_effect(self, light: object) -> bool:
         return self.mood_running
 
+    def mood_run(self, light: object) -> object | None:
+        return None
+
     def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> EffectScroll:
         return EffectScroll(frame=frame, vertical=vertical)
 
@@ -207,7 +210,10 @@ class TestMatrixMorph:
         await light.animate_mood(MORPH_THEME)
         light._paint_mood.assert_not_awaited()
         light.set_effect.assert_awaited_once_with(
-            FirmwareEffect.MORPH, speed=MOOD_MORPH_SPEED_SECONDS, palette=[RED, GREEN]
+            FirmwareEffect.MORPH,
+            speed=MOOD_MORPH_SPEED_SECONDS,
+            duration=0,
+            palette=[RED, GREEN],
         )
         assert light._mood_prestate is runner.prestate
 

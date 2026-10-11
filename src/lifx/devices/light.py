@@ -182,6 +182,10 @@ class Light(Device[LightState]):
         """Forget the theme or mood this light was painted with."""
         self._paint_record = None
 
+    def _adopt_paint_record(self, record: PaintRecord | None) -> None:
+        """Put back a paint record captured before an effect, after its restore."""
+        self._paint_record = record
+
     async def start_effect(
         self, effect: LIFXEffect, *, enable_thread: bool = False
     ) -> None:

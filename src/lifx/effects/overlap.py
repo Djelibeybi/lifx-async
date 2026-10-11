@@ -97,6 +97,7 @@ def inherit_components(
             color=captured.color,
             zone_colors=captured.zone_colors,
             tile_colors=tile_colors,
+            paint_record=captured.paint_record,
             stored_colors=(
                 {
                     name: (

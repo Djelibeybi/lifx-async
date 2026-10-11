@@ -57,13 +57,20 @@ class PaintRecord:
             pixels in the order the light stores them (after any orientation
             remapping), quantised to uint16. Empty for a strip.
 
-    Later tickets add the fields Morph and a software run need beside these.
+        morph: The palette sent to firmware Morph, quantised to uint16 and
+            sorted, so it compares as a multiset. ``None`` unless the record
+            is a Morph one.
+        run: The software effect running the mood, for a record kept alive by
+            a run rather than by colours. ``None`` unless the record is a
+            software-run one.
     """
 
     kind: PaintKind
     slug: str
     colours: tuple[WireColour, ...] = ()
     tiles: tuple[tuple[WireColour, ...], ...] = ()
+    morph: tuple[WireColour, ...] | None = None
+    run: object | None = None
 
     def matches_zones(self, zones: Iterable[HSBK]) -> bool:
         """Whether every zone still shows what was written."""
@@ -72,6 +79,10 @@ class PaintRecord:
     def matches_tiles(self, tiles: Iterable[Iterable[HSBK]]) -> bool:
         """Whether every pixel of every tile still shows what was written."""
         return tuple(tuple(to_wire(c) for c in tile) for tile in tiles) == self.tiles
+
+    def matches_morph(self, palette: Iterable[HSBK]) -> bool:
+        """Whether a Morph palette holds the colours that were sent, in any order."""
+        return tuple(sorted(to_wire(c) for c in palette)) == self.morph
 
 
 class PaintTracking:
@@ -166,6 +177,33 @@ class PaintTracking:
             tiles=tuple(tuple(to_wire(c) for c in tile) for tile in tiles),
         )
 
+    def _record_morph(
+        self, kind: PaintKind, theme: Theme, palette: Iterable[HSBK]
+    ) -> None:
+        """Remember a firmware Morph started from a theme.
+
+        ``palette`` is the palette actually sent (rescaled to brightness and
+        reduced to what Morph carries), never the theme's raw colours.
+        """
+        if theme.slug is None:
+            self._clear_paint_record()
+            return
+        self._paint_record = PaintRecord(
+            kind=kind,
+            slug=theme.slug,
+            morph=tuple(sorted(to_wire(c) for c in palette)),
+        )
+
+    def _record_run(self, kind: PaintKind, theme: Theme, run: object) -> None:
+        """Remember a mood a software effect run is animating.
+
+        The record holds only while ``run`` is the effect running on the light.
+        """
+        if theme.slug is None:
+            self._clear_paint_record()
+            return
+        self._paint_record = PaintRecord(kind=kind, slug=theme.slug, run=run)
+
     async def _verify_paint(self) -> None:
         """Read the light and clear the record if it no longer matches."""
         raise NotImplementedError  # pragma: no cover - supplied by the light
@@ -181,16 +219,5 @@ class PaintTracking:
             record is not None
             and self._paint_record is record
             and not record.matches_zones(zones)
-        ):
-            self._clear_paint_record()
-
-    def _check_tile_paint(
-        self, record: PaintRecord | None, tiles: Iterable[Iterable[HSBK]]
-    ) -> None:
-        """Clear ``record`` if ``tiles`` differ from it. See :meth:`_check_paint`."""
-        if (
-            record is not None
-            and self._paint_record is record
-            and not record.matches_tiles(tiles)
         ):
             self._clear_paint_record()

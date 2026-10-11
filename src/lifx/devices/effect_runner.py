@@ -98,6 +98,14 @@ class EffectRunner(Protocol):
         """Whether a mood software effect runs on a whole light."""
         ...
 
+    def mood_run(self, light: Light) -> object | None:
+        """The mood software effect running on a whole light, if any.
+
+        The very object the light started, so a record kept alive by that run
+        can tell it from a later one.
+        """
+        ...
+
     def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
         """The effect that scrolls a painted matrix mood."""
         ...

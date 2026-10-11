@@ -976,10 +976,16 @@ class _LightEffects:
 
     def runs_mood_effect(self, light: Light) -> bool:
         """Whether a mood software effect runs on a whole light."""
+        return self.mood_run(light) is not None
+
+    def mood_run(self, light: Light) -> object | None:
+        """The mood software effect running on a whole light, if any."""
         effect = Conductor._whole_light_effect(light)
-        return isinstance(effect, EffectScroll) or (
+        if isinstance(effect, EffectScroll) or (
             isinstance(effect, EffectColorloop) and effect.palette is not None
-        )
+        ):
+            return effect
+        return None
 
     def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
         """The effect that scrolls a painted matrix mood."""
