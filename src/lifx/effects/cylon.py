@@ -71,7 +71,7 @@ class EffectCylon(FrameEffect):
         brightness: Peak eye brightness (0.0-1.0)
         background_brightness: Background brightness (0.0-1.0)
         trail: Trail decay factor (0.0=no trail, 1.0=max trail)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
 
     Example:
@@ -108,7 +108,7 @@ class EffectCylon(FrameEffect):
             brightness: Peak eye brightness 0.0-1.0 (default 0.8)
             background_brightness: Background brightness 0.0-1.0 (default 0.0)
             trail: Trail decay factor 0.0-1.0 (default 0.5)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

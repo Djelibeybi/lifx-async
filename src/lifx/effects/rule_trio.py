@@ -195,7 +195,7 @@ class EffectRuleTrio(FrameEffect):
         drift_c: Speed multiplier for CA C relative to A
         theme: Theme providing three colors for the CAs
         brightness: Alive-cell brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Physical zones per logical bulb
 
     Example:
@@ -244,7 +244,7 @@ class EffectRuleTrio(FrameEffect):
                 three distinct colors is cycled to fill them. When None,
                 uses ThemeLibrary.get("exciting").
             brightness: Alive-cell brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

@@ -101,7 +101,7 @@ class EffectNewtonsCradle(FrameEffect):
         saturation: Ball base saturation (0.0-1.0)
         brightness: Maximum ball brightness (0.0-1.0)
         shininess: Phong specular exponent (1-100)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Physical zones per logical bulb
 
     Example:
@@ -138,7 +138,7 @@ class EffectNewtonsCradle(FrameEffect):
             saturation: Ball base saturation 0.0-1.0 (default 0.0, steel)
             brightness: Maximum ball brightness 0.0-1.0 (default 0.8)
             shininess: Phong specular exponent 1-100 (default 60)
-            kelvin: Color temperature 1500-9000 (default 4500)
+            kelvin: Color temperature 1000-10000 (default 4500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

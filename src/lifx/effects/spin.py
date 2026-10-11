@@ -63,7 +63,7 @@ class EffectSpin(FrameEffect):
         theme: Theme providing the palette colors
         bulb_offset: Per-zone hue shift in degrees for shimmer
         brightness: Zone brightness 0.0-1.0
-        kelvin: Color temperature 1500-9000
+        kelvin: Color temperature 1000-10000
         zones_per_bulb: Physical zones per logical bulb
 
     Example:
@@ -94,7 +94,7 @@ class EffectSpin(FrameEffect):
             theme: Theme providing palette colors (defaults to "exciting")
             bulb_offset: Per-zone hue shift in degrees 0-360 (default 5.0)
             brightness: Zone brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

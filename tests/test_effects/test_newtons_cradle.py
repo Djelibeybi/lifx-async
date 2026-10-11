@@ -150,10 +150,10 @@ def test_invalid_shininess_high() -> None:
 def test_invalid_kelvin() -> None:
     """Test kelvin out of range raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectNewtonsCradle(kelvin=1000)
+        EffectNewtonsCradle(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectNewtonsCradle(kelvin=10000)
+        EffectNewtonsCradle(kelvin=10001)
 
 
 def test_invalid_zones_per_bulb() -> None:

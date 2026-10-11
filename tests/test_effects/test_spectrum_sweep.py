@@ -74,10 +74,10 @@ def test_spectrum_sweep_invalid_brightness() -> None:
 def test_spectrum_sweep_invalid_kelvin() -> None:
     """Test EffectSpectrumSweep with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSpectrumSweep(kelvin=1000)
+        EffectSpectrumSweep(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSpectrumSweep(kelvin=10000)
+        EffectSpectrumSweep(kelvin=10001)
 
 
 def test_spectrum_sweep_invalid_zones_per_bulb() -> None:

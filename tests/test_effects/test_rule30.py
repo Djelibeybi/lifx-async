@@ -119,10 +119,10 @@ def test_rule30_invalid_seed() -> None:
 def test_rule30_invalid_kelvin() -> None:
     """Test EffectRule30 with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRule30(kelvin=1000)
+        EffectRule30(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRule30(kelvin=10000)
+        EffectRule30(kelvin=10001)
 
 
 def test_rule30_invalid_zones_per_bulb() -> None:

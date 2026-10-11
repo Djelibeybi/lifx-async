@@ -36,7 +36,7 @@ HSBK Format:
     - Hue: 0-65535 (maps to 0-360 degrees)
     - Saturation: 0-65535 (maps to 0.0-1.0)
     - Brightness: 0-65535 (maps to 0.0-1.0)
-    - Kelvin: 1500-9000
+    - Kelvin: 1000-10000
 """
 
 # Animator - High-level API

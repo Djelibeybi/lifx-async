@@ -122,10 +122,10 @@ def test_pendulum_wave_invalid_brightness() -> None:
 def test_pendulum_wave_invalid_kelvin() -> None:
     """Test EffectPendulumWave with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectPendulumWave(kelvin=1000)
+        EffectPendulumWave(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectPendulumWave(kelvin=10000)
+        EffectPendulumWave(kelvin=10001)
 
 
 def test_pendulum_wave_invalid_zones_per_bulb() -> None:

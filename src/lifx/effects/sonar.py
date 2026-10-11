@@ -126,7 +126,7 @@ class EffectSonar(FrameEffect):
         obstacle_hue: Obstacle color hue in degrees (0-360)
         obstacle_brightness: Obstacle brightness (0.0-1.0)
         brightness: Wavefront peak brightness (0.0-1.0)
-        kelvin: Wavefront color temperature (1500-9000)
+        kelvin: Wavefront color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
 
     Example:
@@ -173,7 +173,7 @@ class EffectSonar(FrameEffect):
             obstacle_hue: Obstacle hue 0-360 degrees (default 15)
             obstacle_brightness: Obstacle brightness 0.0-1.0 (default 0.8)
             brightness: Wavefront peak brightness 0.0-1.0 (default 1.0)
-            kelvin: Color temperature 1500-9000 (default 6500)
+            kelvin: Color temperature 1000-10000 (default 6500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

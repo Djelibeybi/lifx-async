@@ -129,10 +129,10 @@ def test_ripple_invalid_brightness() -> None:
 def test_ripple_invalid_kelvin() -> None:
     """Test EffectRipple with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRipple(kelvin=1000)
+        EffectRipple(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRipple(kelvin=10000)
+        EffectRipple(kelvin=10001)
 
 
 # ---------------------------------------------------------------------------

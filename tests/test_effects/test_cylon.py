@@ -110,10 +110,10 @@ def test_cylon_invalid_trail() -> None:
 def test_cylon_invalid_kelvin() -> None:
     """Test EffectCylon with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectCylon(kelvin=1000)
+        EffectCylon(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectCylon(kelvin=10000)
+        EffectCylon(kelvin=10001)
 
 
 def test_cylon_invalid_zones_per_bulb() -> None:

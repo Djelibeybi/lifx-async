@@ -163,7 +163,7 @@ color = HSBK(
     hue=180.0,         # 0-360 degrees
     saturation=1.0,    # 0.0-1.0
     brightness=0.75,   # 0.0-1.0
-    kelvin=3500,       # 1500-9000
+    kelvin=3500,       # 1000-10000
 )
 ```
 
@@ -300,8 +300,8 @@ LIFX_PROTOCOL_VERSION = 1024
 HUE_MAX = 65535        # Maps to 360°
 SATURATION_MAX = 65535 # Maps to 100%
 BRIGHTNESS_MAX = 65535 # Maps to 100%
-KELVIN_MIN = 1500
-KELVIN_MAX = 9000
+KELVIN_MIN = 1000
+KELVIN_MAX = 10000
 
 # Timing
 MAX_DURATION = 0xFFFFFFFF  # ~49 days in milliseconds

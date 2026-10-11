@@ -108,13 +108,13 @@ def test_invalid_brightness_too_high() -> None:
 def test_invalid_kelvin_too_low() -> None:
     """Test kelvin below minimum raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectJacobsLadder(kelvin=1000)
+        EffectJacobsLadder(kelvin=999)
 
 
 def test_invalid_kelvin_too_high() -> None:
     """Test kelvin above maximum raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectJacobsLadder(kelvin=10000)
+        EffectJacobsLadder(kelvin=10001)
 
 
 def test_invalid_zones_per_bulb_zero() -> None:

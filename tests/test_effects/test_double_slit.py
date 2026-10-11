@@ -140,10 +140,10 @@ def test_invalid_brightness() -> None:
 def test_invalid_kelvin() -> None:
     """Test EffectDoubleSlit with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectDoubleSlit(kelvin=1000)
+        EffectDoubleSlit(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectDoubleSlit(kelvin=10000)
+        EffectDoubleSlit(kelvin=10001)
 
 
 def test_invalid_zones_per_bulb() -> None:

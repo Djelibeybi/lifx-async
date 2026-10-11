@@ -9,7 +9,7 @@ This module provides pre-generated product information for efficient runtime loo
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum
 
 
@@ -35,6 +35,20 @@ class TemperatureRange:
     max: int
 
 
+@dataclass(frozen=True)
+class TemperatureRangeUpgrade:
+    """A color temperature range a product gains from a firmware version on.
+
+    Attributes:
+        min_firmware: First firmware version with this range, encoded as
+            ``(major << 16) | minor``
+        temperature_range: Min/max color temperature in Kelvin from that version
+    """
+
+    min_firmware: int
+    temperature_range: TemperatureRange
+
+
 @dataclass
 class ProductInfo:
     """Information about a LIFX product.
@@ -44,8 +58,12 @@ class ProductInfo:
         name: Product name
         vendor: Vendor ID (always 1 for LIFX)
         capabilities: Bitfield of ProductCapability flags
-        temperature_range: Min/max color temperature in Kelvin
+        temperature_range: Min/max color temperature in Kelvin. On a registry
+            entry this is the range of the earliest firmware; a device's own
+            capabilities hold the range of the firmware it runs
         min_ext_mz_firmware: Minimum firmware version for extended multizone
+        temperature_range_upgrades: Wider temperature ranges later firmware
+            versions support
     """
 
     pid: int
@@ -54,6 +72,7 @@ class ProductInfo:
     capabilities: int
     temperature_range: TemperatureRange | None
     min_ext_mz_firmware: int | None
+    temperature_range_upgrades: tuple[TemperatureRangeUpgrade, ...] = ()
 
     def has_capability(self, capability: ProductCapability) -> bool:
         """Check if product has a specific capability.
@@ -127,6 +146,38 @@ class ProductInfo:
         if firmware_version is None:
             return True
         return firmware_version >= self.min_ext_mz_firmware
+
+    def for_firmware(self, firmware_version: int) -> ProductInfo:
+        """Resolve the capabilities a device running this firmware has.
+
+        Returns a copy, so the shared registry entry is never modified:
+        extended multizone is dropped when the firmware predates it, and the
+        temperature range is the one from the newest upgrade the firmware
+        has reached.
+
+        Args:
+            firmware_version: Host firmware version, ``(major << 16) | minor``
+
+        Returns:
+            A new ProductInfo describing the device on that firmware
+        """
+        capabilities = self.capabilities
+        if not self.supports_extended_multizone(firmware_version):
+            capabilities &= ~ProductCapability.EXTENDED_MULTIZONE
+
+        temperature_range = self.temperature_range
+        reached = [
+            upgrade
+            for upgrade in self.temperature_range_upgrades
+            if firmware_version >= upgrade.min_firmware
+        ]
+        if reached:
+            newest = max(reached, key=lambda upgrade: upgrade.min_firmware)
+            temperature_range = newest.temperature_range
+
+        return replace(
+            self, capabilities=capabilities, temperature_range=temperature_range
+        )
 
 
 # Pre-generated product definitions
@@ -282,6 +333,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     28: ProductInfo(
         pid=28,
@@ -290,6 +347,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     29: ProductInfo(
         pid=29,
@@ -298,6 +361,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.INFRARED,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     30: ProductInfo(
         pid=30,
@@ -306,6 +375,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.INFRARED,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     31: ProductInfo(
         pid=31,
@@ -324,6 +399,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=131149,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     33: ProductInfo(
         pid=33,
@@ -340,6 +421,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     37: ProductInfo(
         pid=37,
@@ -348,6 +435,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     38: ProductInfo(
         pid=38,
@@ -358,6 +451,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=131149,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     39: ProductInfo(
         pid=39,
@@ -366,6 +465,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=0,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     40: ProductInfo(
         pid=40,
@@ -374,6 +479,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     43: ProductInfo(
         pid=43,
@@ -382,6 +493,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     44: ProductInfo(
         pid=44,
@@ -390,6 +507,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     45: ProductInfo(
         pid=45,
@@ -398,6 +521,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.INFRARED,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     46: ProductInfo(
         pid=46,
@@ -406,6 +535,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.INFRARED,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=131152,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     49: ProductInfo(
         pid=49,
@@ -422,6 +557,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=0,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=196678,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     51: ProductInfo(
         pid=51,
@@ -498,6 +639,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=0,
         temperature_range=TemperatureRange(min=2500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=196678,
+                temperature_range=TemperatureRange(min=1500, max=9000),
+            ),
+        ),
     ),
     61: ProductInfo(
         pid=61,
@@ -820,6 +967,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     118: ProductInfo(
         pid=118,
@@ -830,6 +983,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     119: ProductInfo(
         pid=119,
@@ -840,6 +999,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     120: ProductInfo(
         pid=120,
@@ -850,6 +1015,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     121: ProductInfo(
         pid=121,
@@ -1004,6 +1175,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     142: ProductInfo(
         pid=142,
@@ -1014,6 +1191,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     143: ProductInfo(
         pid=143,
@@ -1024,6 +1207,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     144: ProductInfo(
         pid=144,
@@ -1034,6 +1223,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     151: ProductInfo(
         pid=151,
@@ -1096,6 +1291,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     162: ProductInfo(
         pid=162,
@@ -1106,6 +1307,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     163: ProductInfo(
         pid=163,
@@ -1114,6 +1321,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     164: ProductInfo(
         pid=164,
@@ -1122,6 +1335,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     165: ProductInfo(
         pid=165,
@@ -1130,6 +1349,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     166: ProductInfo(
         pid=166,
@@ -1138,6 +1363,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     167: ProductInfo(
         pid=167,
@@ -1146,6 +1377,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     168: ProductInfo(
         pid=168,
@@ -1154,6 +1391,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     169: ProductInfo(
         pid=169,
@@ -1162,6 +1405,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     170: ProductInfo(
         pid=170,
@@ -1170,6 +1419,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     171: ProductInfo(
         pid=171,
@@ -1178,6 +1433,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     172: ProductInfo(
         pid=172,
@@ -1194,6 +1455,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     174: ProductInfo(
         pid=174,
@@ -1202,6 +1469,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     175: ProductInfo(
         pid=175,
@@ -1210,6 +1483,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     176: ProductInfo(
         pid=176,
@@ -1218,6 +1497,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     177: ProductInfo(
         pid=177,
@@ -1226,6 +1511,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     178: ProductInfo(
         pid=178,
@@ -1234,6 +1525,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     179: ProductInfo(
         pid=179,
@@ -1242,6 +1539,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     180: ProductInfo(
         pid=180,
@@ -1250,6 +1553,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     181: ProductInfo(
         pid=181,
@@ -1258,6 +1567,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     182: ProductInfo(
         pid=182,
@@ -1266,6 +1581,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     185: ProductInfo(
         pid=185,
@@ -1274,6 +1595,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     186: ProductInfo(
         pid=186,
@@ -1282,6 +1609,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     187: ProductInfo(
         pid=187,
@@ -1290,6 +1623,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     188: ProductInfo(
         pid=188,
@@ -1298,6 +1637,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     191: ProductInfo(
         pid=191,
@@ -1322,6 +1667,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     202: ProductInfo(
         pid=202,
@@ -1330,6 +1681,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     203: ProductInfo(
         pid=203,
@@ -1340,6 +1697,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     204: ProductInfo(
         pid=204,
@@ -1350,6 +1713,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     205: ProductInfo(
         pid=205,
@@ -1360,6 +1729,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     206: ProductInfo(
         pid=206,
@@ -1370,6 +1745,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     207: ProductInfo(
         pid=207,
@@ -1412,6 +1793,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     214: ProductInfo(
         pid=214,
@@ -1422,6 +1809,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.EXTENDED_MULTIZONE,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     215: ProductInfo(
         pid=215,
@@ -1430,6 +1823,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     216: ProductInfo(
         pid=216,
@@ -1438,6 +1837,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     217: ProductInfo(
         pid=217,
@@ -1446,6 +1851,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     218: ProductInfo(
         pid=218,
@@ -1454,6 +1865,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     219: ProductInfo(
         pid=219,
@@ -1464,6 +1881,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.BUTTONS,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     220: ProductInfo(
         pid=220,
@@ -1474,6 +1897,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.BUTTONS,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     221: ProductInfo(
         pid=221,
@@ -1482,6 +1911,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     222: ProductInfo(
         pid=222,
@@ -1490,6 +1925,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     223: ProductInfo(
         pid=223,
@@ -1498,6 +1939,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     224: ProductInfo(
         pid=224,
@@ -1506,6 +1953,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     225: ProductInfo(
         pid=225,
@@ -1514,6 +1967,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     226: ProductInfo(
         pid=226,
@@ -1538,6 +1997,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     266: ProductInfo(
         pid=266,
@@ -1546,6 +2011,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     267: ProductInfo(
         pid=267,
@@ -1556,6 +2027,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.BUTTONS,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262344,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     268: ProductInfo(
         pid=268,
@@ -1566,6 +2043,12 @@ PRODUCTS: dict[int, ProductInfo] = {
         | ProductCapability.BUTTONS,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        temperature_range_upgrades=(
+            TemperatureRangeUpgrade(
+                min_firmware=262292,
+                temperature_range=TemperatureRange(min=1000, max=10000),
+            ),
+        ),
     ),
     300: ProductInfo(
         pid=300,
@@ -1660,6 +2143,23 @@ class ProductRegistry:
                             min=temp_list[0], max=temp_list[1]
                         )
 
+                # Parse firmware-dependent temperature ranges
+                temp_upgrades = []
+                for upgrade in product.get("upgrades", []):
+                    upgrade_list = upgrade.get("features", {}).get("temperature_range")
+                    if upgrade_list is None or len(upgrade_list) < 2:
+                        continue
+                    temp_upgrades.append(
+                        TemperatureRangeUpgrade(
+                            min_firmware=(upgrade.get("major", 0) << 16)
+                            | upgrade.get("minor", 0),
+                            temperature_range=TemperatureRange(
+                                min=upgrade_list[0], max=upgrade_list[1]
+                            ),
+                        )
+                    )
+                temp_upgrades.sort(key=lambda upgrade: upgrade.min_firmware)
+
                 product_info = ProductInfo(
                     pid=pid,
                     name=name,
@@ -1667,6 +2167,7 @@ class ProductRegistry:
                     capabilities=capabilities,
                     temperature_range=temp_range,
                     min_ext_mz_firmware=min_ext_mz_firmware,
+                    temperature_range_upgrades=tuple(temp_upgrades),
                 )
 
                 self._products[pid] = product_info

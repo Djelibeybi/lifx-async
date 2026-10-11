@@ -484,7 +484,7 @@ class Light(Device[LightState]):
            automatically set to 0 to switch the light to color temperature mode.
 
         Args:
-            kelvin: Color temperature in Kelvin (1500-9000)
+            kelvin: Color temperature in Kelvin (1000-10000)
             duration: Transition duration in seconds (default 0.0)
 
         Raises:
@@ -1087,7 +1087,8 @@ class Light(Device[LightState]):
         """Get the minimum supported kelvin value if available.
 
         Returns:
-            Minimum kelvin value from product registry.
+            Minimum kelvin value from product registry for the light's
+            host firmware.
         """
         if (
             self.capabilities is not None
@@ -1102,7 +1103,8 @@ class Light(Device[LightState]):
         """Get the maximum supported kelvin value if available.
 
         Returns:
-            Maximum kelvin value from product registry.
+            Maximum kelvin value from product registry for the light's
+            host firmware.
         """
         if (
             self.capabilities is not None

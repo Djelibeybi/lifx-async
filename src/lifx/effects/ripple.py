@@ -87,7 +87,7 @@ class EffectRipple(FrameEffect):
         hue2: Color for negative displacement (0-360 degrees)
         saturation: Wave color saturation (0.0-1.0)
         brightness: Peak brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
 
     Example:
         ```python
@@ -132,7 +132,7 @@ class EffectRipple(FrameEffect):
             hue2: Color hue for negative displacement 0-360 (default 240)
             saturation: Color saturation 0.0-1.0 (default 1.0)
             brightness: Peak brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
 
         Raises:
             ValueError: If parameters are out of valid ranges

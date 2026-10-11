@@ -152,10 +152,10 @@ def test_spin_invalid_brightness() -> None:
 def test_spin_invalid_kelvin() -> None:
     """Test EffectSpin with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSpin(kelvin=1000)
+        EffectSpin(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSpin(kelvin=10000)
+        EffectSpin(kelvin=10001)
 
 
 def test_spin_invalid_zones_per_bulb() -> None:

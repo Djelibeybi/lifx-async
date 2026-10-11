@@ -145,7 +145,7 @@ class EffectEmbers(FrameEffect):
         cooling: Cooling factor per diffusion step (0.0-1.0)
         turbulence: Random per-cell flicker amplitude (0.0-0.3)
         brightness: Overall brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
 
     Example:
@@ -186,7 +186,7 @@ class EffectEmbers(FrameEffect):
             turbulence: Random per-cell flicker amplitude, 0.0-0.3
                 (default 0.3)
             brightness: Overall brightness, 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

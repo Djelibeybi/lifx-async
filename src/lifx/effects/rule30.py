@@ -76,7 +76,7 @@ class EffectRule30(FrameEffect):
         brightness: Alive-cell brightness (0.0-1.0)
         background_brightness: Dead-cell brightness (0.0-1.0)
         seed: Initial seed mode ("center", "random", "all")
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
 
     Example:
@@ -116,7 +116,7 @@ class EffectRule30(FrameEffect):
             brightness: Alive-cell brightness 0.0-1.0 (default 0.8)
             background_brightness: Dead-cell brightness 0.0-1.0 (default 0.05)
             seed: Initial seed mode: "center", "random", or "all" (default "center")
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:

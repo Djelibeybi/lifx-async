@@ -9,6 +9,8 @@ from lifx.products import (
     ProductInfo,
     ProductRegistry,
     TemperatureRange,
+    TemperatureRangeUpgrade,
+    get_product,
     get_registry,
 )
 
@@ -186,6 +188,125 @@ class TestProductInfo:
 
         # No firmware version provided - assume supported
         assert product.supports_extended_multizone(None)
+
+
+class TestProductInfoForFirmware:
+    """Resolving a product's firmware-dependent capabilities."""
+
+    @staticmethod
+    def _upgraded_light() -> ProductInfo:
+        return ProductInfo(
+            pid=219,
+            name="Test Luna",
+            vendor=1,
+            capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
+            temperature_range=TemperatureRange(min=1500, max=9000),
+            min_ext_mz_firmware=None,
+            temperature_range_upgrades=(
+                TemperatureRangeUpgrade(
+                    min_firmware=(4 << 16) | 148,
+                    temperature_range=TemperatureRange(min=1000, max=10000),
+                ),
+            ),
+        )
+
+    def test_firmware_below_upgrade_keeps_base_range(self) -> None:
+        resolved = self._upgraded_light().for_firmware((4 << 16) | 147)
+        assert resolved.temperature_range == TemperatureRange(min=1500, max=9000)
+
+    def test_firmware_at_upgrade_gets_upgraded_range(self) -> None:
+        resolved = self._upgraded_light().for_firmware((4 << 16) | 148)
+        assert resolved.temperature_range == TemperatureRange(min=1000, max=10000)
+
+    def test_newer_major_gets_upgraded_range(self) -> None:
+        """4.148 is below 5.0 even though 148 > 0: versions compare as integers."""
+        resolved = self._upgraded_light().for_firmware(5 << 16)
+        assert resolved.temperature_range == TemperatureRange(min=1000, max=10000)
+
+    def test_later_upgrade_wins(self) -> None:
+        product = ProductInfo(
+            pid=1,
+            name="Test",
+            vendor=1,
+            capabilities=ProductCapability.COLOR,
+            temperature_range=TemperatureRange(min=2500, max=9000),
+            min_ext_mz_firmware=None,
+            temperature_range_upgrades=(
+                TemperatureRangeUpgrade(
+                    min_firmware=(2 << 16) | 80,
+                    temperature_range=TemperatureRange(min=1500, max=9000),
+                ),
+                TemperatureRangeUpgrade(
+                    min_firmware=(4 << 16) | 148,
+                    temperature_range=TemperatureRange(min=1000, max=10000),
+                ),
+            ),
+        )
+        assert product.for_firmware((2 << 16) | 79).temperature_range == (
+            TemperatureRange(min=2500, max=9000)
+        )
+        assert product.for_firmware((3 << 16) | 70).temperature_range == (
+            TemperatureRange(min=1500, max=9000)
+        )
+        assert product.for_firmware((4 << 16) | 200).temperature_range == (
+            TemperatureRange(min=1000, max=10000)
+        )
+
+    def test_highest_reached_upgrade_wins_in_any_order(self) -> None:
+        product = ProductInfo(
+            pid=1,
+            name="Test",
+            vendor=1,
+            capabilities=ProductCapability.COLOR,
+            temperature_range=TemperatureRange(min=2500, max=9000),
+            min_ext_mz_firmware=None,
+            temperature_range_upgrades=(
+                TemperatureRangeUpgrade(
+                    min_firmware=(4 << 16) | 148,
+                    temperature_range=TemperatureRange(min=1000, max=10000),
+                ),
+                TemperatureRangeUpgrade(
+                    min_firmware=(2 << 16) | 80,
+                    temperature_range=TemperatureRange(min=1500, max=9000),
+                ),
+            ),
+        )
+        assert product.for_firmware((4 << 16) | 148).temperature_range == (
+            TemperatureRange(min=1000, max=10000)
+        )
+
+    def test_old_firmware_drops_extended_multizone(self) -> None:
+        product = ProductInfo(
+            pid=32,
+            name="Test Strip",
+            vendor=1,
+            capabilities=ProductCapability.MULTIZONE
+            | ProductCapability.EXTENDED_MULTIZONE,
+            temperature_range=None,
+            min_ext_mz_firmware=(2 << 16) | 77,
+        )
+        assert not product.for_firmware((2 << 16) | 76).has_extended_multizone
+        assert product.for_firmware((2 << 16) | 77).has_extended_multizone
+
+    def test_does_not_mutate_the_registry_entry(self) -> None:
+        product = self._upgraded_light()
+        product.for_firmware((4 << 16) | 148)
+        assert product.temperature_range == TemperatureRange(min=1500, max=9000)
+
+    def test_mirror_upgrades_from_4_200(self) -> None:
+        mirror = get_product(267)
+        assert mirror.for_firmware((4 << 16) | 199).temperature_range == (
+            mirror.temperature_range
+        )
+        assert mirror.for_firmware((4 << 16) | 200).temperature_range == (
+            TemperatureRange(min=1000, max=10000)
+        )
+
+    def test_luna_upgrades_from_4_148(self) -> None:
+        luna = get_product(219)
+        assert luna.for_firmware((4 << 16) | 148).temperature_range == (
+            TemperatureRange(min=1000, max=10000)
+        )
 
 
 class TestProductRegistry:

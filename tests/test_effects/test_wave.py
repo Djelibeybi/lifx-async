@@ -125,10 +125,10 @@ def test_wave_invalid_brightness() -> None:
 def test_wave_invalid_kelvin() -> None:
     """Test EffectWave with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectWave(kelvin=1000)
+        EffectWave(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectWave(kelvin=10000)
+        EffectWave(kelvin=10001)
 
 
 def test_wave_invalid_zones_per_bulb() -> None:

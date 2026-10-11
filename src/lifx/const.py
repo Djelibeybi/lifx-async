@@ -107,11 +107,20 @@ MIN_SATURATION: Final[float] = 0.0
 MAX_SATURATION: Final[float] = 1.0
 MIN_BRIGHTNESS: Final[float] = 0.0
 MAX_BRIGHTNESS: Final[float] = 1.0
-MIN_KELVIN: Final[int] = 1500
-MAX_KELVIN: Final[int] = 9000
+# The widest white-mode range of any product: lights on firmware 4.148 or later
+# (4.200 for some Mirrors) reach 1000-10000 K. Each light's own range is its
+# min_kelvin/max_kelvin, and firmware clamps a kelvin outside it.
+MIN_KELVIN: Final[int] = 1000
+MAX_KELVIN: Final[int] = 10000
+
+# The range assumed when a light's own range is unknown: the most conservative
+# one, matching the original LIFX bulb (product 1), so the library never asks
+# an unidentified light for a white it may not support.
+UNKNOWN_RANGE_MIN_KELVIN: Final[int] = 2500
+UNKNOWN_RANGE_MAX_KELVIN: Final[int] = 9000
 
 # Kelvin value devices report for a colour with no white component. The
-# 1500-9000 range above is the white-mode range of the product, not the range
+# 1000-10000 range above is the white-mode range of the products, not the range
 # of the wire field: firmware reports 0 for fully saturated zones (commonly
 # seen on Tile, Beam and Z devices), so 0 is legitimate inbound and is
 # preserved verbatim rather than clamped to MIN_KELVIN.

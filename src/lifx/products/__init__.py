@@ -28,6 +28,7 @@ from lifx.products.registry import (
     ProductInfo,
     ProductRegistry,
     TemperatureRange,
+    TemperatureRangeUpgrade,
     get_product,
     get_registry,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "ProductInfo",
     "ProductRegistry",
     "TemperatureRange",
+    "TemperatureRangeUpgrade",
     "get_ceiling_layout",
     "get_mirror_layout",
     "get_product",

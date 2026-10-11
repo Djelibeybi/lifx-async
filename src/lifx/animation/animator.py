@@ -761,7 +761,7 @@ class Animator:
         Args:
             hsbk: Protocol-ready HSBK data for all pixels.
                   Each tuple is (hue, sat, brightness, kelvin) where
-                  H/S/B are 0-65535 and K is 1500-9000.
+                  H/S/B are 0-65535 and K is 1000-10000.
 
         Returns:
             AnimatorStats with operation statistics. `gated=True` means the

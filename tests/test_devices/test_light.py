@@ -155,7 +155,20 @@ class TestLight:
         )
 
         with pytest.raises(ValueError, match="Kelvin must be"):
-            await light.set_kelvin(10000)
+            await light.set_kelvin(10001)
+
+        with pytest.raises(ValueError, match="Kelvin must be"):
+            await light.set_kelvin(999)
+
+    @pytest.mark.parametrize("kelvin", [1000, 10000])
+    async def test_set_kelvin_extended_range(self, light: Light, kelvin: int) -> None:
+        """The 1000-10000 K range of firmware 4.148+ reaches the wire."""
+        light.connection.request.return_value = True
+
+        await light.set_kelvin(kelvin)
+
+        packet = light.connection.request.call_args[0][0]
+        assert packet.color.kelvin == kelvin
 
     async def test_set_hue(self, light: Light) -> None:
         """Test setting hue."""

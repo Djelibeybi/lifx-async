@@ -84,7 +84,7 @@ class EffectPendulumWave(FrameEffect):
         saturation1: Color 1 saturation (0.0-1.0)
         saturation2: Color 2 saturation (0.0-1.0)
         brightness: Overall brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
         seamless: Whether the pattern is mirror-symmetric about the ring origin
             on a canvas that wraps (a Mirror ring), so it meets itself with no
@@ -125,7 +125,7 @@ class EffectPendulumWave(FrameEffect):
             saturation1: Color 1 saturation 0.0-1.0 (default 1.0)
             saturation2: Color 2 saturation 0.0-1.0 (default 1.0)
             brightness: Overall brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
             seamless: On a canvas that wraps, such as a Mirror ring, draw each
                 pixel at its ring distance from the ring origin (top centre

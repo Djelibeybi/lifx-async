@@ -385,7 +385,7 @@ class TestDeriveEffectPalette:
         color = HSBK(hue=90, saturation=0.000001, brightness=0.4, kelvin=3500)
         palette = derive_effect_palette([color], None, None)
         assert palette is not None
-        assert [c.kelvin for c in palette] == [3500, 1500, 9000]
+        assert [c.kelvin for c in palette] == [3500, 2500, 9000]
 
 
 class TestValidateEffectPalette:
@@ -532,7 +532,7 @@ class TestMorphDerivationMock:
     async def test_single_white_with_unknown_range_falls_back_to_constants(
         self,
     ) -> None:
-        """Unknown device capabilities fall back to the 1500/9000 constants."""
+        """Unknown capabilities fall back to the most conservative range."""
         matrix = _matrix_light()
         matrix._capabilities = None
         white = HSBK(hue=0, saturation=0.0, brightness=0.7, kelvin=4000)
@@ -546,7 +546,7 @@ class TestMorphDerivationMock:
             for c in packet.settings.palette[: packet.settings.palette_count]
         ]
         assert packet.settings.palette_count == 3
-        assert [color.kelvin for color in palette] == [4000, 1500, 9000]
+        assert [color.kelvin for color in palette] == [4000, 2500, 9000]
 
     @pytest.mark.parametrize(
         "error", [LifxTimeoutError("timeout"), LifxProtocolError("malformed")]

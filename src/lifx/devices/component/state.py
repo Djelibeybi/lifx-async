@@ -26,7 +26,11 @@ from pathlib import Path
 from typing import Any, Generic, TypeVar, cast
 
 from lifx.color import HSBK
-from lifx.const import MAX_KELVIN, MAX_PALETTE_COLORS, MIN_KELVIN
+from lifx.const import (
+    MAX_PALETTE_COLORS,
+    UNKNOWN_RANGE_MAX_KELVIN,
+    UNKNOWN_RANGE_MIN_KELVIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -178,11 +182,11 @@ def derive_effect_palette(
     For a white colour (wire saturation 0), the generated palette is the
     current colour plus whites at ``min_kelvin`` and ``max_kelvin``, keeping
     the current brightness and saturation 0. A range endpoint that is None
-    (temperature range unknown) falls back to ``MIN_KELVIN`` /
-    ``MAX_KELVIN``. For a hued colour, the palette is the current colour plus
-    hue +``_EFFECT_PALETTE_HUE_STEP`` and hue -``_EFFECT_PALETTE_HUE_STEP``,
-    each wrapped modulo 360, keeping the current saturation, brightness and
-    kelvin.
+    (temperature range unknown) falls back to the conservative
+    ``UNKNOWN_RANGE_MIN_KELVIN`` / ``UNKNOWN_RANGE_MAX_KELVIN``. For a hued
+    colour, the palette is the current colour plus hue
+    +``_EFFECT_PALETTE_HUE_STEP`` and hue -``_EFFECT_PALETTE_HUE_STEP``, each
+    wrapped modulo 360, keeping the current saturation, brightness and kelvin.
 
     Args:
         colors: Colours currently shown by the device. An empty sequence, or
@@ -206,8 +210,8 @@ def derive_effect_palette(
         return None
 
     if current.to_protocol().saturation == 0:
-        lo = MIN_KELVIN if min_kelvin is None else min_kelvin
-        hi = MAX_KELVIN if max_kelvin is None else max_kelvin
+        lo = UNKNOWN_RANGE_MIN_KELVIN if min_kelvin is None else min_kelvin
+        hi = UNKNOWN_RANGE_MAX_KELVIN if max_kelvin is None else max_kelvin
         return [
             current,
             HSBK(current.hue, 0.0, current.brightness, lo),

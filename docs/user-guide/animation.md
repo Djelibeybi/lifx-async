@@ -181,7 +181,7 @@ The animation module uses protocol-ready HSBK values for performance:
 # - Hue: 0-65535 (maps to 0-360 degrees)
 # - Saturation: 0-65535 (maps to 0.0-1.0)
 # - Brightness: 0-65535 (maps to 0.0-1.0)
-# - Kelvin: 1500-9000
+# - Kelvin: 1000-10000
 
 # Examples
 red = (0, 65535, 65535, 3500)           # Full red
@@ -198,7 +198,7 @@ def to_protocol_hsbk(
     hue: float,        # 0-360 degrees
     saturation: float, # 0.0-1.0
     brightness: float, # 0.0-1.0
-    kelvin: int,       # 1500-9000
+    kelvin: int,       # 1000-10000
 ) -> tuple[int, int, int, int]:
     """Convert user-friendly values to protocol format."""
     return (
