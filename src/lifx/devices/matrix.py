@@ -1381,6 +1381,11 @@ class MatrixLight(PaintTracking, Light):
             tile_height=tiles[0].height,
         )
 
+    async def _firmware_effect_running(self) -> bool:
+        """Whether the light reports a firmware effect, read afresh."""
+        effect = await self._effect_or_none()
+        return effect is not None and effect.effect_type != FirmwareEffect.OFF
+
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect by sending the OFF effect.
 

@@ -970,6 +970,10 @@ class _LightEffects:
             light, None, cast("PreState", prestate)
         )
 
+    def runs_any(self, participant: Participant) -> bool:
+        """Whether a software effect runs on a light or light component."""
+        return Conductor._runs_any(participant)
+
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
         return Conductor._runs_whole_light(light)

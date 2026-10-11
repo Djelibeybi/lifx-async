@@ -1122,6 +1122,13 @@ class MultiZoneLight(PaintTracking, Light):
         zone_count = await self.get_zone_count()
         return framebuffer, MultiZonePacketGenerator(zone_count=zone_count)
 
+    async def _firmware_effect_running(self) -> bool:
+        """Whether the strip reports a firmware effect."""
+        try:
+            return (await self.get_effect()).effect_type != FirmwareEffect.OFF
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
+
     async def _stop_firmware_effect(self) -> None:
         """Stop a running Move effect by sending the OFF effect."""
         await self.set_effect(

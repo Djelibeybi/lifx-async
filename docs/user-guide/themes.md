@@ -294,7 +294,9 @@ Stop the animation by calling `stop_effect()` on each light of the group:
 `DeviceGroup` has no `stop_effect()`. Stopping puts back what each light
 showed before its mood animation started, power included, so a light that was
 off goes back off. Starting another mood on an animating light keeps that
-original state, and a second `stop_effect()` restores nothing more.
+original state, and a second `stop_effect()` restores nothing more. With no effect running,
+`stop_effect()` does nothing at all, so a light you painted with `apply_theme()` keeps showing it
+and keeps its `current_theme`.
 
 ```python
 for light in group.lights:

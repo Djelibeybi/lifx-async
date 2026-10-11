@@ -12,7 +12,7 @@ from lifx.color import HSBK
 from lifx.const import KELVIN_SATURATED
 from lifx.devices.base import WifiInfo
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight, MultiZoneLightState
-from lifx.exceptions import LifxTimeoutError
+from lifx.exceptions import LifxTimeoutError, LifxUnsupportedCommandError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
     Direction,
@@ -979,6 +979,11 @@ class TestMultiZoneEffect:
         """Test stopping effect."""
         # Mock SET operation returns True
         multizone_light.connection.request.return_value = True
+        multizone_light.get_effect = AsyncMock(
+            return_value=MultiZoneEffect(
+                effect_type=FirmwareEffect.MOVE, speed=5000, duration=0
+            )
+        )
 
         await multizone_light.stop_effect()
 
@@ -987,6 +992,32 @@ class TestMultiZoneEffect:
         call_args = multizone_light.connection.request.call_args
         packet = call_args[0][0]
         assert packet.settings.effect_type == FirmwareEffect.OFF
+
+    async def test_stop_effect_does_nothing_when_no_effect_runs(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """Stopping with no effect running sends nothing."""
+        multizone_light.get_effect = AsyncMock(
+            return_value=MultiZoneEffect(
+                effect_type=FirmwareEffect.OFF, speed=0, duration=0
+            )
+        )
+
+        await multizone_light.stop_effect()
+
+        multizone_light.connection.request.assert_not_called()
+
+    async def test_stop_effect_does_nothing_when_the_query_is_rejected(
+        self, multizone_light: MultiZoneLight
+    ) -> None:
+        """A strip that rejects the effect query runs no firmware effect."""
+        multizone_light.get_effect = AsyncMock(
+            side_effect=LifxUnsupportedCommandError("no")
+        )
+
+        await multizone_light.stop_effect()
+
+        multizone_light.connection.request.assert_not_called()
 
     def test_create_effect(self) -> None:
         """Test creating a multizone effect."""

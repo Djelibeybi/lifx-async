@@ -234,14 +234,17 @@ class Light(Device[LightState]):
         await effect_runner().start(self, effect, enable_thread=enable_thread)
 
     async def stop_effect(self) -> None:
-        """Stop every effect on this light.
+        """Stop every effect on this light, or do nothing if none is running.
 
         Stops any running firmware effect, then any software effect the light
         or one of its light components is part of, and restores the prior
-        state of each. The software effect
-        may have been started with ``start_effect()`` or on any Conductor: if
-        the light is one participant of a multi-light run, it leaves that run
-        and the other participants carry on.
+        state of each. With no effect running, in firmware or in software, it
+        sends nothing and changes nothing, so the current theme or mood stays.
+        A light that rejects the effect query counts as running no firmware
+        effect. The software effect may have been started with
+        ``start_effect()`` or on any Conductor: if the light is one
+        participant of a multi-light run, it leaves that run and the other
+        participants carry on.
 
         After ``animate_mood()``, the light gets back what it showed before
         its mood animation started, once: a second call restores nothing
@@ -252,6 +255,12 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
+        if not (
+            effect_runner().runs_any(self) or await self._firmware_effect_running()
+        ):
+            # A mood that ended some other way leaves a stale prior state.
+            self._mood_prestate = None
+            return
         # A firmware mood that ended some other way (another effect, a
         # reboot, another app) leaves a stale prior state: drop it, so it
         # neither overwrites what was shown since nor outranks a later run.
@@ -267,6 +276,10 @@ class Light(Device[LightState]):
         self._mood_prestate = None
         if held is not None:
             await effect_runner().restore_prestate(self, held)
+
+    async def _firmware_effect_running(self) -> bool:
+        """Whether a firmware effect runs; a plain light has none."""
+        return False
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect; a plain light has none to stop."""

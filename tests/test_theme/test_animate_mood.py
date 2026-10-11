@@ -77,6 +77,9 @@ class FakeRunner:
     async def restore_prestate(self, light: object, prestate: object) -> None:
         self.log.append(("restore", prestate))
 
+    def runs_any(self, participant: object) -> bool:
+        return False
+
     def runs_whole_light(self, light: object) -> bool:
         return False
 

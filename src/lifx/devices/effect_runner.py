@@ -90,6 +90,14 @@ class EffectRunner(Protocol):
         """Put back a prior state ``take_prestate()`` returned."""
         ...
 
+    def runs_any(self, participant: Light | LightComponent) -> bool:
+        """Whether a software effect runs on a light or light component.
+
+        A light counts an effect on either of its light components. A light
+        component counts a whole-light effect on its light.
+        """
+        ...
+
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
         ...

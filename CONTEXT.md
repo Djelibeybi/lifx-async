@@ -82,8 +82,10 @@ Ending a software effect on a participant and restoring the participant's
 prior state, while any other participants of the same effect carry on.
 Stopping a light stops every effect on it, software or firmware, including
 the effect on either light component; stopping a light component stops only
-that light component's effect. _Avoid_: canceling (that leaves the prior
-state unrestored).
+that light component's effect. With no effect running (no software run, and no
+firmware effect reported by the light) stopping does nothing: no write, no
+restore, and the current theme or mood stays. _Avoid_: canceling (that leaves
+the prior state unrestored).
 
 **Theme**:
 A palette of colors, either named in the theme library or built by the caller.
