@@ -1921,6 +1921,25 @@ class TestFirmwareTemperatureRange:
 
         assert (older.min_kelvin, older.max_kelvin) == (1500, 9000)
 
+    async def test_same_light_updated_across_the_boundary(self, light: Light) -> None:
+        """A firmware update seen on a live device object widens its range.
+
+        UDP has no session for a reboot to drop, so the same object keeps
+        talking to the light after it updates from 4.147 to 4.148.
+        """
+        light._process_capabilities(
+            DeviceVersion(vendor=1, product=219),
+            FirmwareInfo(build=0, version_major=4, version_minor=147),
+        )
+        assert (light.min_kelvin, light.max_kelvin) == (1500, 9000)
+
+        light.connection.request.return_value = packets.Device.StateHostFirmware(
+            build=0, version_major=4, version_minor=148
+        )
+        await light.get_host_firmware()
+
+        assert (light.min_kelvin, light.max_kelvin) == (1000, 10000)
+
     def test_old_strip_firmware_keeps_registry_extended_multizone(self) -> None:
         strip = Light(serial="d073d5010203", ip="192.168.1.100")
         strip._process_capabilities(

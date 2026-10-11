@@ -689,6 +689,10 @@ class Device(Generic[StateT]):
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
+        # (version_major, version_minor) the capabilities were resolved for, so
+        # a firmware update seen by this object re-resolves them. None when a
+        # caller set the capabilities directly.
+        self._capabilities_firmware: tuple[int, int] | None = None
 
         # State management (populated by connect() factory or _initialize_state())
         self._state: StateT | None = None
@@ -722,6 +726,7 @@ class Device(Generic[StateT]):
         self._version = source._version
         self._host_firmware = source._host_firmware
         self._capabilities = source._capabilities
+        self._capabilities_firmware = source._capabilities_firmware
         self._mac_address = source._mac_address
         self._mac_address_firmware = source._mac_address_firmware
         self._connectivity = source._connectivity
@@ -1075,10 +1080,27 @@ class Device(Generic[StateT]):
         if self._capabilities is not None:
             return
 
+        self._resolve_capabilities(version.product, host_firmware)
+
+    def _resolve_capabilities(self, product: int, host_firmware: FirmwareInfo) -> None:
+        """Resolve the registry entry for a product on the given host firmware.
+
+        Always starts from the shared registry entry, never from a previously
+        resolved copy, so the result is the same whichever firmware was seen
+        first.
+
+        Args:
+            product: Product ID from the device version
+            host_firmware: Host firmware the device runs
+        """
         firmware_version = (
             host_firmware.version_major << 16
         ) | host_firmware.version_minor
-        self._capabilities = get_product(version.product).for_firmware(firmware_version)
+        self._capabilities = get_product(product).for_firmware(firmware_version)
+        self._capabilities_firmware = (
+            host_firmware.version_major,
+            host_firmware.version_minor,
+        )
 
     async def _ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
@@ -1486,6 +1508,17 @@ class Device(Generic[StateT]):
         )
 
         self._host_firmware = firmware
+
+        # UDP has no session for a reboot to drop, so this object can be the
+        # first to see a firmware update: re-resolve capabilities resolved for
+        # an earlier version. Capabilities a caller set directly are left alone.
+        if (
+            self._capabilities is not None
+            and self._capabilities_firmware is not None
+            and self._capabilities_firmware
+            != (firmware.version_major, firmware.version_minor)
+        ):
+            self._resolve_capabilities(self._capabilities.pid, firmware)
 
         # Recalculate the MAC now that we have firmware info. Unconditional:
         # get_mac_address() re-derives only when the firmware it cached against
