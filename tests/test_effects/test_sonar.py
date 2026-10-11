@@ -128,10 +128,10 @@ def test_sonar_invalid_brightness() -> None:
 def test_sonar_invalid_kelvin() -> None:
     """Test EffectSonar with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSonar(kelvin=1000)
+        EffectSonar(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSonar(kelvin=10000)
+        EffectSonar(kelvin=10001)
 
 
 def test_sonar_invalid_zones_per_bulb() -> None:

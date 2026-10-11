@@ -73,7 +73,7 @@ class EffectTwinkle(FrameEffect):
         background_hue: Background hue in degrees (0-360)
         background_saturation: Background saturation (0.0-1.0)
         background_brightness: Background brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
 
     Example:
         ```python
@@ -127,7 +127,7 @@ class EffectTwinkle(FrameEffect):
             background_hue: Background hue 0-360 degrees (default 0)
             background_saturation: Background saturation 0.0-1.0 (default 0.0)
             background_brightness: Background brightness 0.0-1.0 (default 0.0)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
 
         Raises:
             ValueError: If parameters are out of valid ranges

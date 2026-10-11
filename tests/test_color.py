@@ -57,10 +57,17 @@ class TestHSBK:
     def test_validate_kelvin_range(self) -> None:
         """Test kelvin validation."""
         with pytest.raises(ValueError, match="Kelvin must be"):
-            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=1000)
+            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=999)
 
         with pytest.raises(ValueError, match="Kelvin must be"):
-            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=10000)
+            HSBK(hue=180, saturation=0.5, brightness=0.5, kelvin=10001)
+
+    @pytest.mark.parametrize("kelvin", [1000, 10000])
+    def test_extended_white_range_accepted(self, kelvin: int) -> None:
+        """Firmware 4.148+ lights reach 1000-10000 K, so HSBK accepts it."""
+        color = HSBK(hue=0, saturation=0.0, brightness=1.0, kelvin=kelvin)
+        assert color.kelvin == kelvin
+        assert color.to_protocol().kelvin == kelvin
 
     def test_from_rgb_red(self) -> None:
         """Test RGB to HSBK conversion for red."""
@@ -561,7 +568,7 @@ class TestHSBKReplace:
             self.BASE.replace(hue=400)
 
         with pytest.raises(ValueError, match="Kelvin must be"):
-            self.BASE.replace(kelvin=1000)
+            self.BASE.replace(kelvin=999)
 
 
 class TestHSBKSaturationPct:
@@ -839,7 +846,7 @@ class TestSaturatedKelvin:
 
         assert written.kelvin == KELVIN_SATURATED
 
-    @pytest.mark.parametrize("kelvin", [500, 1499, 9001, 12000])
+    @pytest.mark.parametrize("kelvin", [500, 999, 10001, 12000])
     def test_out_of_range_still_raises(self, kelvin: int) -> None:
         """Genuinely bad user input is still rejected."""
         with pytest.raises(ValueError, match="Kelvin must be"):

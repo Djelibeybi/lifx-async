@@ -123,12 +123,12 @@ class TestFireworksConstructor:
     def test_invalid_kelvin_low(self) -> None:
         """Test kelvin below minimum raises ValueError."""
         with pytest.raises(ValueError, match="kelvin must be"):
-            EffectFireworks(kelvin=1000)
+            EffectFireworks(kelvin=999)
 
     def test_invalid_kelvin_high(self) -> None:
         """Test kelvin above maximum raises ValueError."""
         with pytest.raises(ValueError, match="kelvin must be"):
-            EffectFireworks(kelvin=10000)
+            EffectFireworks(kelvin=10001)
 
 
 # ---------------------------------------------------------------------------

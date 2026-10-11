@@ -740,7 +740,7 @@ class TestLightInitializeStateParallel:
         assert isinstance(light._state.color, HSBK)
 
         # Verify capabilities were set
-        assert light._capabilities is product_info
+        assert light._capabilities == product_info
 
     @pytest.mark.asyncio
     async def test_light_initialize_state_with_capabilities_skips_get_version(

@@ -32,6 +32,7 @@ from lifx.products.registry import (
     ProductCapability,
     ProductInfo,
     TemperatureRange,
+    get_product,
 )
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import (
@@ -1773,6 +1774,23 @@ class TestStateDataclasses:
         state.last_updated = time.time() - 10.0
         assert state.is_fresh(max_age=5.0) is False
 
+    def test_device_capabilities_unknown_range_is_most_conservative(self):
+        """An unknown range reports 2500-9000, the narrowest any product has."""
+        caps = DeviceCapabilities(
+            has_color=True,
+            has_multizone=False,
+            has_chain=False,
+            has_matrix=False,
+            has_infrared=False,
+            has_hev=False,
+            has_extended_multizone=False,
+            kelvin_min=None,
+            kelvin_max=None,
+        )
+
+        assert caps.as_dict["kelvin_min"] == 2500
+        assert caps.as_dict["kelvin_max"] == 9000
+
     def test_device_capabilities_has_variable_color_temp(self):
         """Test DeviceCapabilities.has_variable_color_temp property."""
         # Device with fixed temperature
@@ -1818,7 +1836,7 @@ class TestProcessCapabilities:
         with patch("lifx.devices.base.get_product", return_value=product_info):
             device._process_capabilities(version, firmware)
 
-        assert device._capabilities is product_info
+        assert device._capabilities == product_info
 
     def test_process_capabilities_noop_when_already_set(self, mock_product_info):
         """Test _process_capabilities() is a no-op when capabilities already set."""
@@ -1861,6 +1879,77 @@ class TestProcessCapabilities:
 
         assert device._capabilities is not None
         assert not device._capabilities.has_extended_multizone
+
+
+class TestFirmwareTemperatureRange:
+    """A light's kelvin range follows the firmware it runs."""
+
+    @pytest.mark.parametrize(
+        ("product", "major", "minor", "expected"),
+        [
+            (219, 4, 147, (1500, 9000)),  # Luna before the upgrade
+            (219, 4, 148, (1000, 10000)),  # Luna from 4.148
+            (267, 4, 148, (1500, 9000)),  # Mirror still needs 4.200
+            (267, 4, 200, (1000, 10000)),  # Mirror from 4.200
+            (268, 4, 148, (1000, 10000)),  # Mirror Intl from 4.148
+            (1, 2, 80, (2500, 9000)),  # Original 1000: no upgrades
+        ],
+    )
+    def test_min_and_max_kelvin_follow_firmware(
+        self, product: int, major: int, minor: int, expected: tuple[int, int]
+    ) -> None:
+        light = Light(serial="d073d5010203", ip="192.168.1.100")
+        light._process_capabilities(
+            DeviceVersion(vendor=1, product=product),
+            FirmwareInfo(build=0, version_major=major, version_minor=minor),
+        )
+
+        assert (light.min_kelvin, light.max_kelvin) == expected
+
+    def test_upgraded_light_leaves_registry_entry_alone(self) -> None:
+        light = Light(serial="d073d5010203", ip="192.168.1.100")
+        light._process_capabilities(
+            DeviceVersion(vendor=1, product=219),
+            FirmwareInfo(build=0, version_major=4, version_minor=148),
+        )
+
+        older = Light(serial="d073d5010204", ip="192.168.1.101")
+        older._process_capabilities(
+            DeviceVersion(vendor=1, product=219),
+            FirmwareInfo(build=0, version_major=4, version_minor=100),
+        )
+
+        assert (older.min_kelvin, older.max_kelvin) == (1500, 9000)
+
+    async def test_same_light_updated_across_the_boundary(self, light: Light) -> None:
+        """A firmware update seen on a live device object widens its range.
+
+        UDP has no session for a reboot to drop, so the same object keeps
+        talking to the light after it updates from 4.147 to 4.148.
+        """
+        light._process_capabilities(
+            DeviceVersion(vendor=1, product=219),
+            FirmwareInfo(build=0, version_major=4, version_minor=147),
+        )
+        assert (light.min_kelvin, light.max_kelvin) == (1500, 9000)
+
+        light.connection.request.return_value = packets.Device.StateHostFirmware(
+            build=0, version_major=4, version_minor=148
+        )
+        await light.get_host_firmware()
+
+        assert (light.min_kelvin, light.max_kelvin) == (1000, 10000)
+
+    def test_old_strip_firmware_keeps_registry_extended_multizone(self) -> None:
+        strip = Light(serial="d073d5010203", ip="192.168.1.100")
+        strip._process_capabilities(
+            DeviceVersion(vendor=1, product=32),
+            FirmwareInfo(build=0, version_major=2, version_minor=50),
+        )
+
+        assert strip.capabilities is not None
+        assert not strip.capabilities.has_extended_multizone
+        assert get_product(32).has_extended_multizone
 
 
 class TestStateBatchOnThreadDevice:
@@ -1999,7 +2088,7 @@ class TestDeviceInitializeStateParallel:
         assert device._state.power == 65535
 
         # Verify capabilities were set
-        assert device._capabilities is product_info
+        assert device._capabilities == product_info
 
     @pytest.mark.asyncio
     async def test_device_initialize_state_with_capabilities_skips_get_version(

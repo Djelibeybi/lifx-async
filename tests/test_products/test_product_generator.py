@@ -13,12 +13,15 @@ Tests cover:
 from __future__ import annotations
 
 import json
+import sys
+import types
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
+from lifx.products import ProductRegistry
 from lifx.products.generator import (
     download_products,
     format_generated_files,
@@ -958,3 +961,114 @@ class TestFormatGeneratedFiles:
 
         with pytest.raises(RuntimeError, match=r"ruff format failed"):
             format_generated_files(target)
+
+
+# ============================================================================
+# Tests for firmware-dependent temperature ranges
+# ============================================================================
+
+
+@pytest.fixture
+def temperature_upgrade_products_data() -> dict[str, Any]:
+    """A product whose temperature range widens twice with firmware.
+
+    The upgrades are listed out of firmware order, and one carries an
+    incomplete range that must be ignored.
+    """
+    return {
+        "vid": 1,
+        "name": "LIFX",
+        "defaults": {"features": {"color": True}},
+        "products": [
+            {
+                "pid": 219,
+                "name": "Test Luna",
+                "features": {"temperature_range": [2500, 9000]},
+                "upgrades": [
+                    {
+                        "major": 4,
+                        "minor": 148,
+                        "features": {"temperature_range": [1000, 10000]},
+                    },
+                    {
+                        "major": 2,
+                        "minor": 80,
+                        "features": {"temperature_range": [1500, 9000]},
+                    },
+                    {
+                        "major": 3,
+                        "minor": 70,
+                        "features": {"temperature_range": [1200]},
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _load_generated_registry(
+    code: str, monkeypatch: pytest.MonkeyPatch
+) -> types.ModuleType:
+    """Import generated registry source as a throwaway module."""
+    module = types.ModuleType("generated_registry")
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    exec(compile(code, "<generated>", "exec"), module.__dict__)  # nosec B102
+    return module
+
+
+class TestTemperatureRangeUpgrades:
+    """products.json temperature range upgrades reach the generated registry."""
+
+    @pytest.mark.parametrize(
+        ("firmware", "expected"),
+        [
+            ((2 << 16) | 79, (2500, 9000)),
+            ((2 << 16) | 80, (1500, 9000)),
+            ((3 << 16) | 70, (1500, 9000)),
+            ((4 << 16) | 147, (1500, 9000)),
+            ((4 << 16) | 148, (1000, 10000)),
+        ],
+    )
+    def test_generated_registry_resolves_range_by_firmware(
+        self,
+        temperature_upgrade_products_data: dict,
+        monkeypatch: pytest.MonkeyPatch,
+        firmware: int,
+        expected: tuple[int, int],
+    ) -> None:
+        registry = _load_generated_registry(
+            generate_registry_file(temperature_upgrade_products_data), monkeypatch
+        )
+        product = registry.PRODUCTS[219]
+        resolved = product.for_firmware(firmware).temperature_range
+        assert (resolved.min, resolved.max) == expected
+
+    @pytest.mark.parametrize(
+        ("firmware", "expected"),
+        [
+            ((2 << 16) | 79, (2500, 9000)),
+            ((2 << 16) | 80, (1500, 9000)),
+            ((4 << 16) | 148, (1000, 10000)),
+        ],
+    )
+    def test_load_from_dict_resolves_range_by_firmware(
+        self,
+        temperature_upgrade_products_data: dict,
+        firmware: int,
+        expected: tuple[int, int],
+    ) -> None:
+        registry = ProductRegistry()
+        registry.load_from_dict(temperature_upgrade_products_data)
+        product = registry.get_product(219)
+        assert product is not None
+        resolved = product.for_firmware(firmware).temperature_range
+        assert resolved is not None
+        assert (resolved.min, resolved.max) == expected
+
+    def test_product_without_upgrades_has_none(
+        self, minimal_products_data: dict, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        registry = _load_generated_registry(
+            generate_registry_file(minimal_products_data), monkeypatch
+        )
+        assert registry.PRODUCTS[1].temperature_range_upgrades == ()

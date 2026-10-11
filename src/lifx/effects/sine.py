@@ -90,7 +90,7 @@ class EffectSine(FrameEffect):
         brightness: Peak brightness (0.0-1.0)
         floor: Minimum brightness (0.0-1.0, must be < brightness)
         hue2: Optional second hue for gradient along the wave (None = disabled)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
         reverse: Reverse wave travel direction
 
@@ -130,7 +130,7 @@ class EffectSine(FrameEffect):
             brightness: Peak brightness 0.0-1.0 (default 0.8)
             floor: Minimum brightness 0.0-1.0, must be < brightness (default 0.02)
             hue2: Optional second hue 0-360 for gradient (default None, disabled)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
             reverse: Reverse wave direction (default False)
 

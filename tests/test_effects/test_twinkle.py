@@ -160,12 +160,12 @@ class TestTwinkleValidation:
     def test_invalid_kelvin_too_low(self) -> None:
         """Test kelvin below minimum raises ValueError."""
         with pytest.raises(ValueError, match="Kelvin must be"):
-            EffectTwinkle(kelvin=1000)
+            EffectTwinkle(kelvin=999)
 
     def test_invalid_kelvin_too_high(self) -> None:
         """Test kelvin above maximum raises ValueError."""
         with pytest.raises(ValueError, match="Kelvin must be"):
-            EffectTwinkle(kelvin=10000)
+            EffectTwinkle(kelvin=10001)
 
 
 class TestTwinkleInheritance:

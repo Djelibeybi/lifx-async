@@ -103,10 +103,10 @@ def test_embers_invalid_brightness() -> None:
 def test_embers_invalid_kelvin() -> None:
     """Test EffectEmbers with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectEmbers(kelvin=1000)
+        EffectEmbers(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectEmbers(kelvin=10000)
+        EffectEmbers(kelvin=10001)
 
 
 def test_embers_invalid_zones_per_bulb() -> None:

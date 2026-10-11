@@ -134,10 +134,10 @@ def test_sine_invalid_hue2() -> None:
 def test_sine_invalid_kelvin() -> None:
     """Test EffectSine with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSine(kelvin=1000)
+        EffectSine(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectSine(kelvin=10000)
+        EffectSine(kelvin=10001)
 
 
 def test_sine_invalid_zones_per_bulb() -> None:

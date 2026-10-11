@@ -223,7 +223,7 @@ def _validate_colors(line_number: int, record: dict[str, Any]) -> None:
         # Kelvin 0 (KELVIN_SATURATED) is legitimate on an *inbound* read and
         # is never clamped there. Theme data is outbound, blended data:
         # HSBK.average() averages kelvin linearly, so a palette mixing kelvin
-        # 0 with any real kelvin lands in the forbidden 1-1499 band and raises
+        # 0 with any real kelvin lands in the forbidden 1-999 band and raises
         # inside Canvas.blur(), fill_in_points() and every multizone/matrix
         # apply_theme(). A theme that cannot be rendered must not be
         # generated, so the inbound exemption does not apply here.

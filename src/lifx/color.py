@@ -212,7 +212,7 @@ def validate_brightness(value: float) -> None:
 
 
 def validate_kelvin(value: int) -> None:
-    """Validate kelvin temperature is in range 1500-9000, or exactly 0.
+    """Validate kelvin temperature is in range 1000-10000, or exactly 0.
 
     ``MIN_KELVIN``-``MAX_KELVIN`` is the white-mode range of the product, not
     the range of the protocol field. Devices report ``KELVIN_SATURATED`` (0)
@@ -247,9 +247,10 @@ class HSBK:
         hue: Hue value in degrees (0-360)
         saturation: Saturation (0.0-1.0, where 0 is white and 1 is fully saturated)
         brightness: Brightness (0.0-1.0, where 0 is off and 1 is full brightness)
-        kelvin: Color temperature in Kelvin (1500-9000, typically 2500-9000 for
-            LIFX). Devices also report 0 for a colour with no white component;
-            that value is accepted and round-trips unchanged.
+        kelvin: Color temperature in Kelvin (1000-10000; each light's own
+            range is its min_kelvin/max_kelvin). Devices also report 0 for a
+            color with no white component; that value is accepted and
+            round-trips unchanged.
 
     Example:
         ```python
@@ -364,7 +365,7 @@ class HSBK:
     def kelvin(self) -> int:
         """Return kelvin.
 
-        Usually 1500-9000, but 0 when the device reports a colour with no
+        Usually 1000-10000, but 0 when the device reports a colour with no
         white component (a fully saturated zone).
         """
         return self._kelvin
@@ -546,7 +547,7 @@ class HSBK:
         """Create a new HSBK with modified color temperature.
 
         Args:
-            kelvin: New kelvin value (1500-9000, or 0 for no white component)
+            kelvin: New kelvin value (1000-10000, or 0 for no white component)
 
         Returns:
             New HSBK instance
@@ -577,7 +578,7 @@ class HSBK:
                 saturation
             brightness: New brightness (0.0-1.0), or None to keep the current
                 brightness
-            kelvin: New color temperature (1500-9000, or 0 for no white
+            kelvin: New color temperature (1000-10000, or 0 for no white
                 component), or None to keep the current kelvin
 
         Returns:

@@ -71,7 +71,7 @@ A modern, type-safe, async Python library for controlling LIFX lights over the l
                 hue=180,         # 0-360 degrees
                 saturation=0.7,  # 0.0-1.0
                 brightness=0.8,  # 0.0-1.0
-                kelvin=3500,     # 1500-9000
+                kelvin=3500,     # 1000-10000
             )
             await light.set_color(custom)
 

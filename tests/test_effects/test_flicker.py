@@ -65,13 +65,13 @@ def test_flicker_invalid_speed() -> None:
 def test_flicker_invalid_kelvin_min() -> None:
     """Test EffectFlicker with invalid kelvin_min raises ValueError."""
     with pytest.raises(ValueError, match="kelvin_min must be >="):
-        EffectFlicker(kelvin_min=1000)
+        EffectFlicker(kelvin_min=999)
 
 
 def test_flicker_invalid_kelvin_max() -> None:
     """Test EffectFlicker with invalid kelvin_max raises ValueError."""
     with pytest.raises(ValueError, match="kelvin_max must be <="):
-        EffectFlicker(kelvin_max=10000)
+        EffectFlicker(kelvin_max=10001)
 
 
 def test_flicker_invalid_kelvin_range() -> None:

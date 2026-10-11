@@ -118,7 +118,7 @@ def rgb_to_hsbk_numpy(
         - Hue: 0-65535
         - Saturation: 0-65535
         - Brightness: 0-65535
-        - Kelvin: 1500-9000
+        - Kelvin: 1000-10000
     """
     # Normalize RGB to 0-1 float
     rgb_norm = rgb.astype(np.float32) / 255.0

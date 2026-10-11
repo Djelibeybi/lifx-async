@@ -169,6 +169,11 @@ async def use_cached_or_fetch():
 - `Light.min_kelvin` - Lowest supported kelvin value
 - `Light.max_kelvin` - Highest supported kelvin value
 
+Both follow the light's host firmware. Many newer lights, including the Luna,
+widen from 1500-9000 K to 1000-10000 K on firmware 4.148 or later (4.200 for
+the non-Intl LIFX Mirror, product 267), as `products.json` records in each
+product's `upgrades`.
+
 #### InfraredLight properties
 
 - `InfraredLight.infrared` - Infrared brightness

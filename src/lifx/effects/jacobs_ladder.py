@@ -154,7 +154,7 @@ class EffectJacobsLadder(FrameEffect):
         arcs: Target number of simultaneous arc pairs (1-5)
         gap: Base gap between electrodes in bulbs (2-12)
         brightness: Overall brightness 0.0-1.0
-        kelvin: Color temperature 1500-9000
+        kelvin: Color temperature 1000-10000
         zones_per_bulb: Physical zones per logical bulb
 
     Example:
@@ -190,7 +190,7 @@ class EffectJacobsLadder(FrameEffect):
             arcs: Target number of simultaneous arc pairs, must be 1-5 (default 2)
             gap: Base gap between electrodes in bulbs, must be 2-12 (default 5)
             brightness: Overall brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 6500)
+            kelvin: Color temperature 1000-10000 (default 6500)
             zones_per_bulb: Physical zones per logical bulb, must be >= 1 (default 1)
 
         Raises:

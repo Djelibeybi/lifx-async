@@ -377,6 +377,13 @@ The product registry provides automatic device type detection and capability inf
       members_order: source
       show_if_no_docstring: false
 
+::: lifx.products.TemperatureRangeUpgrade
+    options:
+      show_root_heading: true
+      heading_level: 3
+      members_order: source
+      show_if_no_docstring: false
+
 ### Using the Product Registry
 
 ```python

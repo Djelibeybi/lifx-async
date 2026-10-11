@@ -105,10 +105,10 @@ def test_plasma2d_invalid_brightness() -> None:
 def test_plasma2d_invalid_kelvin() -> None:
     """Test EffectPlasma2D with invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectPlasma2D(kelvin=1000)
+        EffectPlasma2D(kelvin=999)
 
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectPlasma2D(kelvin=10000)
+        EffectPlasma2D(kelvin=10001)
 
 
 # ---------------------------------------------------------------------------

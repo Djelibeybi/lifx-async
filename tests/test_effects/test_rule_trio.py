@@ -160,9 +160,9 @@ def test_rule_trio_invalid_brightness() -> None:
 def test_rule_trio_invalid_kelvin() -> None:
     """Test invalid kelvin raises ValueError."""
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRuleTrio(kelvin=1000)
+        EffectRuleTrio(kelvin=999)
     with pytest.raises(ValueError, match="Kelvin must be"):
-        EffectRuleTrio(kelvin=10000)
+        EffectRuleTrio(kelvin=10001)
 
 
 def test_rule_trio_invalid_zones_per_bulb() -> None:

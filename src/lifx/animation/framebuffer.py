@@ -17,7 +17,7 @@ Multi-Tile Canvas Support:
 
 Design Philosophy:
     Colors are "protocol-ready" HSBK tuples - uint16 values matching the LIFX
-    protocol (0-65535 for H/S/B, 1500-9000 for K).
+    protocol (0-65535 for H/S/B, 1000-10000 for K).
 
 Example:
     ```python
@@ -379,7 +379,7 @@ class FrameBuffer:
                   - For multi-tile: length must match canvas_size
                   - For single-tile/multizone: length must match pixel_count
                   Each tuple is (hue, sat, brightness, kelvin) where
-                  H/S/B are 0-65535 and K is 1500-9000.
+                  H/S/B are 0-65535 and K is 1000-10000.
 
         Returns:
             Remapped HSBK data in device order

@@ -615,8 +615,8 @@ class TestValidateRecordsColors:
             _color(saturation=1.1),
             _color(saturation=-1),
             _color(brightness=1.1),
-            _color(kelvin=1000),
-            _color(kelvin=9001),
+            _color(kelvin=999),
+            _color(kelvin=10001),
         ],
     )
     def test_out_of_range_color_aborts(self, color: dict[str, Any]) -> None:
@@ -628,7 +628,7 @@ class TestValidateRecordsColors:
         """Kelvin 0 is inbound-only; a theme is outbound, blended data.
 
         ``HSBK.average()`` averages kelvin linearly, so a palette mixing
-        kelvin 0 with any real kelvin lands in the forbidden 1-1499 band and
+        kelvin 0 with any real kelvin lands in the forbidden 1-999 band and
         raises inside every multizone/matrix ``apply_theme()`` path.
         """
         with pytest.raises(RuntimeError, match=r"line 1.*kelvin.*not valid in theme"):

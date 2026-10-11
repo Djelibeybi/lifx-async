@@ -80,6 +80,28 @@ def download_products() -> dict[str, Any] | list[dict[str, Any]] | None:
         return products
 
 
+def parse_temperature_range_upgrades(
+    product: dict[str, Any],
+) -> list[tuple[int, tuple[int, int]]]:
+    """Extract a product's firmware-dependent temperature ranges.
+
+    Args:
+        product: One product entry from products.json
+
+    Returns:
+        (min_firmware, (min_kelvin, max_kelvin)) pairs ordered by firmware,
+        where min_firmware is encoded as ``(major << 16) | minor``
+    """
+    upgrades = []
+    for upgrade in product.get("upgrades", []):
+        temp_list = upgrade.get("features", {}).get("temperature_range")
+        if temp_list is None or len(temp_list) < 2:
+            continue
+        min_firmware = (upgrade.get("major", 0) << 16) | upgrade.get("minor", 0)
+        upgrades.append((min_firmware, (temp_list[0], temp_list[1])))
+    return sorted(upgrades)
+
+
 def generate_product_definitions(
     products_data: dict[str, Any] | list[dict[str, Any]],
 ) -> str:
@@ -169,6 +191,15 @@ def generate_product_definitions(
                         f"TemperatureRange(min={temp_list[0]}, max={temp_list[1]})"
                     )
 
+            # Parse firmware-dependent temperature ranges
+            temp_upgrade_exprs = [
+                f"TemperatureRangeUpgrade(min_firmware={min_firmware}, "
+                f"temperature_range=TemperatureRange(min={low}, max={high}))"
+                for min_firmware, (low, high) in parse_temperature_range_upgrades(
+                    product
+                )
+            ]
+
             # Format firmware version
             min_ext_mz_firmware_expr = (
                 str(min_ext_mz_firmware) if min_ext_mz_firmware is not None else "None"
@@ -184,6 +215,11 @@ def generate_product_definitions(
             code_lines.append(
                 f"        min_ext_mz_firmware={min_ext_mz_firmware_expr},"
             )
+            if temp_upgrade_exprs:
+                code_lines.append("        temperature_range_upgrades=(")
+                for expr in temp_upgrade_exprs:
+                    code_lines.append(f"            {expr},")
+                code_lines.append("        ),")
             code_lines.append("    ),")
 
             product_count += 1
@@ -215,7 +251,7 @@ This module provides pre-generated product information for efficient runtime loo
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import IntEnum
 
 
@@ -241,6 +277,20 @@ class TemperatureRange:
     max: int
 
 
+@dataclass(frozen=True)
+class TemperatureRangeUpgrade:
+    """A color temperature range a product gains from a firmware version on.
+
+    Attributes:
+        min_firmware: First firmware version with this range, encoded as
+            ``(major << 16) | minor``
+        temperature_range: Min/max color temperature in Kelvin from that version
+    """
+
+    min_firmware: int
+    temperature_range: TemperatureRange
+
+
 @dataclass
 class ProductInfo:
     """Information about a LIFX product.
@@ -250,8 +300,12 @@ class ProductInfo:
         name: Product name
         vendor: Vendor ID (always 1 for LIFX)
         capabilities: Bitfield of ProductCapability flags
-        temperature_range: Min/max color temperature in Kelvin
+        temperature_range: Min/max color temperature in Kelvin. On a registry
+            entry this is the range of the earliest firmware; a device's own
+            capabilities hold the range of the firmware it runs
         min_ext_mz_firmware: Minimum firmware version for extended multizone
+        temperature_range_upgrades: Wider temperature ranges later firmware
+            versions support
     """
 
     pid: int
@@ -260,6 +314,7 @@ class ProductInfo:
     capabilities: int
     temperature_range: TemperatureRange | None
     min_ext_mz_firmware: int | None
+    temperature_range_upgrades: tuple[TemperatureRangeUpgrade, ...] = ()
 
     def has_capability(self, capability: ProductCapability) -> bool:
         """Check if product has a specific capability.
@@ -333,6 +388,38 @@ class ProductInfo:
         if firmware_version is None:
             return True
         return firmware_version >= self.min_ext_mz_firmware
+
+    def for_firmware(self, firmware_version: int) -> ProductInfo:
+        """Resolve the capabilities a device running this firmware has.
+
+        Returns a copy, so the shared registry entry is never modified:
+        extended multizone is dropped when the firmware predates it, and the
+        temperature range is the one from the newest upgrade the firmware
+        has reached.
+
+        Args:
+            firmware_version: Host firmware version, ``(major << 16) | minor``
+
+        Returns:
+            A new ProductInfo describing the device on that firmware
+        """
+        capabilities = self.capabilities
+        if not self.supports_extended_multizone(firmware_version):
+            capabilities &= ~ProductCapability.EXTENDED_MULTIZONE
+
+        temperature_range = self.temperature_range
+        reached = [
+            upgrade
+            for upgrade in self.temperature_range_upgrades
+            if firmware_version >= upgrade.min_firmware
+        ]
+        if reached:
+            newest = max(reached, key=lambda upgrade: upgrade.min_firmware)
+            temperature_range = newest.temperature_range
+
+        return replace(
+            self, capabilities=capabilities, temperature_range=temperature_range
+        )
 
 
 '''
@@ -420,6 +507,23 @@ class ProductRegistry:
                     if len(temp_list) >= 2:
                         temp_range = TemperatureRange(min=temp_list[0], max=temp_list[1])
 
+                # Parse firmware-dependent temperature ranges
+                temp_upgrades = []
+                for upgrade in product.get("upgrades", []):
+                    upgrade_list = upgrade.get("features", {}).get("temperature_range")
+                    if upgrade_list is None or len(upgrade_list) < 2:
+                        continue
+                    temp_upgrades.append(
+                        TemperatureRangeUpgrade(
+                            min_firmware=(upgrade.get("major", 0) << 16)
+                            | upgrade.get("minor", 0),
+                            temperature_range=TemperatureRange(
+                                min=upgrade_list[0], max=upgrade_list[1]
+                            ),
+                        )
+                    )
+                temp_upgrades.sort(key=lambda upgrade: upgrade.min_firmware)
+
                 product_info = ProductInfo(
                     pid=pid,
                     name=name,
@@ -427,6 +531,7 @@ class ProductRegistry:
                     capabilities=capabilities,
                     temperature_range=temp_range,
                     min_ext_mz_firmware=min_ext_mz_firmware,
+                    temperature_range_upgrades=tuple(temp_upgrades),
                 )
 
                 self._products[pid] = product_info

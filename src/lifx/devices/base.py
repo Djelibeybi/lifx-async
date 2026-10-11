@@ -20,6 +20,8 @@ from lifx.const import (
     LIFX_GROUP_NAMESPACE,
     LIFX_LOCATION_NAMESPACE,
     LIFX_UDP_PORT,
+    UNKNOWN_RANGE_MAX_KELVIN,
+    UNKNOWN_RANGE_MIN_KELVIN,
 )
 from lifx.exceptions import (
     LifxDeviceNotFoundError,
@@ -355,8 +357,16 @@ class DeviceCapabilities:
             "has_infrared": self.has_infrared,
             "has_hev": self.has_hev,
             "has_variable_color_temp": self.has_variable_color_temp,
-            "kelvin_max": self.kelvin_max if self.kelvin_max is not None else 9000,
-            "kelvin_min": self.kelvin_min if self.kelvin_min is not None else 1500,
+            "kelvin_max": (
+                self.kelvin_max
+                if self.kelvin_max is not None
+                else UNKNOWN_RANGE_MAX_KELVIN
+            ),
+            "kelvin_min": (
+                self.kelvin_min
+                if self.kelvin_min is not None
+                else UNKNOWN_RANGE_MIN_KELVIN
+            ),
         }
 
 
@@ -679,6 +689,10 @@ class Device(Generic[StateT]):
 
         # Product capabilities for device features (populated on first use)
         self._capabilities: ProductInfo | None = None
+        # (version_major, version_minor) the capabilities were resolved for, so
+        # a firmware update seen by this object re-resolves them. None when a
+        # caller set the capabilities directly.
+        self._capabilities_firmware: tuple[int, int] | None = None
 
         # State management (populated by connect() factory or _initialize_state())
         self._state: StateT | None = None
@@ -712,6 +726,7 @@ class Device(Generic[StateT]):
         self._version = source._version
         self._host_firmware = source._host_firmware
         self._capabilities = source._capabilities
+        self._capabilities_firmware = source._capabilities_firmware
         self._mac_address = source._mac_address
         self._mac_address_firmware = source._mac_address_firmware
         self._connectivity = source._connectivity
@@ -1052,41 +1067,47 @@ class Device(Generic[StateT]):
     ) -> None:
         """Process device capabilities from already-fetched version and firmware data.
 
-        Looks up product info from version.product, checks extended_multizone firmware
-        requirement, and sets self._capabilities. No-op if capabilities already set.
+        Looks up product info from version.product and resolves it for the
+        host firmware: extended multizone is dropped when the firmware predates
+        it, and the temperature range follows any firmware upgrade. The result
+        is a per-device copy, so the shared registry entry is never modified.
+        No-op if capabilities already set.
 
         Args:
             version: Device version info (vendor, product)
-            host_firmware: Host firmware info for extended multizone check
+            host_firmware: Host firmware info for firmware-dependent capabilities
         """
         if self._capabilities is not None:
             return
 
-        self._capabilities = get_product(version.product)
+        self._resolve_capabilities(version.product, host_firmware)
 
-        # If device has extended_multizone with minimum firmware requirement, verify it
-        if self._capabilities and self._capabilities.has_extended_multizone:
-            if self._capabilities.min_ext_mz_firmware is not None:
-                firmware_version = (
-                    host_firmware.version_major << 16
-                ) | host_firmware.version_minor
+    def _resolve_capabilities(self, product: int, host_firmware: FirmwareInfo) -> None:
+        """Resolve the registry entry for a product on the given host firmware.
 
-                # If firmware is too old, remove the extended_multizone capability
-                if (
-                    firmware_version < self._capabilities.min_ext_mz_firmware
-                ):  # pragma: no cover
-                    from lifx.products.registry import ProductCapability
+        Always starts from the shared registry entry, never from a previously
+        resolved copy, so the result is the same whichever firmware was seen
+        first.
 
-                    self._capabilities.capabilities &= (
-                        ~ProductCapability.EXTENDED_MULTIZONE
-                    )
+        Args:
+            product: Product ID from the device version
+            host_firmware: Host firmware the device runs
+        """
+        firmware_version = (
+            host_firmware.version_major << 16
+        ) | host_firmware.version_minor
+        self._capabilities = get_product(product).for_firmware(firmware_version)
+        self._capabilities_firmware = (
+            host_firmware.version_major,
+            host_firmware.version_minor,
+        )
 
     async def _ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
 
         This fetches the device version and firmware to determine product capabilities.
         If the device claims extended_multizone support but firmware is too old,
-        the capability is removed.
+        the capability is removed, and the temperature range follows the firmware.
 
         Called automatically when entering context manager, but can be called manually.
         """
@@ -1487,6 +1508,17 @@ class Device(Generic[StateT]):
         )
 
         self._host_firmware = firmware
+
+        # UDP has no session for a reboot to drop, so this object can be the
+        # first to see a firmware update: re-resolve capabilities resolved for
+        # an earlier version. Capabilities a caller set directly are left alone.
+        if (
+            self._capabilities is not None
+            and self._capabilities_firmware is not None
+            and self._capabilities_firmware
+            != (firmware.version_major, firmware.version_minor)
+        ):
+            self._resolve_capabilities(self._capabilities.pid, firmware)
 
         # Recalculate the MAC now that we have firmware info. Unconditional:
         # get_mac_address() re-derives only when the firmware it cached against

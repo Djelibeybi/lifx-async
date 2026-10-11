@@ -167,7 +167,7 @@ class EffectPlasma(FrameEffect):
         hue: Base tendril hue in degrees (0-360)
         hue_spread: Random hue variation in degrees
         brightness: Peak brightness (0.0-1.0)
-        kelvin: Color temperature (1500-9000)
+        kelvin: Color temperature (1000-10000)
         zones_per_bulb: Number of physical zones per logical bulb
 
     Example:
@@ -206,7 +206,7 @@ class EffectPlasma(FrameEffect):
             hue: Base tendril hue 0-360 degrees (default 270, violet)
             hue_spread: Random hue variation 0-180 degrees (default 60)
             brightness: Peak brightness 0.0-1.0 (default 0.8)
-            kelvin: Color temperature 1500-9000 (default 3500)
+            kelvin: Color temperature 1000-10000 (default 3500)
             zones_per_bulb: Physical zones per logical bulb (default 1)
 
         Raises:
