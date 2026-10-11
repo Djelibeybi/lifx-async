@@ -6,24 +6,24 @@ Language for controlling the independently lit regions of Ceiling and Mirror lig
 
 **Light component**:
 An independently controlled region of one light: uplight or downlight on a Ceiling,
-front or back on a Mirror. Its colours and apparent on/off state can differ from
+front or back on a Mirror. Its colors and apparent on/off state can differ from
 the other region even though both share the light's power.
 
 **Whole-light operation**:
-A colour or power change addressed to the light as a whole, affecting both light
+A color or power change addressed to the light as a whole, affecting both light
 components.
 
-**Stored colours**:
-Colours remembered for restoring a light component when it is turned on again.
-They can differ from the colours it currently displays while dark or fading.
+**Stored colors**:
+Colors remembered for restoring a light component when it is turned on again.
+They can differ from the colors it currently displays while dark or fading.
 
 **Transition target**:
-The colours or power level a light is fading towards. A target can differ from
+The colors or power level a light is fading towards. A target can differ from
 what the light reports while the fade is in progress.
 
-**Observed colours**:
-Colours reported by the light for the zones covered by a response. During a fade,
-they can be intermediate colours rather than the transition target.
+**Observed colors**:
+Colors reported by the light for the zones covered by a response. During a fade,
+they can be intermediate colors rather than the transition target.
 
 **Software effect**:
 An effect built into the library. The library computes each frame and streams it
@@ -43,7 +43,7 @@ effect (both kinds are built in, to different things).
 
 **Waveform**:
 A transition the light performs from one waveform command: it swings between its
-current colour and a target colour in a set shape (saw, sine, half-sine, triangle
+current color and a target color in a set shape (saw, sine, half-sine, triangle
 or pulse) for a set period and number of cycles. Breathe and pulse are waveforms.
 _Avoid_: effect (a waveform is neither a software nor a firmware effect).
 
@@ -55,7 +55,7 @@ downlight is the full grid with the uplight cell dropped, and a Mirror ring is
 25 pixels that wrap, running clockwise from the ring origin on both rings. A
 whole-light effect on a Mirror runs as two ring participants, the front and the
 back, which share the Mirror's one index and simulation and so show the same
-frame. The light component that no effect draws on keeps its colours and stays under the caller's control.
+frame. The light component that no effect draws on keeps its colors and stays under the caller's control.
 Only an effect that draws frames can have a light component as a participant.
 A whole-light effect and a light component effect never share a light
 component: the newest wins, and a whole-light effect that loses one light
@@ -70,7 +70,7 @@ has a device type even though it is not a device.
 
 **Seam**:
 The point on a ring where an effect's first and last pixels meet. On a Mirror
-ring it sits at the ring origin (top centre by default, set with
+ring it sits at the ring origin (top center by default, set with
 `MirrorLight.ring_origin`), not at zone 0. An effect is
 seamless when nothing visibly jumps there. Effects without meaningful ends are
 always seamless on a ring; effects whose meaning needs a start and an end keep
@@ -82,28 +82,28 @@ Ending a software effect on a participant and restoring the participant's
 prior state, while any other participants of the same effect carry on.
 Stopping a light stops every effect on it, software or firmware, including
 the effect on either light component; stopping a light component stops only
-that light component's effect. _Avoid_: cancelling (that leaves the prior
+that light component's effect. _Avoid_: canceling (that leaves the prior
 state unrestored).
 
 **Theme**:
-A palette of colours, either named in the theme library or built by the caller.
-Painting a theme blends its colours across the light.
+A palette of colors, either named in the theme library or built by the caller.
+Painting a theme blends its colors across the light.
 
 **Mood**:
 A theme painted the way the LIFX app paints it: the theme chooses the recipe,
-and the colours are scaled to the light's brightness. Animating a mood starts
+and the colors are scaled to the light's brightness. Animating a mood starts
 the effect the app's Dynamic toggle starts.
 
 **Current theme**, **current mood**:
 The theme a light was last painted with as a theme, or as a mood, for as long as
-the light still shows exactly the colours it was painted with. A light has at
+the light still shows exactly the colors it was painted with. A light has at
 most one of the two, and only as a whole light, never per light component.
 Turning the light off keeps it. A software effect playing the mood keeps it
-while it runs, and so does firmware Morph between its colours. Firmware Move
+while it runs, and so does firmware Morph between its colors. Firmware Move
 ends it, because the light no longer reports what it shows in a form that can
 be checked.
 
 **Brightness inference**:
-Choosing turn-on brightness when no colour is supplied: use suitable stored
+Choosing turn-on brightness when no color is supplied: use suitable stored
 brightness first, otherwise the other light component's brightness, then the
 default brightness.
