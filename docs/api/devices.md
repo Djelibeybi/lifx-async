@@ -675,6 +675,9 @@ async def main():
         # Set a MOVE effect
         await light.set_move_effect(Direction.FORWARD, 5.0)  # seconds per cycle
 
+        # Paint a theme (or, with mood=True, a mood) first, then start MOVE
+        await light.set_move_effect(Direction.FORWARD, 5.0, theme="evening")
+
         # Get current effect
         effect = await light.get_effect()
         print(f"Effect: {effect.effect_type.name}")
