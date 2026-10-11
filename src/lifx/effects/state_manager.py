@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from lifx.color import HSBK
     from lifx.devices.component.participant import ComponentName
     from lifx.devices.light import Light
+    from lifx.devices.paint_record import PaintRecord
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +76,10 @@ class DeviceStateManager:
             print(f"Captured: {prestate}")
             ```
         """
+        # Taken first, to compare once the reads finish: a write while the
+        # state is read replaces or ends the record.
+        paint_record = light._paint_record
+
         # Get power and color states
         color, power, _ = await light.get_color()
 
@@ -98,6 +103,51 @@ class DeviceStateManager:
             zone_colors=zone_colors,
             tile_colors=tile_colors,
             stored_colors=stored_colors,
+            _paint_record=self._record_still_true(
+                light, paint_record, zone_colors, tile_colors
+            ),
+        )
+
+    @staticmethod
+    def _record_still_true(
+        light: Light,
+        record: PaintRecord | None,
+        zone_colors: list[HSBK] | None,
+        tile_colors: list[list[HSBK]] | None,
+    ) -> PaintRecord | None:
+        """Keep a paint record only if the captured colors still match it.
+
+        The record must still be the light's current one, so a write that
+        landed during the capture drops it. It must be a painted record, as
+        restoring still colors does not resume a Morph or a software run. And
+        what it recorded must equal the captured zones or tiles, as the light
+        stores them.
+
+        Args:
+            light: The light the state was captured from
+            record: The light's record before the reads began
+            zone_colors: The captured zones, for a strip
+            tile_colors: The captured tiles, for a matrix light
+
+        Returns:
+            The record, or None if it cannot be trusted
+        """
+        if record is None or light._paint_record is not record:
+            return None
+        if record.morph is not None or record.run is not None:
+            return None
+        if isinstance(light, MatrixLight):
+            return (
+                record
+                if tile_colors is not None
+                and record.matches_tiles(light._shown_read(tile_colors))
+                else None
+            )
+        # Any other light captures no zones, so it cannot match a painted record.
+        return (
+            record
+            if zone_colors is not None and record.matches_zones(zone_colors)
+            else None
         )
 
     async def restore_state(self, light: Light, prestate: PreState) -> None:
@@ -122,6 +172,7 @@ class DeviceStateManager:
         # so they never show as a flash; if it never reports off, they are
         # not written at all.
         write_colours = True
+        exact = False
         if not prestate.power:
             await self._restore_power(light, prestate.power)
             write_colours = await self._wait_until_off(light)
@@ -131,15 +182,21 @@ class DeviceStateManager:
             # tiles it would flatten; it is only the fallback for a strip
             # whose zones could not be written.
             if isinstance(light, MultiZoneLight) and prestate.zone_colors:
-                if not await self._restore_zones(light, prestate.zone_colors):
+                exact = await self._restore_zones(light, prestate.zone_colors)
+                if not exact:
                     await self._restore_color(light, prestate.color)
             elif isinstance(light, MatrixLight) and prestate.tile_colors:
-                await self._restore_tiles(light, prestate.tile_colors)
+                exact = await self._restore_tiles(light, prestate.tile_colors)
             else:
                 await self._restore_color(light, prestate.color)
 
         if prestate.power:
             await self._restore_power(light, prestate.power)
+
+        # The zones or tiles are back exactly, so the light shows what the
+        # record described. After a failed or skipped write, a fallback to one
+        # color, or a single-color restore, it is not known to.
+        light._adopt_paint_record(prestate._paint_record if exact else None)
 
         # Ceiling and Mirror: an effect never changes either component's
         # stored colours, whatever the restore writes above remembered.
@@ -305,17 +362,21 @@ class DeviceStateManager:
 
     async def _restore_tiles(
         self, light: MatrixLight, tile_colors: list[list[HSBK]]
-    ) -> None:
+    ) -> bool:
         """Write every captured tile back to a matrix light.
 
         Args:
             light: MatrixLight device to restore tiles to
             tile_colors: One list of colours per tile
+
+        Returns:
+            Whether every tile was written
         """
         try:
             for tile_index, colors in enumerate(tile_colors):
                 await light.set_matrix_colors(tile_index, colors, duration=0)
             await asyncio.sleep(ZONE_UPDATE_SETTLE_DELAY)
+            return True
         except Exception as e:
             _LOGGER.warning(
                 {
@@ -326,6 +387,7 @@ class DeviceStateManager:
                     "values": {"serial": light.serial, "tiles": len(tile_colors)},
                 }
             )
+            return False
 
     async def _restore_color(self, light: Light, color: HSBK) -> None:
         """Restore device color.

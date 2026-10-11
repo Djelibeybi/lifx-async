@@ -231,8 +231,8 @@ gh workflow run docs.yml
    - `matrix.py`: `MatrixLight` for matrix devices (2D pixel control: tiles, candle, path)
    - `ceiling.py`: `CeilingLight` class (extends `MatrixLight` with independent uplight/downlight component control for LIFX Ceiling products)
    - `mirror.py`: `MirrorLight` class (extends `MatrixLight` with independent front/back component control for LIFX Mirror products; both components are multi-zone rings)
-   - `component/light.py`: `ComponentMatrixLight`, the shared base of `CeilingLight` and `MirrorLight`. Both components share one tile, and the firmware runs one transition per tile, reports in-flight colours from Get64 and reports the old power level until a power-off fade finishes, so it remembers the tile and power it last wrote until the device catches up (`Pending`)
-   - `component/state.py`: Shared helpers for component-based devices (colour comparison, serialisation, atomic state-file I/O, `Pending`) and the firmware-effect palette rule shared by Morph and Move: `derive_effect_palette()` for a single colour, `sample_effect_palette()` for Morph's palette from a device showing several colours, and `validate_effect_palette()` for the shared size check
+   - `component/light.py`: `ComponentMatrixLight`, the shared base of `CeilingLight` and `MirrorLight`. Both components share one tile, and the firmware runs one transition per tile, reports in-flight colors from Get64 and reports the old power level until a power-off fade finishes, so it remembers the tile and power it last wrote until the device catches up (`Pending`)
+   - `component/state.py`: Shared helpers for component-based devices (color comparison, serialization, atomic state-file I/O, `Pending`) and the firmware-effect palette rule shared by Morph and Move: `derive_effect_palette()` for a single color, `sample_effect_palette()` for Morph's palette from a device showing several colors, and `validate_effect_palette()` for the shared size check
    - State caching with configurable TTL to reduce network traffic
 
 4. **High-Level API** (`src/lifx/api.py`)
@@ -256,7 +256,7 @@ gh workflow run docs.yml
    - `framebuffer.py`: Multi-tile canvas mapping and orientation correction
    - `packets.py`: Prebaked packet templates (`MatrixPacketGenerator`, `MultiZonePacketGenerator`)
    - `orientation.py`: Tile orientation remapping with LRU-cached lookup tables
-   - Optimised for high-frequency frame delivery (up to ~20 FPS) for real-time effects
+   - Optimized for high-frequency frame delivery (up to ~20 FPS) for real-time effects
    - Uses protocol-ready uint16 HSBK values (no conversion overhead)
    - Multi-tile canvas support using `user_x`/`user_y` tile positions
 
@@ -323,6 +323,8 @@ All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceN
 - Cached (semi-static): `label`, `version`, `host_firmware`, `wifi_firmware`, `location`, `group`, `hev_config`, `hev_result`, `zone_count`, `multizone_effect`, `tile_chain`, `tile_count`, `tile_effect`
 - **Never cached** (volatile): `power`, `color`, `hev_cycle`, `zones`, `tile_colors`, `ambient_light_level` — always use `get_*()` methods
 - **Derived, not cached** (computed on every read): `connectivity` is recomputed on every read from the device's own transport report in the most recent correlated response, and comes from discovery metadata until one has been observed. There is no cache entry to refresh or invalidate, but the two values it derives from are stored — the connection's observed transport report and the constructor's discovery metadata — so a new device-construction path must carry both across, which is what `adopt_cached_metadata()` exists to do
+- **Current theme / current mood** (`MultiZoneLight` and `MatrixLight`): `current_theme` and `current_mood` read an in-memory `PaintRecord` (`devices/paint_record.py`), per device object, set for a slugged theme by `apply_theme()` / `apply_mood()` (painted zones or tiles), by `set_morph_effect()` and the `animate_mood()` Morph path (the palette actually sent, matched against `get_effect()`), and by the `animate_mood()` scroll (the software run, held while the effect runner reports it active). Every color or effect write ends it through `Light._zones_changed()`; `set_power()` keeps it. `get_current_theme()`, `get_current_mood()` and `refresh_state()` read the zones, tiles or effect and clear it on mismatch
+- **Component writes on Ceiling and Mirror**: only whole-light paints are tracked. Any write to one light component (colors, turning it on or off including the power-off the last lit component causes, or starting an effect on it) ends the record, including the `_write_tile()` branch that hands the tile to a running Animator. Whole-light `set_power()` keeps it
 - `get_color()` returns `(color, power, label)` in a single request/response pair — most efficient way to get color + power
 - No automatic expiration — application controls when to refresh
 
@@ -470,7 +472,7 @@ Local generator quirks:
   the firmware reports unpacks to an `UNKNOWN_<n>` pseudo-member instead of raising, and packs
   back to the same value. `FirmwareEffect` and `TileEffectSkyType` are open: LIFX say effect
   replies are polymorphic by effect type until they rebuild the effect messages, and a Mirror
-  running the button-started Colour Sweep reports `sky_type` 13
+  running the button-started Color Sweep reports `sky_type` 13
 - **sensor packets**: Adds undocumented ambient light sensor packets:
   - `SensorGetAmbientLight` (401): Request packet with no parameters
   - `SensorStateAmbientLight` (402): Response packet with lux field (float32)

@@ -21,6 +21,7 @@ from lifx.const import (
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
 from lifx.devices.effect_runner import PriorState
 from lifx.devices.light import Light, LightState
+from lifx.devices.paint_record import PaintTracking
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
@@ -348,7 +349,7 @@ class MultiZoneLightState(LightState):
         )
 
 
-class MultiZoneLight(Light):
+class MultiZoneLight(PaintTracking, Light):
     """LIFX MultiZone light device (strips, beams).
 
     Extends the Light class with zone-specific functionality:
@@ -803,6 +804,7 @@ class MultiZoneLight(Light):
             ),
         )
         self._raise_if_unhandled(result)
+        self._zones_changed()
 
         _LOGGER.debug(
             {
@@ -904,6 +906,7 @@ class MultiZoneLight(Light):
             # Standard: wait for response and check for errors
             result = await self.connection.request(packet)
             self._raise_if_unhandled(result)
+        self._zones_changed()
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
             debug_colors = [
@@ -1070,6 +1073,8 @@ class MultiZoneLight(Light):
         )
         self._raise_if_unhandled(result)
 
+        self._zones_changed()
+
         # Update cached state
         cached_effect = effect if effect.effect_type != FirmwareEffect.OFF else None
         self._multizone_effect = cached_effect
@@ -1116,6 +1121,13 @@ class MultiZoneLight(Light):
         framebuffer = await FrameBuffer.for_multizone(self)
         zone_count = await self.get_zone_count()
         return framebuffer, MultiZonePacketGenerator(zone_count=zone_count)
+
+    async def _firmware_effect_running(self) -> bool:
+        """Whether the strip reports a firmware effect."""
+        try:
+            return (await self.get_effect()).effect_type != FirmwareEffect.OFF
+        except LifxUnsupportedCommandError:
+            return False  # a light that rejects GetEffect runs no firmware effect
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running Move effect by sending the OFF effect."""
@@ -1179,6 +1191,9 @@ class MultiZoneLight(Light):
         speed: float,
         duration: float = 0,
         palette: list[HSBK] | None = None,
+        *,
+        theme: Theme | str | None = None,
+        mood: bool = False,
     ) -> None:
         """Start the firmware Move effect in one call.
 
@@ -1193,6 +1208,14 @@ class MultiZoneLight(Light):
         reading the strip's colours through :meth:`get_all_color_zones`. The
         raw ``set_effect(MultiZoneEffect)`` path never paints.
 
+        With ``theme`` the strip is painted from that theme before Move
+        starts: with :meth:`apply_theme`, or, when ``mood`` is true, with the
+        LIFX app's mood recipe at the strip's current brightness (turning the
+        strip on if it is off). Move then ends the strip's current theme or
+        mood, because its effect reply carries no palette to verify. Unlike
+        :meth:`animate_mood`, this captures no prior state, so
+        :meth:`stop_effect` leaves the painted colors showing.
+
         Args:
             direction: A ``Direction`` member, or its case-insensitive name
                 (``"forward"``, ``"reversed"``).
@@ -1201,11 +1224,17 @@ class MultiZoneLight(Light):
                 default) means indefinitely.
             palette: Up to 16 colours to paint before Move starts. ``None``
                 (the default) derives a palette from the strip's own zones
-                as described above.
+                as described above. Cannot be combined with ``theme``.
+            theme: A theme, or the slug of a library theme, to paint before
+                Move starts.
+            mood: Paint ``theme`` as a mood rather than as a theme. Requires
+                ``theme``.
 
         Raises:
             ValueError: If direction, speed, duration or an explicit
-                palette is invalid.
+                palette is invalid, if both ``theme`` and ``palette`` are
+                given, or if ``mood`` is true without a ``theme``.
+            KeyError: If ``theme`` is a slug the theme library does not hold.
             TypeError: If speed or duration is a non-numeric value.
             LifxUnsupportedCommandError: If device doesn't support this command
             LifxTimeoutError: If device does not respond
@@ -1218,18 +1247,32 @@ class MultiZoneLight(Light):
             await light.set_move_effect(Direction.FORWARD, 5.0)
             ```
         """
+        if theme is not None and palette is not None:
+            raise ValueError("Pass either theme or palette, not both")
+        if mood and theme is None:
+            raise ValueError("mood requires a theme")
+
+        from lifx.theme.library import resolve_theme
+        from lifx.theme.theme import Theme
+
         effect = MultiZoneEffect.move(direction, speed, duration)
 
-        if palette is not None:
+        if theme is not None:
+            resolved = resolve_theme(theme)
+            if mood:
+                is_on, brightness = await self._mood_reading()
+                await self._paint_mood(
+                    resolved, power_on=not is_on, brightness=brightness
+                )
+            else:
+                await self.apply_theme(resolved, duration=0)
+        elif palette is not None:
             validate_effect_palette(palette)
-            paint = palette
+            await self.apply_theme(Theme(list(palette)), duration=0)
         else:
             paint = await self._derive_move_palette()
-
-        if paint is not None:
-            from lifx.theme.theme import Theme
-
-            await self.apply_theme(Theme(list(paint)), duration=0)
+            if paint is not None:
+                await self.apply_theme(Theme(list(paint)), duration=0)
 
         await self.set_effect(effect)
 
@@ -1482,6 +1525,7 @@ class MultiZoneLight(Light):
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_all_color_zones(colors, duration=duration)
+        self._record_paint("theme", theme, colors)
 
     async def _paint_mood(
         self,
@@ -1498,6 +1542,7 @@ class MultiZoneLight(Light):
             lambda duration: self.set_all_color_zones(colors, duration=duration),
             power_on,
         )
+        self._record_paint("mood", theme, colors)
         return []
 
     async def animate_mood(self, theme: Theme) -> None:
@@ -1544,6 +1589,7 @@ class MultiZoneLight(Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        record = self._paint_record
         await super().refresh_state()
 
         zones, effect = await asyncio.gather(
@@ -1553,6 +1599,14 @@ class MultiZoneLight(Light):
 
         self._state.zones = zones
         self._state.effect = effect.effect_type
+        self._check_paint(record, lambda r: r.matches_zones(zones))
+
+    async def _verify_paint(self) -> None:
+        """Read every zone and clear the record unless each still matches."""
+        record = self._paint_record
+        if record is not None:
+            zones = await self.get_all_color_zones()
+            self._check_paint(record, lambda r: r.matches_zones(zones))
 
     async def _initialize_state(self) -> MultiZoneLightState:
         """Initialize multizone light state transactionally.

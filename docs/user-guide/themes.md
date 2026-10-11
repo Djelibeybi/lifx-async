@@ -21,9 +21,9 @@ async def apply_evening_mode():
 
 ### One Theme, Per-Device-Type Rendering
 
-`group.lights` holds every colour-capable device, including strips and matrix
+`group.lights` holds every color-capable device, including strips and matrix
 devices, and `apply_theme()` dispatches polymorphically: single-zone lights get
-a random colour, multizone lights get distributed colours, and matrix and
+a random color, multizone lights get distributed colors, and matrix and
 ceiling devices get a smooth interpolation. Painting `group.multizone_lights`
 or `group.matrix_lights` as well would paint those devices a second time.
 
@@ -265,7 +265,7 @@ async def activate_scene(scene: str):
         room_lights = groups[room]
         theme = ThemeLibrary.get(theme_name)
 
-        # Every colour-capable device in the room, painted exactly once
+        # Every color-capable device in the room, painted exactly once
         await room_lights.apply_theme(theme, power_on=True, duration=1.5)
 
 # Usage:
@@ -294,7 +294,9 @@ Stop the animation by calling `stop_effect()` on each light of the group:
 `DeviceGroup` has no `stop_effect()`. Stopping puts back what each light
 showed before its mood animation started, power included, so a light that was
 off goes back off. Starting another mood on an animating light keeps that
-original state, and a second `stop_effect()` restores nothing more.
+original state, and a second `stop_effect()` restores nothing more. With no effect running,
+`stop_effect()` does nothing at all, so a light you painted with `apply_theme()` keeps showing it
+and keeps its `current_theme`.
 
 ```python
 for light in group.lights:
@@ -306,8 +308,8 @@ Moods use the app's own timings and rules:
 - The change fades in over 0.3 seconds.
 - `apply_mood()` powers lights on only when every targeted light is off.
   `animate_mood()` turns on every light it targets.
-- The mood is rescaled so its brightest colour matches the light's
-  brightness. So are the colours an animation steps through; bulbs in one
+- The mood is rescaled so its brightest color matches the light's
+  brightness. So are the colors an animation steps through; bulbs in one
   `DeviceGroup` share a loop rescaled to the brightest of them.
 - Calling `apply_mood()` on a light that is already running a mood effect
   restarts that effect with the new theme.
@@ -316,8 +318,8 @@ Moods use the app's own timings and rules:
 
 What a mood does depends on the light:
 
-- **Bulbs** show one of the theme's colours. Animated, they run a Colour Loop
-  through the theme's colours, and bulbs in one `DeviceGroup` share one loop.
+- **Bulbs** show one of the theme's colors. Animated, they run a Color Loop
+  through the theme's colors, and bulbs in one `DeviceGroup` share one loop.
 - **Strips** show the mood across their zones. Animated, they run firmware
   MOVE after painting the still image.
 - **Matrix lights** show the mood's image. Animated, a MORPH mood runs
@@ -326,13 +328,56 @@ What a mood does depends on the light:
 - **Spot, Path and the Mirror** use firmware MORPH for every mood. The Mirror
   is painted as a single matrix light over its 4x13 buffer, not ring by ring.
 - **Every Candle, the Tube and the Mirror** paint stripe moods as bands along
-  the long axis, with the first colour at the bottom. On every Candle and the
+  the long axis, with the first color at the bottom. On every Candle and the
   Tube, a MOVE stripe mood scrolls the bands down the light; blended and grid
   moods scroll sideways. The Mirror runs MORPH instead.
 - **A Tile chain** is painted and scrolled as one canvas in chain order,
   whatever shape the tiles are arranged in. A Tile whose accelerometer
   reports a rotation (left, right or upside down) is remapped; FaceUp and
   FaceDown are not.
+
+## Knowing What a Light Shows
+
+A strip or matrix light remembers the theme or mood it was last painted with, so you can ask
+what a light is showing without reading its colors. `current_theme` and `current_mood` hold the
+library slug, or `None`. They read an in-memory record kept per device object, so they make no
+request and say nothing about paints made by another client or another process.
+
+```python
+await light.apply_theme(get_theme("evening"))
+light.current_theme  # "evening"
+light.current_mood   # None
+
+await light.apply_mood(get_theme("evening"))
+light.current_theme  # None
+light.current_mood   # "evening"
+```
+
+A light has at most one of the two. `apply_theme()` and `apply_mood()` set it, as do
+`animate_mood()` on a matrix light and `MatrixLight.set_morph_effect()`. A bulb is never
+tracked, and a theme built by the caller records nothing unless it carries a slug.
+
+The property does not know whether the light still shows the paint. To check, read the light with
+`await light.get_current_theme()` or `await light.get_current_mood()`. Each reads the zones or
+tiles (or, for firmware Morph, the effect) and returns the slug only if the light still shows
+exactly what was painted, allowing for the rounding of colors to uint16. If it does not, the
+record is cleared and the call returns `None`. A light is never identified from its colors: a
+paint this object did not make reads as `None`. `refresh_state()` runs the same check on the state
+it already fetches, with no extra request.
+
+What ends the record:
+
+- Any write that changes the light's colors or effect: `set_color()`, `set_brightness()`,
+  waveforms, `pulse()`, `breathe()`, zone and tile writes, `set_effect()` and `start_effect()`.
+  Firmware Move ends it too, because the light reports no palette to check, so
+  `set_move_effect(theme=...)` and `animate_mood()` on a strip leave `current_mood` as `None`.
+- Any write to one light component of a Ceiling or Mirror. Only whole-light paints are tracked.
+- A verification that finds the light showing something else.
+
+What keeps it: `set_power()`, whether the light is turned on or off. A software effect that
+plays a mood (the matrix scroll) keeps it while it runs, and firmware Morph keeps it while the
+light still reports the palette that was sent. `stop_effect()` after `animate_mood()` puts back
+the record the light had before the animation, along with its colors.
 
 ## Custom Themes
 

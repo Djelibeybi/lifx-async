@@ -29,7 +29,7 @@ The `ThemeLibrary` provides access to 378 themes, resolvable under 381 names.
 Every library theme records how the LIFX app shows it:
 
 - `Theme.static_mode` is the still image the app paints, such as `blended` (a
-  gradient from the palette) or `grid_static` (the colours are an ordered grid).
+  gradient from the palette) or `grid_static` (the colors are an ordered grid).
   A theme you build yourself has none and is treated as `blended`.
 - `Theme.dynamic_mode` is the effect the app's Dynamic toggle starts, when the
   theme names one. `Theme.resolved_dynamic_mode` gives the effect either way:
@@ -40,10 +40,10 @@ Every library theme records how the LIFX app shows it:
 `StaticMode` and `DynamicMode` are the matching `Literal` types. They list
 every mode the library's data contains, so a new release can widen them.
 
-Colours are stored in source order, which matters most for `grid_static`
+Colors are stored in source order, which matters most for `grid_static`
 themes and other non-`blended` static modes: there the order is the layout.
 
-Tags are spelt as the app spells them (for example `Cozy`). Tag matching
+Tags are spelled as the app spells them (for example `Cozy`). Tag matching
 ignores case and punctuation, so `"calm"` finds `Calm`.
 
 Only the LIFX app's own themes carry tags; library-only and deprecated themes
@@ -70,23 +70,23 @@ if {"Calm", "Cozy"} <= set(tags):
 `apply_mood()` paints a theme the way the LIFX app paints a mood, and
 `animate_mood()` starts the effect the app's Dynamic toggle starts. Both take
 only the theme and use the app's own timings: a 0.3 second fade, and the mood
-rescaled so its brightest colour matches the light's brightness, animated
+rescaled so its brightest color matches the light's brightness, animated
 palettes included. `apply_mood()` powers lights on only when every targeted
 light is off; `animate_mood()` turns on every light it targets.
 
 `stop_effect()` after `animate_mood()` puts back what the light showed before
-its mood animation started: power, and its colour, zones or tiles. Starting
+its mood animation started: power, and its color, zones or tiles. Starting
 another mood on an animating light keeps that state, and it is restored once.
 A `DeviceGroup` has no `stop_effect()`; call it on each light.
 
 | Light | Still image (`apply_mood`) | Effect (`animate_mood`) |
 |---|---|---|
-| Bulb | One of the theme's colours; a `DeviceGroup` deals them one per bulb | `EffectColorloop` through the theme's colours; bulbs in one `DeviceGroup` share one loop |
+| Bulb | One of the theme's colors; a `DeviceGroup` deals them one per bulb | `EffectColorloop` through the theme's colors; bulbs in one `DeviceGroup` share one loop |
 | Strip | The mood across the zones | Firmware MOVE, after painting the still image |
 | Matrix light | The mood's image, by `static_mode` | Firmware MORPH for a MORPH mood; `EffectScroll` for a MOVE mood |
 | Spot and Path | The mood's image, painted like any other matrix light | Firmware MORPH for every mood |
-| Mirror | Stripe moods paint as bands along the long axis, first colour at the bottom; other moods as for a matrix light | Firmware MORPH for every mood |
-| Candle and Tube | Stripe moods paint as bands along the long axis, first colour at the bottom | A MOVE stripe mood scrolls the bands down the light; other moods as for a matrix light |
+| Mirror | Stripe moods paint as bands along the long axis, first color at the bottom; other moods as for a matrix light | Firmware MORPH for every mood |
+| Candle and Tube | Stripe moods paint as bands along the long axis, first color at the bottom | A MOVE stripe mood scrolls the bands down the light; other moods as for a matrix light |
 
 The Mirror's still image is painted over its 4x13 buffer as a single matrix
 light, not ring by ring, with stripe moods as bands along its long axis. The
@@ -105,6 +105,28 @@ If a light is already running a mood effect, `apply_mood()` restarts that
 effect with the new theme instead of painting a still image.
 
 `apply_theme()` is unchanged; use it for the library's own gradients.
+
+## Current Theme and Current Mood
+
+Strips and matrix lights (including Ceiling and Mirror lights) remember the theme or mood they
+were last painted with, for a theme that has a slug.
+
+| Member | Reads | Returns |
+|---|---|---|
+| `current_theme` | The in-memory record, with no request | The slug of the theme last painted as a theme, or `None` |
+| `current_mood` | The in-memory record, with no request | The slug of the theme last painted as a mood, or `None` |
+| `await get_current_theme()` | The light, then the record | The slug if the light still shows the paint, or `None` |
+| `await get_current_mood()` | The light, then the record | The slug if the light still shows the paint, or `None` |
+| `await refresh_state()` | The state it already fetches | Nothing; clears the record if the light no longer shows it |
+
+A light has at most one of the two. Verification compares every zone or tile with what was
+painted, allowing for uint16 rounding. A firmware Morph record is confirmed by the effect the
+light reports and the palette that was sent. A software run that plays a mood is confirmed
+while it is the effect running on the light. A paint this object did not make reads as `None`.
+
+Any write that changes colors or starts or stops an effect ends the record, as does any write
+to one light component of a Ceiling or Mirror. `set_power()` keeps it. Firmware Move ends it
+because the light reports no palette to check. Bulbs are never tracked.
 
 ::: lifx.theme.MoodGenerator
     options:

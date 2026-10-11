@@ -45,7 +45,7 @@ Device runtime information returned by `Device.get_info()`.
 WiFi module information returned by `Device.get_wifi_info()`, including the
 firmware-aware `rssi_unit` (`dB` through firmware 2.77, otherwise `dBm`).
 
-Also available as `device.state.wifi_info`. Neither state initialisation nor
+Also available as `device.state.wifi_info`. Neither state initialization nor
 `refresh_state()` queries the device for WiFi signal strength unless the device
 was created with `fetch_wifi_info=True` (or `fetch_radio_info=True` on a device
 evidenced as WiFi), so `signal` and `rssi` are `None` by default while
@@ -62,7 +62,7 @@ requests, so it costs no extra round trip.
 
 `fetch_wifi_info` is also a settable property, so a device can start or stop
 collecting readings at any point. It takes effect from the next state
-initialisation or refresh:
+initialization or refresh:
 
 ```python
 async with await Device.connect(ip="192.168.1.100") as device:
@@ -78,7 +78,7 @@ Turning it off is equally immediate: the next refresh stores `None` for
 stamped `last_updated`.
 
 For a one-off reading, call `get_wifi_info()` directly — it is a single
-request, where a refresh also re-fetches colour, power, label and every zone or
+request, where a refresh also re-fetches color, power, label and every zone or
 tile:
 
 ```python
@@ -122,7 +122,7 @@ async with await Device.connect(ip="192.168.1.100") as device:
 
 Also available as `device.state.thread_info`, which is `None` unless the device
 was created with `fetch_thread_info=True`, in which case the query joins the
-same parallel batch as the other state requests on every initialisation and
+same parallel batch as the other state requests on every initialization and
 refresh. Like `fetch_wifi_info`, it is a settable property that takes effect
 from the next fetch, and a device that does not answer leaves the field `None`
 rather than failing the refresh. On a device evidenced as WiFi the query is
@@ -372,7 +372,7 @@ Configuration dataclass for firmware effects (MORPH, FLAME, SKY, COLOR_SWEEP). U
 
 SKY requires the matrix capability plus host firmware 4.x or later — confirmed on Ceiling, Luna, Tube, Path and the E26 Candle. Check with `await matrix.supports_sky_effect()`; `set_effect()` raises `LifxUnsupportedCommandError` when either requirement is unmet.
 
-MORPH started with no palette builds one from the device's own colours, because the firmware does not start MORPH with an empty palette. `set_effect()` first reads the tiles with `get_all_tile_colors()`. A device showing one colour gets a generated three-colour palette, and a device showing several gets those colours (all of them in the order first seen when there are 16 or fewer, otherwise 16 pixels sampled evenly across the device). If that read times out, `set_effect()` raises `LifxTimeoutError`; if the reply is malformed, or the device reports no tile colours at all, it raises `LifxProtocolError` naming the device. Either way it sends nothing. Pass `palette=` to choose the colours yourself. FLAME and SKY with no palette send none and read nothing. COLOR_SWEEP runs on the Mirror only: with no palette it sweeps through colour temperatures, and with a palette it sweeps through the palette colours instead.
+MORPH started with no palette builds one from the device's own colors, because the firmware does not start MORPH with an empty palette. `set_effect()` first reads the tiles with `get_all_tile_colors()`. A device showing one color gets a generated three-color palette, and a device showing several gets those colors (all of them in the order first seen when there are 16 or fewer, otherwise 16 pixels sampled evenly across the device). If that read times out, `set_effect()` raises `LifxTimeoutError`; if the reply is malformed, or the device reports no tile colors at all, it raises `LifxProtocolError` naming the device. Either way it sends nothing. Pass `palette=` to choose the colors yourself, or use `MatrixLight.set_morph_effect(theme, mood=False)` to start MORPH from a `Theme` or library slug (`mood=True` follows the `animate_mood()` Morph path). FLAME and SKY with no palette send none and read nothing. COLOR_SWEEP runs on the Mirror only: with no palette it sweeps through color temperatures, and with a palette it sweeps through the palette colors instead.
 
 `speed` is in seconds. For a SKY sunrise or sunset it sets how long the transition takes. A speed of 0 normally means the 3 second default. COLOR_SWEEP and SKY with a non-zero `duration` are the exception: speed 0 plays the effect once across `duration`. With no duration, speed 0 keeps the 3 second default for both, because a Mirror given COLOR_SWEEP at speed 0 with no duration repeats the sweep every second or two.
 
@@ -482,7 +482,7 @@ broadcast, `from_ip()`, or a won `find_by_serial()` race reports correctly
 once it has answered, even though it carries no mDNS TXT record.
 
 The value does not change the device's address, routing, retry, or tuning
-behaviour. It does gate the radio-specific queries: `get_wifi_info()` and
+behavior. It does gate the radio-specific queries: `get_wifi_info()` and
 `get_wifi_firmware()` are refused once a device is evidenced as Thread, and
 `get_thread_info()` is refused once it is evidenced as WiFi, because each
 firmware install can only answer its own radio's packets. Evidence means an
@@ -620,7 +620,7 @@ async def main():
 
 The sensor can also be read as part of state instead of on demand. A light
 created with `fetch_ambient_light=True` — or one that has the property set later
-— queries it during state initialisation and on every `refresh_state()`, storing
+— queries it during state initialization and on every `refresh_state()`, storing
 the result in `state.ambient_light`:
 
 ```python
@@ -635,7 +635,7 @@ async with await Device.connect(ip="192.168.1.100") as light:
 
 The query joins the same parallel batch as the other state requests, so it costs
 no extra round trip. Toggling the property takes effect from the next state
-initialisation or refresh: turning it off stores `None` rather than leaving the
+initialization or refresh: turning it off stores `None` rather than leaving the
 last reading behind a freshly stamped `last_updated`.
 
 **Notes:**
@@ -645,7 +645,7 @@ last reading behind a freshly stamped `last_updated`.
 - `state.ambient_light` is captured whenever state refreshes, including the debounced refresh that follows `set_power()`/`set_color()`. A reading taken while the light is on measures the light's own output, so it is stored as `-1.0` (`lifx.INVALID_AMBIENT_LIGHT_RESPONSE`) rather than as a plausible-looking lux value
 - For accurate readings, the light should be turned off (otherwise the light's own illumination interferes with the sensor)
 - `get_ambient_light_level()` always fetches fresh from the device; `state.ambient_light` is as fresh as the last state refresh, and is `None` until the sensor is queried at least once
-- If a request does fail outright, `state.ambient_light` is left `None` and a warning is logged — state initialisation and refresh still succeed
+- If a request does fail outright, `state.ambient_light` is left `None` and a warning is logged — state initialization and refresh still succeed
 - Returns ambient light level in lux (higher values indicate brighter ambient light)
 
 ### MultiZone Control
@@ -663,7 +663,7 @@ async def main():
 
         # Write zones back the same way. set_all_color_zones picks the
         # extended or legacy packet based on device capabilities, chunks
-        # past the 82-colour extended packet limit, and run-length encodes
+        # past the 82-color extended packet limit, and run-length encodes
         # legacy writes, so it works on any strip or beam.
         colors[0] = Colors.RED
         await light.set_all_color_zones(colors, duration=1.0)
@@ -674,6 +674,9 @@ async def main():
 
         # Set a MOVE effect
         await light.set_move_effect(Direction.FORWARD, 5.0)  # seconds per cycle
+
+        # Paint a theme (or, with mood=True, a mood) first, then start MOVE
+        await light.set_move_effect(Direction.FORWARD, 5.0, theme="evening")
 
         # Get current effect
         effect = await light.get_effect()
@@ -700,6 +703,9 @@ async def main():
             for h in range(0, 360, 10)
         ]
         await light.set_tile_colors(colors)
+
+        # Start MORPH from a theme or library slug (mood=True for the mood recipe)
+        await light.set_morph_effect("evening")
 
         # Set a tile effect (MORPH, FLAME, SKY, or COLOR_SWEEP)
         await light.set_effect(

@@ -31,6 +31,7 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.effect_runner import PriorState, effect_runner
+from lifx.devices.paint_record import PaintRecord
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
@@ -126,6 +127,10 @@ class Light(Device[LightState]):
     # What the light showed before a firmware mood animation started, which
     # stop_effect() restores. A software mood's run holds it instead.
     _mood_prestate: PriorState | None = None
+    # The theme or mood this light was last painted with, if it still stands.
+    # Only lights that track paints (see ``PaintTracking``) ever set it, but
+    # every color write ends it through ``_clear_paint_record()``.
+    _paint_record: PaintRecord | None = None
 
     @property
     def animator(self) -> Animator:
@@ -173,6 +178,14 @@ class Light(Device[LightState]):
         assert geometry is not None
         return geometry
 
+    def _clear_paint_record(self) -> None:
+        """Forget the theme or mood this light was painted with."""
+        self._paint_record = None
+
+    def _adopt_paint_record(self, record: PaintRecord | None) -> None:
+        """Put back a paint record captured before an effect, after its restore."""
+        self._paint_record = record
+
     async def start_effect(
         self, effect: LIFXEffect, *, enable_thread: bool = False
     ) -> None:
@@ -217,17 +230,21 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
+        self._clear_paint_record()
         await effect_runner().start(self, effect, enable_thread=enable_thread)
 
     async def stop_effect(self) -> None:
-        """Stop every effect on this light.
+        """Stop every effect on this light, or do nothing if none is running.
 
         Stops any running firmware effect, then any software effect the light
         or one of its light components is part of, and restores the prior
-        state of each. The software effect
-        may have been started with ``start_effect()`` or on any Conductor: if
-        the light is one participant of a multi-light run, it leaves that run
-        and the other participants carry on.
+        state of each. With no effect running, in firmware or in software, it
+        sends nothing and changes nothing, so the current theme or mood stays.
+        A light that rejects the effect query counts as running no firmware
+        effect. The software effect may have been started with
+        ``start_effect()`` or on any Conductor: if the light is one
+        participant of a multi-light run, it leaves that run and the other
+        participants carry on.
 
         After ``animate_mood()``, the light gets back what it showed before
         its mood animation started, once: a second call restores nothing
@@ -238,6 +255,12 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
+        if not (
+            effect_runner().runs_any(self) or await self._firmware_effect_running()
+        ):
+            # A mood that ended some other way leaves a stale prior state.
+            self._mood_prestate = None
+            return
         # A firmware mood that ended some other way (another effect, a
         # reboot, another app) leaves a stale prior state: drop it, so it
         # neither overwrites what was shown since nor outranks a later run.
@@ -253,6 +276,10 @@ class Light(Device[LightState]):
         self._mood_prestate = None
         if held is not None:
             await effect_runner().restore_prestate(self, held)
+
+    async def _firmware_effect_running(self) -> bool:
+        """Whether a firmware effect runs; a plain light has none."""
+        return False
 
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect; a plain light has none to stop."""
@@ -582,10 +609,14 @@ class Light(Device[LightState]):
     def _zones_changed(self) -> None:
         """Hook called after a write that changes zone colours.
 
-        A no-op here. Component devices override it to forget colours they
-        were tracking for an in-flight transition, so a later component write
-        does not undo a colour change made through an inherited method.
+        The one hook every color or effect write calls, so ``current_theme``
+        and ``current_mood`` are right without a read: it forgets the paint
+        record. The paint that sets a new record does so after its own writes.
+        Component devices extend it to forget colors they were tracking for
+        an in-flight transition, so a later component write does not undo a
+        color change made through an inherited method.
         """
+        self._clear_paint_record()
 
     async def get_power(self) -> int:
         """Get light power state (specific to light, not device).

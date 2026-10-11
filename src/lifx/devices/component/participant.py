@@ -111,6 +111,8 @@ class LightComponent:
     async def stop_effect(self) -> None:
         """Stop the software effect on this light component only.
 
+        Does nothing if no software effect runs on it.
+
         The light component gets its colours from before the effect back, or
         turns off again if it was dark or its light was off. An effect on the
         other light component, or on other lights in the same run, carries
@@ -118,7 +120,8 @@ class LightComponent:
         light component, and this light component gets its colours from
         before that effect back.
         """
-        await effect_runner().leave_every_run(self)
+        if effect_runner().runs_any(self):
+            await effect_runner().leave_every_run(self)
 
     def __repr__(self) -> str:
         """Name the light component and its light."""

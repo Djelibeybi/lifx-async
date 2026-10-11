@@ -97,6 +97,7 @@ def inherit_components(
             color=captured.color,
             zone_colors=captured.zone_colors,
             tile_colors=tile_colors,
+            _paint_record=captured._paint_record,
             stored_colors=(
                 {
                     name: (
@@ -353,6 +354,24 @@ class OverlapRules:
     def _runs_whole_light(cls, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light, on any Conductor."""
         return any(light.serial in conductor._running for conductor in cls._live)
+
+    @classmethod
+    def _runs_any(cls, participant: Participant) -> bool:
+        """Whether a software effect runs on a participant, on any Conductor.
+
+        A light also counts an effect on either of its light components. A
+        light component also counts a whole-light effect on its light, which
+        stopping it moves onto the other light component.
+        """
+        light, component = resolve(participant)
+        own = key_of(participant)
+        return any(
+            key == own
+            or (component is None and isinstance(key, tuple) and key[0] == light.serial)
+            or (component is not None and key == light.serial)
+            for conductor in cls._live
+            for key in conductor._running
+        )
 
     @classmethod
     def _whole_light_effect(cls, light: Light) -> LIFXEffect | None:

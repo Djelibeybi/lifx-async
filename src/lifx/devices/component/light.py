@@ -403,6 +403,7 @@ class ComponentMatrixLight(MatrixLight):
 
     def _zones_changed(self) -> None:
         """Forget pending colours after raw writes, effects or Animator startup."""
+        super()._zones_changed()
         if self._animator is not None:
             self._animator._forget_hold()
         self._pending_tile.clear()
@@ -534,6 +535,9 @@ class ComponentMatrixLight(MatrixLight):
         the Animator's held tile instead: the effect's next frame carries it.
         """
         if self._animator is not None and self._animator._animating():
+            # The write never reaches set_matrix_colors, which ends a tracked
+            # theme or mood for every other tile write.
+            self._clear_paint_record()
             self._animator._retarget_hold(tile_colors, duration)
             self._known_tile = dict(enumerate(tile_colors))
             self._publish_tile(tile_colors)
@@ -738,6 +742,9 @@ class ComponentMatrixLight(MatrixLight):
             )
             if other_dark:
                 await self._write_power(False, duration)
+                # Turning the last lit component off is a component write even
+                # though only the whole light's power goes out.
+                self._clear_paint_record()
                 # Power-off succeeded. Publish that progress before attempting
                 # an optional second write; its failure cannot make us 'on'.
                 self._known_tile = dict(enumerate(tile))
@@ -956,7 +963,7 @@ class ComponentMatrixLight(MatrixLight):
         """Trust a recent power write, as every other write here does."""
         return await self._power_for_update() > 0
 
-    async def _write_mood_frames(
+    async def _write_frames(
         self,
         tiles: list[TileInfo],
         frames: list[list[HSBK]],

@@ -152,7 +152,7 @@ class TestMatrixMove:
         await matrix.light.stop_effect()
         matrix.log.clear()
         await matrix.light.stop_effect()
-        assert matrix.log == [("effect", FirmwareEffect.OFF)]
+        assert matrix.log == []
 
 
 class TestMatrixMorph:
@@ -201,7 +201,7 @@ class TestMatrixMorph:
         await matrix.light.stop_effect()
         matrix.log.clear()
         await matrix.light.stop_effect()
-        assert matrix.log == [("effect", FirmwareEffect.OFF)]
+        assert matrix.log == []
 
 
 class StripSim:

@@ -209,7 +209,11 @@ class Conductor(OverlapRules):
             ```
         """
         await self._start(
-            effect, participants, enable_thread=enable_thread, supplied={}
+            effect,
+            participants,
+            enable_thread=enable_thread,
+            supplied={},
+            ends_paint=True,
         )
 
     async def _start(
@@ -219,6 +223,7 @@ class Conductor(OverlapRules):
         *,
         enable_thread: bool,
         supplied: Mapping[ParticipantKey, PreState],
+        ends_paint: bool = False,
     ) -> None:
         """Start an effect, as ``start()`` does, with supplied prior states.
 
@@ -232,6 +237,9 @@ class Conductor(OverlapRules):
             participants: Lights and light components to apply effect to
             enable_thread: Stream frames to lights evidenced as Thread anyway
             supplied: Prior states by participant key
+            ends_paint: Forget the theme or mood each taking-part light
+                remembers, before the effect's first frame. A mood
+                animation sets its own record, so it leaves this off.
         """
         _refuse_thread_frames(
             effect, participants, "Conductor.start()", enable_thread=enable_thread
@@ -256,6 +264,10 @@ class Conductor(OverlapRules):
                 }
             )
             return
+
+        if ends_paint:
+            for participant in filtered_participants:
+                resolve(participant)[0]._clear_paint_record()
 
         # Newest wins: stop whatever each participant already runs, with no
         # restore in between, before this effect captures or inherits.
@@ -958,16 +970,26 @@ class _LightEffects:
             light, None, cast("PreState", prestate)
         )
 
+    def runs_any(self, participant: Participant) -> bool:
+        """Whether a software effect runs on a light or light component."""
+        return Conductor._runs_any(participant)
+
     def runs_whole_light(self, light: Light) -> bool:
         """Whether a whole-light software effect runs on a light."""
         return Conductor._runs_whole_light(light)
 
     def runs_mood_effect(self, light: Light) -> bool:
         """Whether a mood software effect runs on a whole light."""
+        return self.mood_run(light) is not None
+
+    def mood_run(self, light: Light) -> LIFXEffect | None:
+        """The mood software effect running on a whole light, if any."""
         effect = Conductor._whole_light_effect(light)
-        return isinstance(effect, EffectScroll) or (
+        if isinstance(effect, EffectScroll) or (
             isinstance(effect, EffectColorloop) and effect.palette is not None
-        )
+        ):
+            return effect
+        return None
 
     def scroll_effect(self, frame: list[list[HSBK]], vertical: bool) -> LIFXEffect:
         """The effect that scrolls a painted matrix mood."""

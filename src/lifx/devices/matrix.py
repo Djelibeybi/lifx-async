@@ -39,6 +39,7 @@ from lifx.devices.component.state import (
 )
 from lifx.devices.effect_runner import PriorState, effect_runner
 from lifx.devices.light import Light, LightState
+from lifx.devices.paint_record import PaintKind, PaintRecord, PaintTracking
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
@@ -187,6 +188,18 @@ class TileInfo:
                 return "UpsideDown"
             else:
                 return "Upright"
+
+
+def _morph_colors(palette: list[HSBK]) -> list[HSBK]:
+    """The colors firmware MORPH is sent for ``palette``, before any shuffle.
+
+    A palette past ``MAX_PALETTE_COLORS`` is reduced by the area each run of
+    colors covers, as the LIFX app reduces a mood. The reduction is
+    deterministic; only the order sent varies.
+    """
+    if len(palette) > MAX_PALETTE_COLORS:
+        return MoodGenerator.morph_palette(palette)
+    return palette
 
 
 def _plays_once_at_zero_speed(effect_type: FirmwareEffect, duration: int) -> bool:
@@ -410,7 +423,7 @@ class MatrixLightState(LightState):
         )
 
 
-class MatrixLight(Light):
+class MatrixLight(PaintTracking, Light):
     """LIFX Matrix Light Device.
 
     MatrixLight devices have 2D arrays of controllable color zones arranged in tiles.
@@ -440,6 +453,8 @@ class MatrixLight(Light):
     """
 
     _state: MatrixLightState
+    # Mood frames being written right now; see ``_write_mood_frames()``.
+    _mood_frames_writing: int = 0
 
     def __init__(
         self,
@@ -749,22 +764,30 @@ class MatrixLight(Light):
         buffer can be padded past its pixels (the Mirror's 4x13 is 64 long).
         """
         return self._brightest_or(
-            self._shown_colors(await self.get_all_tile_colors()), reported
+            self._shown_colors_flat(await self.get_all_tile_colors()), reported
         )
 
     def _prior_brightness(self, prestate: PriorState) -> float:
         """The brightest pixel shown before the animation."""
         return self._brightest_or(
-            self._shown_colors(prestate.tile_colors or []), prestate.color.brightness
+            self._shown_colors_flat(prestate.tile_colors or []),
+            prestate.color.brightness,
         )
 
-    def _shown_colors(self, all_colors: list[list[HSBK]]) -> list[HSBK]:
-        """Each tile's pixels, without the padding past ``width * height``."""
+    @staticmethod
+    def _shown_colors(
+        tiles: list[TileInfo], all_colors: list[list[HSBK]]
+    ) -> list[list[HSBK]]:
+        """Each tile's pixels, kept per tile, without the padding past its size."""
         return [
-            color
-            for tile, colors in zip(self._device_chain or [], all_colors)
-            for color in colors[: tile.width * tile.height]
+            colors[: tile.width * tile.height]
+            for tile, colors in zip(tiles, all_colors)
         ]
+
+    def _shown_colors_flat(self, all_colors: list[list[HSBK]]) -> list[HSBK]:
+        """Every tile's pixels as one flat list, without each tile's padding."""
+        shown = self._shown_colors(self._device_chain or [], all_colors)
+        return [color for colors in shown for color in colors]
 
     @staticmethod
     def _can_batch_chain_fetch(device_chain: list[TileInfo]) -> bool:
@@ -1358,6 +1381,11 @@ class MatrixLight(Light):
             tile_height=tiles[0].height,
         )
 
+    async def _firmware_effect_running(self) -> bool:
+        """Whether the light reports a firmware effect, read afresh."""
+        effect = await self._effect_or_none()
+        return effect is not None and effect.effect_type != FirmwareEffect.OFF
+
     async def _stop_firmware_effect(self) -> None:
         """Stop a running firmware effect by sending the OFF effect.
 
@@ -1488,7 +1516,7 @@ class MatrixLight(Light):
         ):
             # The app's rule: pick the colours by run weight, then shuffle.
             # Selection is deterministic; only the order varies.
-            palette = MoodGenerator.morph_palette(palette)
+            palette = _morph_colors(palette)
             random.shuffle(palette)
 
         # Create and validate MatrixEffect
@@ -1608,11 +1636,13 @@ class MatrixLight(Light):
         needs_power_on = power_on and not await self.get_power()
 
         # Apply colors to each tile
+        painted: list[list[HSBK]] = []
         for tile, colors in zip(tiles, tile_colors, strict=True):
             # The canvas renders in row-major screen order, so a physically
             # rotated tile needs the same orientation remapping the animation
             # layer applies in FrameBuffer._for_multi_tile().
             oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            painted.append(oriented)
 
             # Apply with appropriate timing
             if needs_power_on:
@@ -1625,6 +1655,7 @@ class MatrixLight(Light):
         # Turn on light if requested and currently off
         if needs_power_on:
             await self.set_power(True, duration=duration)
+        self._record_tile_paint("theme", theme, self._shown_colors(tiles, painted))
 
     @staticmethod
     def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
@@ -1718,9 +1749,39 @@ class MatrixLight(Light):
             await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
 
         await self._write_mood(write, power_on)
+        self._record_tile_paint(
+            "mood",
+            theme,
+            self._shown_colors(
+                tiles,
+                [
+                    self._orient_tile_colors(tile, colors) if has_chain else colors
+                    for tile, colors in zip(tiles, frames, strict=True)
+                ],
+            ),
+        )
         return frames
 
     async def _write_mood_frames(
+        self,
+        tiles: list[TileInfo],
+        frames: list[list[HSBK]],
+        duration: float,
+        *,
+        has_chain: bool,
+    ) -> None:
+        """Write one frame per tile.
+
+        These writes are the mood's own, so they do not end a record that a
+        software run keeps alive: the scroll writes here every step.
+        """
+        self._mood_frames_writing += 1
+        try:
+            await self._write_frames(tiles, frames, duration, has_chain=has_chain)
+        finally:
+            self._mood_frames_writing -= 1
+
+    async def _write_frames(
         self,
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
@@ -1734,6 +1795,13 @@ class MatrixLight(Light):
             await self.set_matrix_colors(
                 tile.tile_index, oriented, duration=round(duration * 1000)
             )
+
+    def _zones_changed(self) -> None:
+        """Forget the paint record after a write, except a software run's own."""
+        record = self._paint_record
+        if self._mood_frames_writing and record is not None and record.run is not None:
+            return
+        super()._zones_changed()
 
     def _mood_dynamic_mode(self, theme: Theme) -> str:
         """MOVE for a MOVE mood; MORPH for everything else, as the app does.
@@ -1758,15 +1826,9 @@ class MatrixLight(Light):
         brightness = self._prior_brightness(prestate)
         is_on = await self._mood_power()
         if self._mood_dynamic_mode(theme) == "morph":
-            # Held here, since a firmware effect has no run to hold it.
-            self._mood_prestate = prestate
-            await self.set_effect(
-                FirmwareEffect.MORPH,
-                speed=MOOD_MORPH_SPEED_SECONDS,
-                palette=MoodGenerator(theme).get_palette(brightness),
+            await self._morph_mood(
+                theme, prestate, brightness, is_on, speed=MOOD_MORPH_SPEED_SECONDS
             )
-            if not is_on:
-                await self.set_power(True, duration=MOOD_FADE_SECONDS)
             return
         await self._stop_firmware_effect()
         frames = await self._paint_mood(
@@ -1785,18 +1847,148 @@ class MatrixLight(Light):
             self.version and has_vertical_theme(self.version.product)
         ) and theme.static_mode in ("solid", "solid_static", "solid_loop")
         runner = effect_runner()
-        await runner.start(
-            self, runner.scroll_effect(frames, vertical), prestate=prestate
+        scroll = runner.scroll_effect(frames, vertical)
+        await runner.start(self, scroll, prestate=prestate)
+        # The run's first frames end the paint record, so the mood is recorded
+        # after the run starts, and only if the run is the one in charge.
+        if runner.mood_run(self) is scroll:
+            self._record_run("mood", theme, scroll)
+        else:
+            self._clear_paint_record()  # the still image is no longer shown
+
+    async def set_morph_effect(
+        self,
+        theme: Theme | str,
+        *,
+        mood: bool = False,
+        speed: float | None = None,
+        duration: int = 0,
+    ) -> None:
+        """Start firmware Morph from a theme, without painting the tiles first.
+
+        With ``mood`` false the theme's own colors are the Morph palette (a
+        palette past 16 colors is reduced by the area each run covers, as
+        :meth:`set_effect` does) and the light records a current theme. With
+        ``mood`` true this follows the :meth:`animate_mood` Morph path
+        whatever the theme's dynamic mode: the palette is the LIFX app's mood
+        palette at the brightness the light showed, the prior state is
+        captured and held for :meth:`stop_effect`, an off light is turned on
+        with the mood fade, and the light records a current mood.
+
+        The light keeps reporting the theme or mood as current while Morph
+        runs with the palette that was sent. A caller-built theme has no
+        slug, so nothing is recorded for it.
+
+        Args:
+            theme: A theme, or the slug of a library theme
+            mood: Start the theme as a mood rather than as a theme
+            speed: Morph speed in seconds. ``None`` (the default) means 3
+                seconds, or the LIFX app's mood speed when ``mood`` is true.
+            duration: Effect duration in nanoseconds (0 for infinite)
+
+        Raises:
+            KeyError: If ``theme`` is a slug the theme library does not hold
+            ValueError: If speed or duration is invalid
+            LifxUnsupportedCommandError: If the device doesn't support this
+            LifxTimeoutError: If the device does not respond
+
+        Example:
+            ```python
+            await matrix.set_morph_effect("evening")
+            await matrix.set_morph_effect("evening", mood=True)
+            ```
+        """
+        from lifx.theme.library import resolve_theme
+
+        resolved = resolve_theme(theme)
+        if not mood:
+            await self._start_morph(
+                resolved,
+                list(resolved.colors),
+                "theme",
+                speed=3.0 if speed is None else speed,
+                duration=duration,
+            )
+            return
+        prestate = await self._begin_mood_animation()
+        brightness = self._prior_brightness(prestate)
+        is_on = await self._mood_power()
+        await self._morph_mood(
+            resolved,
+            prestate,
+            brightness,
+            is_on,
+            speed=MOOD_MORPH_SPEED_SECONDS if speed is None else speed,
+            duration=duration,
         )
+
+    async def _morph_mood(
+        self,
+        theme: Theme,
+        prestate: PriorState,
+        brightness: float,
+        is_on: bool,
+        *,
+        speed: float,
+        duration: int = 0,
+    ) -> None:
+        """Start a mood as firmware Morph, holding the prior state for stop.
+
+        The prior state is held here, since a firmware effect has no run to
+        hold it. An off light is turned on with the mood fade.
+        """
+        self._mood_prestate = prestate
+        await self._start_morph(
+            theme,
+            MoodGenerator(theme).get_palette(brightness),
+            "mood",
+            speed=speed,
+            duration=duration,
+        )
+        if not is_on:
+            await self.set_power(True, duration=MOOD_FADE_SECONDS)
+
+    async def _start_morph(
+        self,
+        theme: Theme,
+        palette: list[HSBK],
+        kind: PaintKind,
+        *,
+        speed: float,
+        duration: int = 0,
+    ) -> None:
+        """Start firmware Morph from a theme and record it as the current paint.
+
+        The record holds the palette actually sent, which is ``palette`` after
+        the reduction to what Morph carries, never the theme's raw colors.
+        Verification matches the light's reported palette against it as a
+        multiset. Nothing is painted first.
+
+        Args:
+            theme: The theme the palette comes from
+            palette: The colors to send, already rescaled for a mood
+            kind: Whether to record a current theme or a current mood
+            speed: Morph speed in seconds
+            duration: Effect duration in nanoseconds (0 for infinite)
+        """
+        await self.set_effect(
+            FirmwareEffect.MORPH, speed=speed, duration=duration, palette=palette
+        )
+        self._record_morph(kind, theme, _morph_colors(palette))
+
+    async def _effect_or_none(self) -> MatrixEffect | None:
+        """The running firmware effect; none for a light that rejects the query."""
+        try:
+            return await self.get_effect()
+        except LifxUnsupportedCommandError:
+            return None  # a light that rejects GetEffect runs no firmware effect
 
     async def _mood_effect_running(self) -> bool:
         """Firmware MORPH, or a mood software effect."""
         if await super()._mood_effect_running():
             return True
-        try:
-            return (await self.get_effect()).effect_type == FirmwareEffect.MORPH
-        except LifxUnsupportedCommandError:
-            return False  # a light that rejects GetEffect runs no firmware effect
+        effect = await self._effect_or_none()
+        return effect is not None and effect.effect_type == FirmwareEffect.MORPH
 
     @property
     def device_chain(self) -> list[TileInfo] | None:
@@ -1839,15 +2031,73 @@ class MatrixLight(Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        record = self._paint_record
         await super().refresh_state()
 
         # Fetch all matrix light state sequentially to avoid overwhelming device
         all_tile_colors = await self.get_all_tile_colors()
         effect = await self.get_effect()
+        self._check_record(record, self._shown_read(all_tile_colors), effect)
 
         # Flatten tile colors for state storage
         self._state.tile_colors = [c for tile in all_tile_colors for c in tile]
         self._state.effect = effect.effect_type
+
+    def _shown_read(self, all_colors: list[list[HSBK]]) -> list[list[HSBK]]:
+        """What a read of every tile shows, without each tile's padding."""
+        chain = self._device_chain or []
+        if len(chain) != len(all_colors):
+            # The chain changed length since it was cached; the tiles cannot
+            # be trimmed pairwise, and the count alone will not match.
+            return all_colors
+        return self._shown_colors(chain, all_colors)
+
+    async def _verify_paint(self) -> None:
+        """Read what the record depends on and clear it unless it still holds.
+
+        A software run needs no read, a Morph record reads the effect, and a
+        painted one reads every tile.
+        """
+        record = self._paint_record
+        if record is None:
+            return
+        tiles: list[list[HSBK]] = []
+        effect = None
+        if record.morph is not None:
+            effect = await self._effect_or_none()
+        elif record.run is None:
+            tiles = self._shown_read(await self.get_all_tile_colors())
+        self._check_record(record, tiles, effect)
+
+    def _check_record(
+        self,
+        record: PaintRecord | None,
+        tiles: list[list[HSBK]],
+        effect: MatrixEffect | None,
+    ) -> None:
+        """Clear ``record`` unless the light still shows it.
+
+        Which reading counts depends on the record: a software run holds
+        while the effect runner reports it active, a Morph record while the
+        light reports Morph with the palette that was sent, a painted one
+        while every tile matches. A reading that does not apply to the record
+        is ignored. As elsewhere, a paint made since ``record`` was taken is
+        left alone.
+        """
+
+        def holds(held: PaintRecord) -> bool:
+            if held.run is not None:
+                return effect_runner().mood_run(self) is held.run
+            if held.morph is not None:
+                return (
+                    effect is not None
+                    and effect.effect_type == FirmwareEffect.MORPH
+                    and effect.palette is not None
+                    and held.matches_morph(effect.palette)
+                )
+            return held.matches_tiles(tiles)
+
+        self._check_paint(record, holds)
 
     async def _initialize_state(self) -> MatrixLightState:
         """Initialize matrix light state transactionally.

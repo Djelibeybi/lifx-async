@@ -384,3 +384,15 @@ def get_theme(name: str) -> Theme:
         ```
     """
     return ThemeLibrary.get(name)
+
+
+def resolve_theme(theme: Theme | str) -> Theme:
+    """Return ``theme``, looking it up in the library when it is a slug.
+
+    Args:
+        theme: A theme, or the name or slug of a library theme
+
+    Raises:
+        KeyError: If ``theme`` is a name the library does not hold
+    """
+    return ThemeLibrary.get(theme) if isinstance(theme, str) else theme
