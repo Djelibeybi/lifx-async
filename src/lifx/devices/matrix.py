@@ -1851,6 +1851,75 @@ class MatrixLight(PaintTracking, Light):
         else:
             self._clear_paint_record()  # the still image is no longer shown
 
+    async def set_morph_effect(
+        self,
+        theme: Theme | str,
+        *,
+        mood: bool = False,
+        speed: float | None = None,
+        duration: int = 0,
+    ) -> None:
+        """Start firmware Morph from a theme, without painting the tiles first.
+
+        With ``mood`` false the theme's own colours are the Morph palette (a
+        palette past 16 colours is reduced by the area each run covers, as
+        :meth:`set_effect` does) and the light records a current theme. With
+        ``mood`` true this follows the :meth:`animate_mood` Morph path
+        whatever the theme's dynamic mode: the palette is the LIFX app's mood
+        palette at the brightness the light showed, the prior state is
+        captured and held for :meth:`stop_effect`, an off light is turned on
+        with the mood fade, and the light records a current mood.
+
+        The light keeps reporting the theme or mood as current while Morph
+        runs with the palette that was sent. A caller-built theme has no
+        slug, so nothing is recorded for it.
+
+        Args:
+            theme: A theme, or the slug of a library theme
+            mood: Start the theme as a mood rather than as a theme
+            speed: Morph speed in seconds. ``None`` (the default) means 3
+                seconds, or the LIFX app's mood speed when ``mood`` is true.
+            duration: Effect duration in nanoseconds (0 for infinite)
+
+        Raises:
+            KeyError: If ``theme`` is a slug the theme library does not hold
+            ValueError: If speed or duration is invalid
+            LifxUnsupportedCommandError: If the device doesn't support this
+            LifxTimeoutError: If the device does not respond
+
+        Example:
+            ```python
+            await matrix.set_morph_effect("evening")
+            await matrix.set_morph_effect("evening", mood=True)
+            ```
+        """
+        from lifx.theme.library import ThemeLibrary
+
+        resolved = ThemeLibrary.get(theme) if isinstance(theme, str) else theme
+        if not mood:
+            await self._start_morph(
+                resolved,
+                list(resolved.colors),
+                mood=False,
+                speed=3.0 if speed is None else speed,
+                duration=duration,
+            )
+            return
+        prestate = await self._begin_mood_animation()
+        brightness = self._prior_brightness(prestate)
+        is_on = await self._mood_power()
+        # Held here, since a firmware effect has no run to hold it.
+        self._mood_prestate = prestate
+        await self._start_morph(
+            resolved,
+            MoodGenerator(resolved).get_palette(brightness),
+            mood=True,
+            speed=MOOD_MORPH_SPEED_SECONDS if speed is None else speed,
+            duration=duration,
+        )
+        if not is_on:
+            await self.set_power(True, duration=MOOD_FADE_SECONDS)
+
     async def _start_morph(
         self,
         theme: Theme,

@@ -1041,6 +1041,27 @@ effect = MultiZoneEffect.move(Direction.FORWARD, 5.0)
 await light.set_effect(effect)
 ```
 
+## Firmware Morph effect from a theme
+
+`MatrixLight.set_morph_effect()` starts firmware Morph from a `Theme` or a library slug, without
+painting the tiles first. By default the theme's own colours are the Morph palette (past 16
+colours they are reduced by the area each run covers) and the light records a current theme.
+With `mood=True` it follows the `animate_mood()` Morph path whatever the theme's dynamic mode:
+the palette is the LIFX app's mood palette at the light's current brightness, the prior state is
+captured so `stop_effect()` restores it, and an off light is turned on with the mood fade. The
+light then records a current mood. `speed` (seconds) and `duration` (nanoseconds) are the
+controls `set_effect()` takes; `speed` defaults to 3 seconds, or the app's mood speed when
+`mood=True`. An unknown slug raises the same `KeyError` as `ThemeLibrary.get()`.
+
+While Morph runs with the palette that was sent, `current_theme` or `current_mood` stays set and
+`get_current_theme()` or `get_current_mood()` confirms it. Stopping Morph, or another palette
+started from the LIFX app, ends the match.
+
+```python
+await matrix.set_morph_effect("evening")
+await matrix.set_morph_effect("evening", mood=True)
+```
+
 ## Next Steps
 
 - See [Effects Gallery](effects-gallery.md) for animated previews of all effects
