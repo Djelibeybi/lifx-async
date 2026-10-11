@@ -39,6 +39,7 @@ from lifx.devices.component.state import (
 )
 from lifx.devices.effect_runner import PriorState, effect_runner
 from lifx.devices.light import Light, LightState
+from lifx.devices.paint_record import PaintTracking
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
@@ -410,7 +411,7 @@ class MatrixLightState(LightState):
         )
 
 
-class MatrixLight(Light):
+class MatrixLight(PaintTracking, Light):
     """LIFX Matrix Light Device.
 
     MatrixLight devices have 2D arrays of controllable color zones arranged in tiles.
@@ -757,6 +758,16 @@ class MatrixLight(Light):
         return self._brightest_or(
             self._shown_colors(prestate.tile_colors or []), prestate.color.brightness
         )
+
+    @staticmethod
+    def _shown_colours(
+        tiles: list[TileInfo], all_colors: list[list[HSBK]]
+    ) -> list[list[HSBK]]:
+        """Each tile's pixels, without the padding past ``width * height``."""
+        return [
+            colors[: tile.width * tile.height]
+            for tile, colors in zip(tiles, all_colors)
+        ]
 
     def _shown_colors(self, all_colors: list[list[HSBK]]) -> list[HSBK]:
         """Each tile's pixels, without the padding past ``width * height``."""
@@ -1608,11 +1619,13 @@ class MatrixLight(Light):
         needs_power_on = power_on and not await self.get_power()
 
         # Apply colors to each tile
+        painted: list[list[HSBK]] = []
         for tile, colors in zip(tiles, tile_colors, strict=True):
             # The canvas renders in row-major screen order, so a physically
             # rotated tile needs the same orientation remapping the animation
             # layer applies in FrameBuffer._for_multi_tile().
             oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            painted.append(oriented)
 
             # Apply with appropriate timing
             if needs_power_on:
@@ -1625,6 +1638,7 @@ class MatrixLight(Light):
         # Turn on light if requested and currently off
         if needs_power_on:
             await self.set_power(True, duration=duration)
+        self._record_tile_paint("theme", theme, self._shown_colours(tiles, painted))
 
     @staticmethod
     def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
@@ -1718,6 +1732,17 @@ class MatrixLight(Light):
             await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
 
         await self._write_mood(write, power_on)
+        self._record_tile_paint(
+            "mood",
+            theme,
+            self._shown_colours(
+                tiles,
+                [
+                    self._orient_tile_colors(tile, colors) if has_chain else colors
+                    for tile, colors in zip(tiles, frames, strict=True)
+                ],
+            ),
+        )
         return frames
 
     async def _write_mood_frames(
@@ -1839,15 +1864,34 @@ class MatrixLight(Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        record = self._paint_record
         await super().refresh_state()
 
         # Fetch all matrix light state sequentially to avoid overwhelming device
         all_tile_colors = await self.get_all_tile_colors()
         effect = await self.get_effect()
+        self._check_tile_paint(record, self._shown_read(all_tile_colors))
 
         # Flatten tile colors for state storage
         self._state.tile_colors = [c for tile in all_tile_colors for c in tile]
         self._state.effect = effect.effect_type
+
+    def _shown_read(self, all_colors: list[list[HSBK]]) -> list[list[HSBK]]:
+        """What a read of every tile shows, without each tile's padding."""
+        chain = self._device_chain or []
+        if len(chain) != len(all_colors):
+            # The chain changed length since it was cached; the tiles cannot
+            # be trimmed pairwise, and the count alone will not match.
+            return all_colors
+        return self._shown_colours(chain, all_colors)
+
+    async def _verify_paint(self) -> None:
+        """Read every tile and clear the record unless each still matches."""
+        record = self._paint_record
+        if record is not None:
+            self._check_tile_paint(
+                record, self._shown_read(await self.get_all_tile_colors())
+            )
 
     async def _initialize_state(self) -> MatrixLightState:
         """Initialize matrix light state transactionally.
