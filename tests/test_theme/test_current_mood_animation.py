@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from lifx_emulator.factories import create_device
 
-from lifx.color import HSBK
+from lifx.devices.ceiling import CeilingLight
 from lifx.devices.effect_runner import _Registry, effect_runner
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.mirror import MirrorLight
@@ -22,44 +23,21 @@ from lifx.effects import EffectColorloop
 from lifx.exceptions import LifxUnsupportedCommandError
 from lifx.protocol.protocol_types import FirmwareEffect
 from lifx.theme import Theme
+from tests.conftest import remove_emulated_device
+from tests.test_theme.conftest import (
+    BLUE,
+    GREEN,
+    RED,
+    make_theme,
+    morphing,
+)
 
 pytestmark = pytest.mark.emulator
-
-TILE_SERIAL = "d073d5000007"
-
-RED = HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500)
-GREEN = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-BLUE = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
-
-
-def morphing(slug: str | None = "unit_test_m", *colours: HSBK) -> Theme:
-    """A caller-built slugged theme whose mood runs firmware Morph."""
-    return Theme(list(colours) or [RED, GREEN, BLUE], slug=slug, static_mode="blended")
 
 
 def scrolling(slug: str | None = "unit_test_s") -> Theme:
     """A caller-built slugged theme whose mood scrolls (a MOVE mood)."""
-    return Theme([RED, GREEN, BLUE], slug=slug, static_mode="solid_static")
-
-
-@pytest.fixture
-async def matrix(emulator_server) -> AsyncIterator[MatrixLight]:
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        await light.set_power(True)
-        yield light
-        await light.stop_effect()
-
-
-@pytest.fixture
-async def app(emulator_server) -> AsyncIterator[MatrixLight]:
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        yield light
+    return make_theme(slug, RED, GREEN, BLUE)
 
 
 class TestMorph:
@@ -255,6 +233,58 @@ class TestMirror:
             await mirror_device.stop_effect()
 
 
+@pytest.fixture(params=[171, 173], ids=["spot", "path"])
+async def morph_only_light(
+    request: pytest.FixtureRequest, emulator_server
+) -> AsyncIterator[MatrixLight]:
+    """A Spot or a Path, which run firmware MORPH for every mood."""
+    port, server, scenario_manager = emulator_server
+    if server is None:
+        pytest.skip("Cannot create devices with an external emulator")
+    serial = f"d073d5000{request.param:03x}"
+    server.add_device(
+        create_device(
+            product_id=request.param, serial=serial, scenario_manager=scenario_manager
+        )
+    )
+    try:
+        async with MatrixLight(
+            serial=serial, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
+        ) as light:
+            await light.set_power(True)
+            yield light
+            await light.stop_effect()
+    finally:
+        remove_emulated_device(server, serial)
+
+
+class TestMorphOnlyProducts:
+    async def test_scroll_mood_runs_morph_and_is_tracked(
+        self, morph_only_light: MatrixLight
+    ) -> None:
+        await morph_only_light.animate_mood(scrolling())
+        effect = await morph_only_light.get_effect()
+        assert effect.effect_type == FirmwareEffect.MORPH
+        assert morph_only_light.current_mood == "unit_test_s"
+        assert await morph_only_light.get_current_mood() == "unit_test_s"
+
+
+class TestCeiling:
+    async def test_scroll_mood_stays_current_while_it_writes(
+        self, ceiling_device: CeilingLight
+    ) -> None:
+        async with ceiling_device:
+            await ceiling_device.set_power(True)
+            try:
+                await ceiling_device.animate_mood(scrolling())
+                # Let the scroll write a few frames.
+                await asyncio.sleep(0.5)
+                assert ceiling_device.current_mood == "unit_test_s"
+                assert await ceiling_device.get_current_mood() == "unit_test_s"
+            finally:
+                await ceiling_device.stop_effect()
+
+
 @dataclass
 class ControlledRunner:
     """Wraps the real runner but lets a test say which run is active."""
@@ -269,19 +299,26 @@ class ControlledRunner:
         return self.active
 
 
+@pytest.fixture
+def controlled(monkeypatch: pytest.MonkeyPatch) -> ControlledRunner:
+    """The real runner, with the scroll it starts reported as the active run."""
+    fake = ControlledRunner(effect_runner())
+    monkeypatch.setattr(_Registry, "runner", fake)
+    real_scroll = fake.real.scroll_effect
+
+    def scroll(frame: Any, vertical: bool) -> Any:
+        fake.active = real_scroll(frame, vertical)
+        return fake.active
+
+    fake.scroll_effect = scroll  # type: ignore[method-assign]
+    return fake
+
+
 class TestRunLifetime:
-    async def test_record_follows_the_run_not_the_colours(
-        self, matrix: MatrixLight, monkeypatch: pytest.MonkeyPatch
+    async def test_record_follows_the_run_not_the_colors(
+        self, matrix: MatrixLight, controlled: ControlledRunner
     ) -> None:
-        fake = ControlledRunner(effect_runner())
-        monkeypatch.setattr(_Registry, "runner", fake)
-        real_scroll = fake.real.scroll_effect
-
-        def scroll(frame: Any, vertical: bool) -> Any:
-            fake.active = real_scroll(frame, vertical)
-            return fake.active
-
-        fake.scroll_effect = scroll  # type: ignore[method-assign]
+        fake = controlled
         await matrix.animate_mood(scrolling())
         await asyncio.sleep(0.3)  # several frames: they must not end the record
         assert await matrix.get_current_mood() == "unit_test_s"
@@ -290,19 +327,10 @@ class TestRunLifetime:
         assert matrix.current_mood is None
 
     async def test_stopped_run_ends_the_record(
-        self, matrix: MatrixLight, monkeypatch: pytest.MonkeyPatch
+        self, matrix: MatrixLight, controlled: ControlledRunner
     ) -> None:
-        fake = ControlledRunner(effect_runner())
-        monkeypatch.setattr(_Registry, "runner", fake)
-        real_scroll = fake.real.scroll_effect
-
-        def scroll(frame: Any, vertical: bool) -> Any:
-            fake.active = real_scroll(frame, vertical)
-            return fake.active
-
-        fake.scroll_effect = scroll  # type: ignore[method-assign]
         await matrix.animate_mood(scrolling())
-        fake.active = None
+        controlled.active = None
         await matrix.refresh_state()
         assert matrix.current_mood is None
 

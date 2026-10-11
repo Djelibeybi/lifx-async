@@ -1207,7 +1207,7 @@ class MultiZoneLight(PaintTracking, Light):
         strip on if it is off). Move then ends the strip's current theme or
         mood, because its effect reply carries no palette to verify. Unlike
         :meth:`animate_mood`, this captures no prior state, so
-        :meth:`stop_effect` leaves the painted colours showing.
+        :meth:`stop_effect` leaves the painted colors showing.
 
         Args:
             direction: A ``Direction`` member, or its case-insensitive name
@@ -1245,13 +1245,13 @@ class MultiZoneLight(PaintTracking, Light):
         if mood and theme is None:
             raise ValueError("mood requires a theme")
 
-        from lifx.theme.library import ThemeLibrary
+        from lifx.theme.library import resolve_theme
         from lifx.theme.theme import Theme
 
         effect = MultiZoneEffect.move(direction, speed, duration)
 
         if theme is not None:
-            resolved = ThemeLibrary.get(theme) if isinstance(theme, str) else theme
+            resolved = resolve_theme(theme)
             if mood:
                 is_on, brightness = await self._mood_reading()
                 await self._paint_mood(
@@ -1592,13 +1592,14 @@ class MultiZoneLight(PaintTracking, Light):
 
         self._state.zones = zones
         self._state.effect = effect.effect_type
-        self._check_paint(record, zones)
+        self._check_paint(record, lambda r: r.matches_zones(zones))
 
     async def _verify_paint(self) -> None:
         """Read every zone and clear the record unless each still matches."""
         record = self._paint_record
         if record is not None:
-            self._check_paint(record, await self.get_all_color_zones())
+            zones = await self.get_all_color_zones()
+            self._check_paint(record, lambda r: r.matches_zones(zones))
 
     async def _initialize_state(self) -> MultiZoneLightState:
         """Initialize multizone light state transactionally.

@@ -101,7 +101,7 @@ class DeviceStateManager:
             zone_colors=zone_colors,
             tile_colors=tile_colors,
             stored_colors=stored_colors,
-            paint_record=paint_record,
+            _paint_record=paint_record,
         )
 
     async def restore_state(self, light: Light, prestate: PreState) -> None:
@@ -145,9 +145,9 @@ class DeviceStateManager:
         if prestate.power:
             await self._restore_power(light, prestate.power)
 
-        # The colours are back, so the light shows what the record described.
+        # The colors are back, so the light shows what the record described.
         # With none written, the light is not known to.
-        light._adopt_paint_record(prestate.paint_record if write_colours else None)
+        light._adopt_paint_record(prestate._paint_record if write_colours else None)
 
         # Ceiling and Mirror: an effect never changes either component's
         # stored colours, whatever the restore writes above remembered.

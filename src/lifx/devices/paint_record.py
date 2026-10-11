@@ -7,40 +7,44 @@ record into the public ``current_theme`` / ``current_mood`` properties and the
 ``get_current_*()`` verifiers.
 
 The record lives on :class:`~lifx.devices.light.Light` (``_paint_record``)
-so every colour write on the class can end it through one hook,
+so every color write on the class can end it through one hook,
 ``Light._clear_paint_record()``. A subclass that tracks paints:
 
 - inherits :class:`PaintTracking` ahead of its light base class,
-- calls ``_clear_paint_record()`` at the top of every colour or effect write,
-- calls ``_record_paint()`` after the write that paints the whole light, and
+- ends the record after every color or effect write that succeeds, which
+  ``Light._zones_changed()`` does through ``_clear_paint_record()`` (a write
+  that raises leaves the record for verification to catch),
+- calls the matching ``_record_*()`` after the write that paints the whole
+  light, so the new record is set once the write has ended the old one, and
 - implements ``_verify_paint()`` to read the light and call ``_check_paint()``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from lifx.color import HSBK
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
+    from lifx.effects.base import LIFXEffect
     from lifx.theme.theme import Theme
 
-#: One colour as the wire carries it: (hue, saturation, brightness, kelvin).
-WireColour = tuple[int, int, int, int]
+#: One color as the wire carries it: (hue, saturation, brightness, kelvin).
+WireColor = tuple[int, int, int, int]
 
 PaintKind = Literal["theme", "mood"]
 
 
-def to_wire(colour: HSBK) -> WireColour:
-    """Quantise a colour to the uint16 values the light stores.
+def to_wire(color: HSBK) -> WireColor:
+    """Quantize a color to the uint16 values the light stores.
 
-    Writes and readings both go through this, so a colour that the light
-    rounded on its way in compares equal to the colour that was written.
+    Writes and readings both go through this, so a color that the light
+    rounded on its way in compares equal to the color that was written.
     """
-    protocol = colour.to_protocol()
+    protocol = color.to_protocol()
     return protocol.hue, protocol.saturation, protocol.brightness, protocol.kelvin
 
 
@@ -51,37 +55,37 @@ class PaintRecord:
     Attributes:
         kind: Whether the theme was painted as a theme or as a mood
         slug: The theme's library slug
-        colours: What was written, per zone for a strip, quantised to uint16.
+        colors: What was written, per zone for a strip, quantized to uint16.
             Empty for a matrix light.
         tiles: What was written, per tile for a matrix light: each tile's
             pixels in the order the light stores them (after any orientation
-            remapping), quantised to uint16. Empty for a strip.
+            remapping), quantized to uint16. Empty for a strip.
 
-        morph: The palette sent to firmware Morph, quantised to uint16 and
+        morph: The palette sent to firmware Morph, quantized to uint16 and
             sorted, so it compares as a multiset. ``None`` unless the record
             is a Morph one.
         run: The software effect running the mood, for a record kept alive by
-            a run rather than by colours. ``None`` unless the record is a
+            a run rather than by colors. ``None`` unless the record is a
             software-run one.
     """
 
     kind: PaintKind
     slug: str
-    colours: tuple[WireColour, ...] = ()
-    tiles: tuple[tuple[WireColour, ...], ...] = ()
-    morph: tuple[WireColour, ...] | None = None
-    run: object | None = None
+    colors: tuple[WireColor, ...] = ()
+    tiles: tuple[tuple[WireColor, ...], ...] = ()
+    morph: tuple[WireColor, ...] | None = None
+    run: LIFXEffect | None = None
 
     def matches_zones(self, zones: Iterable[HSBK]) -> bool:
         """Whether every zone still shows what was written."""
-        return tuple(to_wire(zone) for zone in zones) == self.colours
+        return tuple(to_wire(zone) for zone in zones) == self.colors
 
     def matches_tiles(self, tiles: Iterable[Iterable[HSBK]]) -> bool:
         """Whether every pixel of every tile still shows what was written."""
         return tuple(tuple(to_wire(c) for c in tile) for tile in tiles) == self.tiles
 
     def matches_morph(self, palette: Iterable[HSBK]) -> bool:
-        """Whether a Morph palette holds the colours that were sent, in any order."""
+        """Whether a Morph palette holds the colors that were sent, in any order."""
         return tuple(sorted(to_wire(c) for c in palette)) == self.morph
 
 
@@ -97,6 +101,9 @@ class PaintTracking:
     if TYPE_CHECKING:
 
         def _clear_paint_record(self) -> None: ...
+
+        async def _verify_paint(self) -> None:
+            """Read the light and clear the record if it no longer matches."""
 
     @property
     def current_theme(self) -> str | None:
@@ -124,7 +131,7 @@ class PaintTracking:
 
         Every zone must still equal what was painted (uint16 rounding
         allowed). A light that no longer matches has its record cleared.
-        The theme is never identified from the light's colours: a paint this
+        The theme is never identified from the light's colors: a paint this
         object did not make reads as ``None``.
 
         Returns:
@@ -144,19 +151,21 @@ class PaintTracking:
         await self._verify_paint()
         return self.current_mood
 
+    def _remember(self, kind: PaintKind, theme: Theme, **shape: Any) -> None:
+        """Remember a paint, or forget the old one if the theme has no slug."""
+        if theme.slug is None:
+            self._clear_paint_record()
+            return
+        self._paint_record = PaintRecord(kind=kind, slug=theme.slug, **shape)
+
     def _record_paint(
         self,
         kind: PaintKind,
         theme: Theme,
-        colours: Iterable[HSBK],
+        colors: Iterable[HSBK],
     ) -> None:
         """Remember a whole-light paint, or forget the old one if unslugged."""
-        if theme.slug is None:
-            self._clear_paint_record()
-            return
-        self._paint_record = PaintRecord(
-            kind=kind, slug=theme.slug, colours=tuple(to_wire(c) for c in colours)
-        )
+        self._remember(kind, theme, colors=tuple(to_wire(c) for c in colors))
 
     def _record_tile_paint(
         self,
@@ -168,13 +177,8 @@ class PaintTracking:
 
         ``tiles`` holds each tile's pixels as the light stores them.
         """
-        if theme.slug is None:
-            self._clear_paint_record()
-            return
-        self._paint_record = PaintRecord(
-            kind=kind,
-            slug=theme.slug,
-            tiles=tuple(tuple(to_wire(c) for c in tile) for tile in tiles),
+        self._remember(
+            kind, theme, tiles=tuple(tuple(to_wire(c) for c in t) for t in tiles)
         )
 
     def _record_morph(
@@ -183,41 +187,25 @@ class PaintTracking:
         """Remember a firmware Morph started from a theme.
 
         ``palette`` is the palette actually sent (rescaled to brightness and
-        reduced to what Morph carries), never the theme's raw colours.
+        reduced to what Morph carries), never the theme's raw colors.
         """
-        if theme.slug is None:
-            self._clear_paint_record()
-            return
-        self._paint_record = PaintRecord(
-            kind=kind,
-            slug=theme.slug,
-            morph=tuple(sorted(to_wire(c) for c in palette)),
-        )
+        self._remember(kind, theme, morph=tuple(sorted(to_wire(c) for c in palette)))
 
-    def _record_run(self, kind: PaintKind, theme: Theme, run: object) -> None:
+    def _record_run(self, kind: PaintKind, theme: Theme, run: LIFXEffect) -> None:
         """Remember a mood a software effect run is animating.
 
         The record holds only while ``run`` is the effect running on the light.
         """
-        if theme.slug is None:
-            self._clear_paint_record()
-            return
-        self._paint_record = PaintRecord(kind=kind, slug=theme.slug, run=run)
+        self._remember(kind, theme, run=run)
 
-    async def _verify_paint(self) -> None:
-        """Read the light and clear the record if it no longer matches."""
-        raise NotImplementedError  # pragma: no cover - supplied by the light
-
-    def _check_paint(self, record: PaintRecord | None, zones: Iterable[HSBK]) -> None:
-        """Clear ``record`` if ``zones`` differ from it.
+    def _check_paint(
+        self, record: PaintRecord | None, holds: Callable[[PaintRecord], bool]
+    ) -> None:
+        """Clear ``record`` unless ``holds`` says the light still shows it.
 
         ``record`` is the one the caller held before it read the light. A paint
         made while the read was in flight is a newer record, and a reading
         taken before it says nothing about it.
         """
-        if (
-            record is not None
-            and self._paint_record is record
-            and not record.matches_zones(zones)
-        ):
+        if record is not None and self._paint_record is record and not holds(record):
             self._clear_paint_record()

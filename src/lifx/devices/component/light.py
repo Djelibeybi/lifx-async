@@ -963,7 +963,7 @@ class ComponentMatrixLight(MatrixLight):
         """Trust a recent power write, as every other write here does."""
         return await self._power_for_update() > 0
 
-    async def _write_mood_frames(
+    async def _write_frames(
         self,
         tiles: list[TileInfo],
         frames: list[list[HSBK]],

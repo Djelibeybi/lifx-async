@@ -1,7 +1,7 @@
 """Tests for the current theme and mood on Ceiling and Mirror lights.
 
 Only whole-light paints are tracked. Any write to one light component (its
-colours, its apparent on/off state or an effect on it) ends the record, while
+colors, its apparent on/off state or an effect on it) ends the record, while
 whole-light power keeps it. Everything goes through the public device API
 against the embedded emulator.
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
+from functools import partial
 
 import pytest
 
@@ -18,28 +19,21 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.component.light import ComponentMatrixLight
 from lifx.devices.mirror import MirrorLight
 from lifx.effects.frame_effect import FrameContext, FrameEffect
-from lifx.theme import Theme
+from tests.test_theme.conftest import make_theme
 
 pytestmark = pytest.mark.emulator
 
-RED = HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500)
-GREEN = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
 AMBER = HSBK(hue=40, saturation=1.0, brightness=0.6, kelvin=3500)
-AWKWARD = HSBK(hue=33.3333, saturation=0.33333, brightness=0.77777, kelvin=3500)
 DARK = HSBK(hue=0, saturation=0.0, brightness=0.0, kelvin=3500)
 
 Operation = Callable[[ComponentMatrixLight], Awaitable[None]]
 
 
-def themed(slug: str | None = "unit_test_a", *colours: HSBK) -> Theme:
-    """A caller-built theme carrying a slug, never a library theme."""
-    return Theme(
-        list(colours) or [RED, GREEN, AWKWARD], slug=slug, static_mode="grid_static"
-    )
+themed = partial(make_theme, static_mode="grid_static")
 
 
 class _Solid(FrameEffect):
-    """Frame effect painting every pixel one colour."""
+    """Frame effect painting every pixel one color."""
 
     def __init__(self) -> None:
         super().__init__(power_on=True, fps=20.0)
@@ -62,11 +56,11 @@ def _mirror(light: ComponentMatrixLight) -> MirrorLight:
     return light
 
 
-async def _uplight_colour(light: ComponentMatrixLight) -> None:
+async def _uplight_color(light: ComponentMatrixLight) -> None:
     await _ceiling(light).set_uplight_color(AMBER)
 
 
-async def _downlight_colours(light: ComponentMatrixLight) -> None:
+async def _downlight_colors(light: ComponentMatrixLight) -> None:
     await _ceiling(light).set_downlight_colors(AMBER)
 
 
@@ -86,11 +80,11 @@ async def _downlight_on(light: ComponentMatrixLight) -> None:
     await _ceiling(light).turn_downlight_on()
 
 
-async def _front_colours(light: ComponentMatrixLight) -> None:
+async def _front_colors(light: ComponentMatrixLight) -> None:
     await _mirror(light).set_front_colors(AMBER)
 
 
-async def _back_colours(light: ComponentMatrixLight) -> None:
+async def _back_colors(light: ComponentMatrixLight) -> None:
     await _mirror(light).set_back_colors(AMBER)
 
 
@@ -119,14 +113,14 @@ async def _back_theme(light: ComponentMatrixLight) -> None:
 
 
 COMPONENT_WRITES = [
-    pytest.param("ceiling", _uplight_colour, id="ceiling-uplight-colour"),
-    pytest.param("ceiling", _downlight_colours, id="ceiling-downlight-colours"),
+    pytest.param("ceiling", _uplight_color, id="ceiling-uplight-color"),
+    pytest.param("ceiling", _downlight_colors, id="ceiling-downlight-colors"),
     pytest.param("ceiling", _uplight_off, id="ceiling-uplight-off"),
     pytest.param("ceiling", _uplight_on, id="ceiling-uplight-on"),
     pytest.param("ceiling", _downlight_off, id="ceiling-downlight-off"),
     pytest.param("ceiling", _downlight_on, id="ceiling-downlight-on"),
-    pytest.param("mirror", _front_colours, id="mirror-front-colours"),
-    pytest.param("mirror", _back_colours, id="mirror-back-colours"),
+    pytest.param("mirror", _front_colors, id="mirror-front-colors"),
+    pytest.param("mirror", _back_colors, id="mirror-back-colors"),
     pytest.param("mirror", _front_off, id="mirror-front-off"),
     pytest.param("mirror", _front_on, id="mirror-front-on"),
     pytest.param("mirror", _back_off, id="mirror-back-off"),
@@ -228,7 +222,7 @@ class TestComponentWritesEndTheRecord:
         self, request: pytest.FixtureRequest, kind: str
     ) -> None:
         # A dark theme leaves both components dark, so turning one "off"
-        # powers the whole light off without writing any colours.
+        # powers the whole light off without writing any colors.
         device = request.getfixturevalue(f"{kind}_device")
         async with device:
             await device.stop_effect()

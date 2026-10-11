@@ -106,6 +106,28 @@ effect with the new theme instead of painting a still image.
 
 `apply_theme()` is unchanged; use it for the library's own gradients.
 
+## Current Theme and Current Mood
+
+Strips and matrix lights (including Ceiling and Mirror lights) remember the theme or mood they
+were last painted with, for a theme that has a slug.
+
+| Member | Reads | Returns |
+|---|---|---|
+| `current_theme` | The in-memory record, with no request | The slug of the theme last painted as a theme, or `None` |
+| `current_mood` | The in-memory record, with no request | The slug of the theme last painted as a mood, or `None` |
+| `await get_current_theme()` | The light, then the record | The slug if the light still shows the paint, or `None` |
+| `await get_current_mood()` | The light, then the record | The slug if the light still shows the paint, or `None` |
+| `await refresh_state()` | The state it already fetches | Nothing; clears the record if the light no longer shows it |
+
+A light has at most one of the two. Verification compares every zone or tile with what was
+painted, allowing for uint16 rounding. A firmware Morph record is confirmed by the effect the
+light reports and the palette that was sent. A software run that plays a mood is confirmed
+while it is the effect running on the light. A paint this object did not make reads as `None`.
+
+Any write that changes colors or starts or stops an effect ends the record, as does any write
+to one light component of a Ceiling or Mirror. `set_power()` keeps it. Firmware Move ends it
+because the light reports no palette to check. Bulbs are never tracked.
+
 ::: lifx.theme.MoodGenerator
     options:
       show_root_heading: true

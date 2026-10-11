@@ -98,7 +98,7 @@ class EffectRunner(Protocol):
         """Whether a mood software effect runs on a whole light."""
         ...
 
-    def mood_run(self, light: Light) -> object | None:
+    def mood_run(self, light: Light) -> LIFXEffect | None:
         """The mood software effect running on a whole light, if any.
 
         The very object the light started, so a record kept alive by that run

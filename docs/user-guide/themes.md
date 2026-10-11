@@ -334,6 +334,49 @@ What a mood does depends on the light:
   reports a rotation (left, right or upside down) is remapped; FaceUp and
   FaceDown are not.
 
+## Knowing What a Light Shows
+
+A strip or matrix light remembers the theme or mood it was last painted with, so you can ask
+what a light is showing without reading its colors. `current_theme` and `current_mood` hold the
+library slug, or `None`. They read an in-memory record kept per device object, so they make no
+request and say nothing about paints made by another client or another process.
+
+```python
+await light.apply_theme(get_theme("evening"))
+light.current_theme  # "evening"
+light.current_mood   # None
+
+await light.apply_mood(get_theme("evening"))
+light.current_theme  # None
+light.current_mood   # "evening"
+```
+
+A light has at most one of the two. `apply_theme()` and `apply_mood()` set it, as do
+`animate_mood()` on a matrix light and `MatrixLight.set_morph_effect()`. A bulb is never
+tracked, and a theme built by the caller records nothing unless it carries a slug.
+
+The property does not know whether the light still shows the paint. To check, read the light with
+`await light.get_current_theme()` or `await light.get_current_mood()`. Each reads the zones or
+tiles (or, for firmware Morph, the effect) and returns the slug only if the light still shows
+exactly what was painted, allowing for the rounding of colors to uint16. If it does not, the
+record is cleared and the call returns `None`. A light is never identified from its colors: a
+paint this object did not make reads as `None`. `refresh_state()` runs the same check on the state
+it already fetches, with no extra request.
+
+What ends the record:
+
+- Any write that changes the light's colors or effect: `set_color()`, `set_brightness()`,
+  waveforms, `pulse()`, `breathe()`, zone and tile writes, `set_effect()` and `start_effect()`.
+  Firmware Move ends it too, because the light reports no palette to check, so
+  `set_move_effect(theme=...)` and `animate_mood()` on a strip leave `current_mood` as `None`.
+- Any write to one light component of a Ceiling or Mirror. Only whole-light paints are tracked.
+- A verification that finds the light showing something else.
+
+What keeps it: `set_power()`, whether the light is turned on or off. A software effect that
+plays a mood (the matrix scroll) keeps it while it runs, and firmware Morph keeps it while the
+light still reports the palette that was sent. `stop_effect()` after `animate_mood()` puts back
+the record the light had before the animation, along with its colors.
+
 ## Custom Themes
 
 ### Create Branded Theme

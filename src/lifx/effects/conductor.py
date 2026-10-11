@@ -978,7 +978,7 @@ class _LightEffects:
         """Whether a mood software effect runs on a whole light."""
         return self.mood_run(light) is not None
 
-    def mood_run(self, light: Light) -> object | None:
+    def mood_run(self, light: Light) -> LIFXEffect | None:
         """The mood software effect running on a whole light, if any."""
         effect = Conductor._whole_light_effect(light)
         if isinstance(effect, EffectScroll) or (

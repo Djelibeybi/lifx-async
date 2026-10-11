@@ -129,7 +129,7 @@ class Light(Device[LightState]):
     _mood_prestate: PriorState | None = None
     # The theme or mood this light was last painted with, if it still stands.
     # Only lights that track paints (see ``PaintTracking``) ever set it, but
-    # every colour write ends it through ``_clear_paint_record()``.
+    # every color write ends it through ``_clear_paint_record()``.
     _paint_record: PaintRecord | None = None
 
     @property
@@ -596,12 +596,12 @@ class Light(Device[LightState]):
     def _zones_changed(self) -> None:
         """Hook called after a write that changes zone colours.
 
-        The one hook every colour or effect write calls, so ``current_theme``
+        The one hook every color or effect write calls, so ``current_theme``
         and ``current_mood`` are right without a read: it forgets the paint
         record. The paint that sets a new record does so after its own writes.
-        Component devices extend it to forget colours they were tracking for
+        Component devices extend it to forget colors they were tracking for
         an in-flight transition, so a later component write does not undo a
-        colour change made through an inherited method.
+        color change made through an inherited method.
         """
         self._clear_paint_record()
 

@@ -7,61 +7,34 @@ changes the light behind the first object's back.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from functools import partial
 
 import pytest
 
 from lifx.color import HSBK
 from lifx.devices.matrix import MatrixLight, TileInfo
-from lifx.effects import EffectColorloop
-from lifx.protocol.protocol_types import FirmwareEffect, LightWaveform
-from lifx.theme import Theme
+from lifx.protocol.protocol_types import FirmwareEffect
+from tests.test_theme.conftest import (
+    AWKWARD,
+    BLUE,
+    COMMON_CLEARING_WRITES,
+    GREEN,
+    RED,
+    assert_power_keeps,
+    assert_write_clears,
+    make_theme,
+)
 
 pytestmark = pytest.mark.emulator
 
-TILE_SERIAL = "d073d5000007"
-
-RED = HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500)
-GREEN = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-BLUE = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
-# Values that no uint16 holds exactly, so every write is rounded.
-AWKWARD = HSBK(hue=33.3333, saturation=0.33333, brightness=0.77777, kelvin=3500)
+themed = partial(make_theme, static_mode="grid_static")
 
 
-def themed(slug: str | None = "unit_test_a", *colours: HSBK) -> Theme:
-    """A caller-built theme carrying a slug, never a library theme."""
-    return Theme(
-        list(colours) or [RED, GREEN, AWKWARD],
-        slug=slug,
-        static_mode="grid_static",
-    )
-
-
-@pytest.fixture
-async def matrix(emulator_server) -> AsyncIterator[MatrixLight]:
-    """A connected matrix light, powered on."""
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        await light.set_power(True)
-        yield light
-
-
-@pytest.fixture
-async def app(emulator_server) -> AsyncIterator[MatrixLight]:
-    """Another client of the same light: what the LIFX app does."""
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        yield light
-
-
-def one_pixel_off(colours: list[HSBK]) -> list[HSBK]:
+def one_pixel_off(colors: list[HSBK]) -> list[HSBK]:
     """The same frame with the last pixel changed."""
-    return [*colours[:-1], HSBK(300, 1.0, 1.0, 3500)]
+    return [*colors[:-1], HSBK(300, 1.0, 1.0, 3500)]
 
 
 class TestRecord:
@@ -198,26 +171,6 @@ class TestVerification:
         assert await matrix.get_current_theme() is None
 
 
-async def _set_color(light: MatrixLight) -> None:
-    await light.set_color(RED)
-
-
-async def _set_brightness(light: MatrixLight) -> None:
-    await light.set_brightness(0.5)
-
-
-async def _set_waveform(light: MatrixLight) -> None:
-    await light.set_waveform(RED, 1.0, 1, LightWaveform.SINE)
-
-
-async def _pulse(light: MatrixLight) -> None:
-    await light.pulse(RED, period=0.1, cycles=1)
-
-
-async def _breathe(light: MatrixLight) -> None:
-    await light.breathe(RED, period=0.1, cycles=1)
-
-
 async def _set_matrix_colors(light: MatrixLight) -> None:
     await light.set_matrix_colors(0, [RED, GREEN, BLUE, AWKWARD] * 16)
 
@@ -238,25 +191,13 @@ async def _set_effect(light: MatrixLight) -> None:
     await light.set_effect(FirmwareEffect.OFF)
 
 
-async def _start_effect(light: MatrixLight) -> None:
-    try:
-        await light.start_effect(EffectColorloop())
-    finally:
-        await light.stop_effect()
-
-
 CLEARING_WRITES: dict[str, Callable[[MatrixLight], Awaitable[None]]] = {
-    "set_color": _set_color,
-    "set_brightness": _set_brightness,
-    "set_waveform": _set_waveform,
-    "pulse": _pulse,
-    "breathe": _breathe,
+    **COMMON_CLEARING_WRITES,
     "set_matrix_colors": _set_matrix_colors,
     "set_matrix_colors_uniform": _set_matrix_colors_uniform,
     "set64": _set64,
     "copy_frame_buffer": _copy_frame_buffer,
     "set_effect": _set_effect,
-    "start_effect": _start_effect,
 }
 
 
@@ -266,26 +207,15 @@ class TestWritesClearTheRecord:
     async def test_write_clears(
         self, matrix: MatrixLight, name: str, kind: str
     ) -> None:
-        if kind == "theme":
-            await matrix.apply_theme(themed("unit_test_a"))
-        else:
-            await matrix.apply_mood(themed("unit_test_a"))
-        assert (matrix.current_theme or matrix.current_mood) == "unit_test_a"
-
-        await CLEARING_WRITES[name](matrix)
-
-        assert matrix.current_theme is None
-        assert matrix.current_mood is None
+        await assert_write_clears(
+            matrix, themed("unit_test_a"), kind, CLEARING_WRITES[name]
+        )
 
     @pytest.mark.parametrize("on", [False, True])
     async def test_set_power_keeps_the_record(
         self, matrix: MatrixLight, on: bool
     ) -> None:
-        await matrix.apply_theme(themed("unit_test_a"))
-        await matrix.set_power(on)
-        assert matrix.current_theme == "unit_test_a"
-        await matrix.set_power(not on, duration=0.0)
-        assert matrix.current_theme == "unit_test_a"
+        await assert_power_keeps(matrix, themed("unit_test_a"), on)
 
 
 class TestChain:

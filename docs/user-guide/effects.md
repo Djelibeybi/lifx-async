@@ -1022,7 +1022,7 @@ mood, at the strip's current brightness, turning the strip on if it is off. Pass
 and `palette` raises `ValueError`, and an unknown slug raises the same `KeyError` as
 `ThemeLibrary.get()`. Move carries no palette in its reply, so starting it ends the strip's
 `current_theme` or `current_mood`. Unlike `animate_mood()`, it captures no prior state, so
-`stop_effect()` leaves the painted colours showing.
+`stop_effect()` leaves the painted colors showing.
 
 ```python
 from lifx import Direction
@@ -1044,8 +1044,8 @@ await light.set_effect(effect)
 ## Firmware Morph effect from a theme
 
 `MatrixLight.set_morph_effect()` starts firmware Morph from a `Theme` or a library slug, without
-painting the tiles first. By default the theme's own colours are the Morph palette (past 16
-colours they are reduced by the area each run covers) and the light records a current theme.
+painting the tiles first. By default the theme's own colors are the Morph palette (past 16
+colors they are reduced by the area each run covers) and the light records a current theme.
 With `mood=True` it follows the `animate_mood()` Morph path whatever the theme's dynamic mode:
 the palette is the LIFX app's mood palette at the light's current brightness, the prior state is
 captured so `stop_effect()` restores it, and an off light is turned on with the mood fade. The

@@ -6,55 +6,27 @@ the same light stands in for the LIFX app.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-
 import pytest
 
-from lifx.color import HSBK
 from lifx.devices.matrix import MatrixLight
 from lifx.protocol.protocol_types import FirmwareEffect
 from lifx.theme import Theme
 from lifx.theme.library import ThemeLibrary
+from tests.test_theme.conftest import (
+    BLUE,
+    GREEN,
+    RED,
+    morphing,
+)
 
 pytestmark = pytest.mark.emulator
 
-TILE_SERIAL = "d073d5000007"
-
-RED = HSBK(hue=0, saturation=1.0, brightness=0.8, kelvin=3500)
-GREEN = HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=3500)
-BLUE = HSBK(hue=240, saturation=1.0, brightness=0.8, kelvin=3500)
-
-
-def themed(slug: str | None = "unit_test_m") -> Theme:
-    """A caller-built slugged theme."""
-    return Theme([RED, GREEN, BLUE], slug=slug, static_mode="blended")
-
-
-@pytest.fixture
-async def matrix(emulator_server) -> AsyncIterator[MatrixLight]:
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        await light.set_power(True)
-        yield light
-        await light.stop_effect()
-
-
-@pytest.fixture
-async def app(emulator_server) -> AsyncIterator[MatrixLight]:
-    port, _, _ = emulator_server
-    async with MatrixLight(
-        serial=TILE_SERIAL, ip="127.0.0.1", port=port, timeout=2.0, max_retries=2
-    ) as light:
-        yield light
-
 
 class TestTheme:
-    async def test_sends_the_theme_colours_and_records_a_theme(
+    async def test_sends_the_theme_colors_and_records_a_theme(
         self, matrix: MatrixLight, app: MatrixLight
     ) -> None:
-        await matrix.set_morph_effect(themed())
+        await matrix.set_morph_effect(morphing())
         effect = await app.get_effect()
         assert effect.effect_type == FirmwareEffect.MORPH
         assert effect.palette is not None
@@ -79,7 +51,7 @@ class TestTheme:
         self, matrix: MatrixLight, app: MatrixLight
     ) -> None:
         await matrix.set_morph_effect(
-            themed(), speed=7.0, duration=5_000_000_000
+            morphing(), speed=7.0, duration=5_000_000_000
         )  # emulator drops duration
         effect = await app.get_effect()
         assert effect.speed == 7000
@@ -92,23 +64,23 @@ class TestTheme:
 
         monkeypatch.setattr(matrix, "apply_theme", refuse)
         monkeypatch.setattr(matrix, "set64", refuse, raising=False)
-        await matrix.set_morph_effect(themed())
+        await matrix.set_morph_effect(morphing())
 
     async def test_slugless_theme_records_nothing(self, matrix: MatrixLight) -> None:
-        await matrix.set_morph_effect(themed(None))
+        await matrix.set_morph_effect(morphing(None))
         assert (matrix.current_theme, matrix.current_mood) == (None, None)
 
     async def test_another_palette_ends_the_record(
         self, matrix: MatrixLight, app: MatrixLight
     ) -> None:
-        await matrix.set_morph_effect(themed())
+        await matrix.set_morph_effect(morphing())
         await app.set_effect(FirmwareEffect.MORPH, speed=3.0, palette=[RED, RED])
         assert await matrix.get_current_theme() is None
 
 
 class TestMood:
     async def test_records_a_mood(self, matrix: MatrixLight) -> None:
-        await matrix.set_morph_effect(themed(), mood=True)
+        await matrix.set_morph_effect(morphing(), mood=True)
         assert matrix.current_mood == "unit_test_m"
         assert matrix.current_theme is None
         assert await matrix.get_current_mood() == "unit_test_m"
@@ -125,12 +97,12 @@ class TestMood:
 
     async def test_turns_an_off_light_on(self, matrix: MatrixLight) -> None:
         await matrix.set_power(False)
-        await matrix.set_morph_effect(themed(), mood=True)
+        await matrix.set_morph_effect(morphing(), mood=True)
         assert await matrix.get_power() > 0
 
     async def test_stop_restores_the_prior_theme(self, matrix: MatrixLight) -> None:
-        await matrix.apply_theme(themed("unit_test_before"))
-        await matrix.set_morph_effect(themed(), mood=True)
+        await matrix.apply_theme(morphing("unit_test_before"))
+        await matrix.set_morph_effect(morphing(), mood=True)
         await matrix.stop_effect()
         assert matrix.current_theme == "unit_test_before"
         assert matrix.current_mood is None

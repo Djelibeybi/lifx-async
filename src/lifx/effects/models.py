@@ -6,7 +6,7 @@ This module provides dataclasses for managing device state during effects.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from lifx.color import HSBK
@@ -56,9 +56,6 @@ class PreState:
             (None for other lights, or when the tiles could not be read)
         stored_colors: Stored colours of each light component, keyed by component
             name, for Ceiling and Mirror lights (None for other lights)
-        paint_record: The theme or mood the light was painted with, if it still
-            stood when the state was captured. Restoring the state puts it
-            back with the colours.
 
     Example:
         ```python
@@ -76,7 +73,9 @@ class PreState:
     zone_colors: list[HSBK] | None = None
     tile_colors: list[list[HSBK]] | None = None
     stored_colors: dict[str, list[HSBK] | None] | None = None
-    paint_record: PaintRecord | None = None
+    # Internal: the theme or mood the light was painted with, if it still
+    # stood at capture. Restoring the state puts it back with the colors.
+    _paint_record: PaintRecord | None = field(default=None, repr=False, compare=False)
 
     def __repr__(self) -> str:
         """String representation of PreState."""
