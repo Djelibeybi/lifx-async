@@ -52,17 +52,26 @@ class PaintRecord:
         kind: Whether the theme was painted as a theme or as a mood
         slug: The theme's library slug
         colours: What was written, per zone for a strip, quantised to uint16.
-            Later tickets add the fields a matrix light and Morph need beside
-            it.
+            Empty for a matrix light.
+        tiles: What was written, per tile for a matrix light: each tile's
+            pixels in the order the light stores them (after any orientation
+            remapping), quantised to uint16. Empty for a strip.
+
+    Later tickets add the fields Morph and a software run need beside these.
     """
 
     kind: PaintKind
     slug: str
     colours: tuple[WireColour, ...] = ()
+    tiles: tuple[tuple[WireColour, ...], ...] = ()
 
     def matches_zones(self, zones: Iterable[HSBK]) -> bool:
         """Whether every zone still shows what was written."""
         return tuple(to_wire(zone) for zone in zones) == self.colours
+
+    def matches_tiles(self, tiles: Iterable[Iterable[HSBK]]) -> bool:
+        """Whether every pixel of every tile still shows what was written."""
+        return tuple(tuple(to_wire(c) for c in tile) for tile in tiles) == self.tiles
 
 
 class PaintTracking:
@@ -138,6 +147,25 @@ class PaintTracking:
             kind=kind, slug=theme.slug, colours=tuple(to_wire(c) for c in colours)
         )
 
+    def _record_tile_paint(
+        self,
+        kind: PaintKind,
+        theme: Theme,
+        tiles: Iterable[Iterable[HSBK]],
+    ) -> None:
+        """Remember a whole-light matrix paint, or forget the old one if unslugged.
+
+        ``tiles`` holds each tile's pixels as the light stores them.
+        """
+        if theme.slug is None:
+            self._clear_paint_record()
+            return
+        self._paint_record = PaintRecord(
+            kind=kind,
+            slug=theme.slug,
+            tiles=tuple(tuple(to_wire(c) for c in tile) for tile in tiles),
+        )
+
     async def _verify_paint(self) -> None:
         """Read the light and clear the record if it no longer matches."""
         raise NotImplementedError  # pragma: no cover - supplied by the light
@@ -153,5 +181,16 @@ class PaintTracking:
             record is not None
             and self._paint_record is record
             and not record.matches_zones(zones)
+        ):
+            self._clear_paint_record()
+
+    def _check_tile_paint(
+        self, record: PaintRecord | None, tiles: Iterable[Iterable[HSBK]]
+    ) -> None:
+        """Clear ``record`` if ``tiles`` differ from it. See :meth:`_check_paint`."""
+        if (
+            record is not None
+            and self._paint_record is record
+            and not record.matches_tiles(tiles)
         ):
             self._clear_paint_record()
