@@ -21,6 +21,7 @@ from lifx.const import (
 from lifx.devices.component.state import derive_effect_palette, validate_effect_palette
 from lifx.devices.effect_runner import PriorState
 from lifx.devices.light import Light, LightState
+from lifx.devices.paint_record import PaintTracking
 from lifx.exceptions import (
     LifxProtocolError,
     LifxTimeoutError,
@@ -348,7 +349,7 @@ class MultiZoneLightState(LightState):
         )
 
 
-class MultiZoneLight(Light):
+class MultiZoneLight(PaintTracking, Light):
     """LIFX MultiZone light device (strips, beams).
 
     Extends the Light class with zone-specific functionality:
@@ -803,6 +804,7 @@ class MultiZoneLight(Light):
             ),
         )
         self._raise_if_unhandled(result)
+        self._zones_changed()
 
         _LOGGER.debug(
             {
@@ -904,6 +906,7 @@ class MultiZoneLight(Light):
             # Standard: wait for response and check for errors
             result = await self.connection.request(packet)
             self._raise_if_unhandled(result)
+        self._zones_changed()
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
             debug_colors = [
@@ -1069,6 +1072,8 @@ class MultiZoneLight(Light):
             ),
         )
         self._raise_if_unhandled(result)
+
+        self._zones_changed()
 
         # Update cached state
         cached_effect = effect if effect.effect_type != FirmwareEffect.OFF else None
@@ -1482,6 +1487,7 @@ class MultiZoneLight(Light):
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_all_color_zones(colors, duration=duration)
+        self._record_paint("theme", theme, colors)
 
     async def _paint_mood(
         self,
@@ -1498,6 +1504,7 @@ class MultiZoneLight(Light):
             lambda duration: self.set_all_color_zones(colors, duration=duration),
             power_on,
         )
+        self._record_paint("mood", theme, colors)
         return []
 
     async def animate_mood(self, theme: Theme) -> None:
@@ -1544,6 +1551,7 @@ class MultiZoneLight(Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        record = self._paint_record
         await super().refresh_state()
 
         zones, effect = await asyncio.gather(
@@ -1553,6 +1561,13 @@ class MultiZoneLight(Light):
 
         self._state.zones = zones
         self._state.effect = effect.effect_type
+        self._check_paint(record, zones)
+
+    async def _verify_paint(self) -> None:
+        """Read every zone and clear the record unless each still matches."""
+        record = self._paint_record
+        if record is not None:
+            self._check_paint(record, await self.get_all_color_zones())
 
     async def _initialize_state(self) -> MultiZoneLightState:
         """Initialize multizone light state transactionally.

@@ -403,6 +403,7 @@ class ComponentMatrixLight(MatrixLight):
 
     def _zones_changed(self) -> None:
         """Forget pending colours after raw writes, effects or Animator startup."""
+        super()._zones_changed()
         if self._animator is not None:
             self._animator._forget_hold()
         self._pending_tile.clear()

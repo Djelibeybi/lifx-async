@@ -31,6 +31,7 @@ from lifx.devices.base import (
     WifiInfo,
 )
 from lifx.devices.effect_runner import PriorState, effect_runner
+from lifx.devices.paint_record import PaintRecord
 from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightWaveform
@@ -126,6 +127,10 @@ class Light(Device[LightState]):
     # What the light showed before a firmware mood animation started, which
     # stop_effect() restores. A software mood's run holds it instead.
     _mood_prestate: PriorState | None = None
+    # The theme or mood this light was last painted with, if it still stands.
+    # Only lights that track paints (see ``PaintTracking``) ever set it, but
+    # every colour write ends it through ``_clear_paint_record()``.
+    _paint_record: PaintRecord | None = None
 
     @property
     def animator(self) -> Animator:
@@ -173,6 +178,10 @@ class Light(Device[LightState]):
         assert geometry is not None
         return geometry
 
+    def _clear_paint_record(self) -> None:
+        """Forget the theme or mood this light was painted with."""
+        self._paint_record = None
+
     async def start_effect(
         self, effect: LIFXEffect, *, enable_thread: bool = False
     ) -> None:
@@ -217,6 +226,7 @@ class Light(Device[LightState]):
             await light.stop_effect()
             ```
         """
+        self._clear_paint_record()
         await effect_runner().start(self, effect, enable_thread=enable_thread)
 
     async def stop_effect(self) -> None:
@@ -582,10 +592,14 @@ class Light(Device[LightState]):
     def _zones_changed(self) -> None:
         """Hook called after a write that changes zone colours.
 
-        A no-op here. Component devices override it to forget colours they
-        were tracking for an in-flight transition, so a later component write
-        does not undo a colour change made through an inherited method.
+        The one hook every colour or effect write calls, so ``current_theme``
+        and ``current_mood`` are right without a read: it forgets the paint
+        record. The paint that sets a new record does so after its own writes.
+        Component devices extend it to forget colours they were tracking for
+        an in-flight transition, so a later component write does not undo a
+        colour change made through an inherited method.
         """
+        self._clear_paint_record()
 
     async def get_power(self) -> int:
         """Get light power state (specific to light, not device).
