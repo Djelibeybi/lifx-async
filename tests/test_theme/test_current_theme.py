@@ -13,7 +13,7 @@ import pytest
 
 from lifx.color import HSBK
 from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
-from lifx.effects import EffectColorloop
+from lifx.effects import Conductor, EffectColorloop
 from lifx.protocol.protocol_types import FirmwareEffect, LightWaveform
 from lifx.theme import Theme
 
@@ -261,3 +261,54 @@ class TestWritesClearTheRecord:
         assert strip.current_theme == "unit_test_a"
         await strip.set_power(not on, duration=0.0)
         assert strip.current_theme == "unit_test_a"
+
+
+class TestStripEffectsEndTracking:
+    """Starting any effect on a strip ends the tracked theme or mood."""
+
+    @pytest.mark.parametrize("kind", ["theme", "mood"])
+    @pytest.mark.parametrize(
+        "effect_type",
+        [FirmwareEffect.OFF, FirmwareEffect.MOVE, FirmwareEffect.MORPH],
+    )
+    async def test_set_effect_of_any_type_clears(
+        self, strip: MultiZoneLight, kind: str, effect_type: FirmwareEffect
+    ) -> None:
+        paint = strip.apply_theme if kind == "theme" else strip.apply_mood
+        await paint(themed("unit_test_a"))
+        try:
+            await strip.set_effect(
+                MultiZoneEffect(effect_type=effect_type, speed=5000, duration=0)
+            )
+            assert strip.current_theme is None
+            assert strip.current_mood is None
+            assert await strip.get_current_theme() is None
+            assert await strip.get_current_mood() is None
+        finally:
+            await strip.set_effect(
+                MultiZoneEffect(effect_type=FirmwareEffect.OFF, speed=0, duration=0)
+            )
+
+    async def test_animate_mood_leaves_no_record(self, strip: MultiZoneLight) -> None:
+        try:
+            await strip.animate_mood(themed("unit_test_a"))
+            assert strip.current_mood is None
+            assert strip.current_theme is None
+            assert await strip.get_current_mood() is None
+        finally:
+            await strip.stop_effect()
+
+    @pytest.mark.parametrize("kind", ["theme", "mood"])
+    async def test_conductor_start_clears_at_once(
+        self, strip: MultiZoneLight, kind: str
+    ) -> None:
+        """Before the effect's own first write, not only once it has drawn."""
+        paint = strip.apply_theme if kind == "theme" else strip.apply_mood
+        await paint(themed("unit_test_a"))
+        conductor = Conductor()
+        try:
+            await conductor.start(EffectColorloop(), [strip])
+            assert strip.current_theme is None
+            assert strip.current_mood is None
+        finally:
+            await conductor.stop([strip])
