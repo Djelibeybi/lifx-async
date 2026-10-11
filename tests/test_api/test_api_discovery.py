@@ -55,6 +55,16 @@ from tests.conftest import (
     get_free_port,
 )
 
+# Hang guard for awaiting mocked sources and their events. These waits bound
+# no real work: a mocked source runs as soon as the loop schedules it, so the
+# only thing a small budget measures is runner latency, and a loaded CI runner
+# can stall well past 0.1 s. The guard only has to stop a genuine hang, so it
+# outlasts every lookup deadline these tests hand the API (at most the
+# 15 s default) while staying inside the suite-wide 60 s pytest timeout. A
+# lookup that misses its result then fails on the asserted value rather than
+# on a guard firing first.
+MOCKED_SOURCE_GUARD = 30.0
+
 
 @pytest.mark.emulator
 class TestDiscover:
@@ -305,7 +315,7 @@ class TestDiscoverUdpEntryGate:
                 method="test",
             )
         )
-        await asyncio.wait_for(construction_started.wait(), timeout=0.1)
+        await asyncio.wait_for(construction_started.wait(), timeout=MOCKED_SOURCE_GUARD)
 
         construction.cancel()
 
@@ -425,10 +435,10 @@ class TestDiscoverMerged:
         )
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        generator = discover(timeout=1.0)
+        generator = discover(timeout=10.0)
         first = asyncio.create_task(anext(generator))
         (udp_ready if first_source == "udp" else mdns_ready).set()
-        assert await asyncio.wait_for(first, timeout=0.1) is (
+        assert await asyncio.wait_for(first, timeout=MOCKED_SOURCE_GUARD) is (
             udp_device if first_source == "udp" else mdns_device
         )
         (mdns_ready if first_source == "udp" else udp_ready).set()
@@ -763,7 +773,7 @@ class TestMergedDiscoveryFailures:
                     cleanup_started["udp"].wait(),
                     cleanup_started["mdns"].wait(),
                 ),
-                timeout=0.1,
+                timeout=MOCKED_SOURCE_GUARD,
             )
             task.cancel()
             release_cleanup.set()
@@ -1027,7 +1037,7 @@ class TestMergedDiscoveryFailures:
         with pytest.raises(RuntimeError, match="synthetic invariant failure"):
             await asyncio.wait_for(
                 anext(discover(timeout=10.0)),
-                timeout=0.1,
+                timeout=MOCKED_SOURCE_GUARD,
             )
         assert udp_closed.is_set()
 
@@ -1180,14 +1190,14 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        lookup = asyncio.create_task(find_by_serial(serial, timeout=1.0))
+        lookup = asyncio.create_task(find_by_serial(serial, timeout=10.0))
         await asyncio.wait_for(
             asyncio.gather(started["udp"].wait(), started["mdns"].wait()),
-            timeout=0.1,
+            timeout=MOCKED_SOURCE_GUARD,
         )
         release[winner_source].set()
 
-        assert await asyncio.wait_for(lookup, timeout=0.1) is (
+        assert await asyncio.wait_for(lookup, timeout=MOCKED_SOURCE_GUARD) is (
             udp_device if winner_source == "udp" else mdns_device
         )
         assert closed == {"udp", "mdns"}
@@ -1227,8 +1237,8 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        lookup = asyncio.create_task(find_by_serial(serial, timeout=1.0))
-        await asyncio.wait_for(mdns_failed.wait(), timeout=0.1)
+        lookup = asyncio.create_task(find_by_serial(serial, timeout=10.0))
+        await asyncio.wait_for(mdns_failed.wait(), timeout=MOCKED_SOURCE_GUARD)
         assert not lookup.done()
         release_udp.set()
         assert await lookup is udp_device
@@ -1300,7 +1310,9 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
 
         with pytest.raises(RuntimeError, match="synthetic lookup invariant failure"):
-            await asyncio.wait_for(find_by_serial("d073d5123456"), timeout=0.1)
+            await asyncio.wait_for(
+                find_by_serial("d073d5123456"), timeout=MOCKED_SOURCE_GUARD
+            )
         assert udp_closed.is_set()
 
     async def test_find_by_serial_construction_crossing_deadline_returns_none(
@@ -1859,7 +1871,7 @@ class TestFindBySerialRaceLifecycle:
                 cleanup_started["udp"].wait(),
                 cleanup_started["mdns"].wait(),
             ),
-            timeout=0.1,
+            timeout=MOCKED_SOURCE_GUARD,
         )
         lookup.cancel()
         release_cleanup.set()
