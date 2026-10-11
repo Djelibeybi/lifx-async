@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.11.1 (2026-10-11)
+
+### Bug Fixes
+
+- **devices**: Resolve kelvin range upgrades by firmware
+  ([#301](https://github.com/Djelibeybi/lifx-async/pull/301),
+  [`7f1a84f`](https://github.com/Djelibeybi/lifx-async/commit/7f1a84fbb33c003257850205f5a0df7ce1b65f73))
+
+
 ## v7.11.0 (2026-10-11)
 
 ### Features
