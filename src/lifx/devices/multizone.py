@@ -1184,6 +1184,9 @@ class MultiZoneLight(PaintTracking, Light):
         speed: float,
         duration: float = 0,
         palette: list[HSBK] | None = None,
+        *,
+        theme: Theme | str | None = None,
+        mood: bool = False,
     ) -> None:
         """Start the firmware Move effect in one call.
 
@@ -1198,6 +1201,14 @@ class MultiZoneLight(PaintTracking, Light):
         reading the strip's colours through :meth:`get_all_color_zones`. The
         raw ``set_effect(MultiZoneEffect)`` path never paints.
 
+        With ``theme`` the strip is painted from that theme before Move
+        starts: with :meth:`apply_theme`, or, when ``mood`` is true, with the
+        LIFX app's mood recipe at the strip's current brightness (turning the
+        strip on if it is off). Move then ends the strip's current theme or
+        mood, because its effect reply carries no palette to verify. Unlike
+        :meth:`animate_mood`, this captures no prior state, so
+        :meth:`stop_effect` leaves the painted colours showing.
+
         Args:
             direction: A ``Direction`` member, or its case-insensitive name
                 (``"forward"``, ``"reversed"``).
@@ -1206,11 +1217,17 @@ class MultiZoneLight(PaintTracking, Light):
                 default) means indefinitely.
             palette: Up to 16 colours to paint before Move starts. ``None``
                 (the default) derives a palette from the strip's own zones
-                as described above.
+                as described above. Cannot be combined with ``theme``.
+            theme: A theme, or the slug of a library theme, to paint before
+                Move starts.
+            mood: Paint ``theme`` as a mood rather than as a theme. Requires
+                ``theme``.
 
         Raises:
             ValueError: If direction, speed, duration or an explicit
-                palette is invalid.
+                palette is invalid, if both ``theme`` and ``palette`` are
+                given, or if ``mood`` is true without a ``theme``.
+            KeyError: If ``theme`` is a slug the theme library does not hold.
             TypeError: If speed or duration is a non-numeric value.
             LifxUnsupportedCommandError: If device doesn't support this command
             LifxTimeoutError: If device does not respond
@@ -1223,18 +1240,32 @@ class MultiZoneLight(PaintTracking, Light):
             await light.set_move_effect(Direction.FORWARD, 5.0)
             ```
         """
+        if theme is not None and palette is not None:
+            raise ValueError("Pass either theme or palette, not both")
+        if mood and theme is None:
+            raise ValueError("mood requires a theme")
+
+        from lifx.theme.library import ThemeLibrary
+        from lifx.theme.theme import Theme
+
         effect = MultiZoneEffect.move(direction, speed, duration)
 
-        if palette is not None:
+        if theme is not None:
+            resolved = ThemeLibrary.get(theme) if isinstance(theme, str) else theme
+            if mood:
+                is_on, brightness = await self._mood_reading()
+                await self._paint_mood(
+                    resolved, power_on=not is_on, brightness=brightness
+                )
+            else:
+                await self.apply_theme(resolved, duration=0)
+        elif palette is not None:
             validate_effect_palette(palette)
-            paint = palette
+            await self.apply_theme(Theme(list(palette)), duration=0)
         else:
             paint = await self._derive_move_palette()
-
-        if paint is not None:
-            from lifx.theme.theme import Theme
-
-            await self.apply_theme(Theme(list(paint)), duration=0)
+            if paint is not None:
+                await self.apply_theme(Theme(list(paint)), duration=0)
 
         await self.set_effect(effect)
 

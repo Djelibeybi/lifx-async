@@ -12,10 +12,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 import pytest
 
 from lifx.color import HSBK
-from lifx.devices.multizone import MultiZoneEffect, MultiZoneLight
+from lifx.devices.multizone import Direction, MultiZoneEffect, MultiZoneLight
 from lifx.effects import Conductor, EffectColorloop
 from lifx.protocol.protocol_types import FirmwareEffect, LightWaveform
-from lifx.theme import Theme
+from lifx.theme import Theme, get_theme
 
 pytestmark = pytest.mark.emulator
 
@@ -312,3 +312,83 @@ class TestStripEffectsEndTracking:
             assert strip.current_mood is None
         finally:
             await conductor.stop([strip])
+
+
+class TestMoveEffectPaintsATheme:
+    """set_move_effect(theme=...) paints, then Move ends the record."""
+
+    async def _stop(self, strip: MultiZoneLight) -> None:
+        await strip.set_effect(
+            MultiZoneEffect(effect_type=FirmwareEffect.OFF, speed=0, duration=0)
+        )
+
+    @pytest.mark.parametrize("by_slug", [False, True])
+    async def test_theme_is_painted_then_move_runs(
+        self, strip: MultiZoneLight, by_slug: bool
+    ) -> None:
+        # A library theme is looked up at test time; nothing about it is asserted.
+        theme = get_theme("evening") if by_slug else themed("unit_test_a", RED, GREEN)
+        await strip.set_color_zones(0, 0, AWKWARD)  # something to repaint
+        try:
+            await strip.set_move_effect(
+                Direction.FORWARD, 5.0, theme="evening" if by_slug else theme
+            )
+            assert (await strip.get_effect()).effect_type == FirmwareEffect.MOVE
+            assert (await strip.get_all_color_zones())[0] != AWKWARD
+            assert strip.current_theme is None
+            assert strip.current_mood is None
+        finally:
+            await self._stop(strip)
+
+    async def test_mood_is_painted_at_current_brightness(
+        self, strip: MultiZoneLight
+    ) -> None:
+        theme = themed("unit_test_a", RED, GREEN)
+        await strip.set_color_zones(0, 0, AWKWARD)  # something to repaint
+        try:
+            await strip.set_move_effect(Direction.FORWARD, 5.0, theme=theme, mood=True)
+            assert (await strip.get_effect()).effect_type == FirmwareEffect.MOVE
+            assert (await strip.get_all_color_zones())[0] != AWKWARD
+            assert strip.current_mood is None
+            assert strip.current_theme is None
+        finally:
+            await self._stop(strip)
+
+    async def test_mood_turns_an_off_strip_on(self, strip: MultiZoneLight) -> None:
+        await strip.set_power(False, duration=0.0)
+        try:
+            await strip.set_move_effect(
+                Direction.FORWARD, 5.0, theme=themed("unit_test_a"), mood=True
+            )
+            assert await strip.get_power()
+        finally:
+            await self._stop(strip)
+
+    async def test_mood_captures_no_prior_state(self, strip: MultiZoneLight) -> None:
+        """Unlike animate_mood(), stopping has nothing to put back."""
+        try:
+            await strip.set_move_effect(
+                Direction.FORWARD, 5.0, theme=themed("unit_test_a"), mood=True
+            )
+            await strip.stop_effect()
+            assert (await strip.get_effect()).effect_type == FirmwareEffect.OFF
+        finally:
+            await self._stop(strip)
+
+    async def test_theme_and_palette_together_raise(
+        self, strip: MultiZoneLight
+    ) -> None:
+        with pytest.raises(ValueError, match="theme or palette"):
+            await strip.set_move_effect(
+                Direction.FORWARD, 5.0, palette=[RED], theme=themed()
+            )
+
+    async def test_mood_without_a_theme_raises(self, strip: MultiZoneLight) -> None:
+        with pytest.raises(ValueError, match="mood requires a theme"):
+            await strip.set_move_effect(Direction.FORWARD, 5.0, mood=True)
+
+    async def test_unknown_slug_raises(self, strip: MultiZoneLight) -> None:
+        with pytest.raises(KeyError):
+            await strip.set_move_effect(
+                Direction.FORWARD, 5.0, theme="no_such_theme_exists"
+            )

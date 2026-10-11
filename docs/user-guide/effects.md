@@ -1016,6 +1016,21 @@ from lifx import Direction
 await light.set_move_effect(Direction.FORWARD, 5.0)
 ```
 
+To move a theme instead, pass `theme=` with a `Theme` or a library slug. The strip is painted with
+`apply_theme()` before Move starts. Add `mood=True` to paint it the way the LIFX app paints a
+mood, at the strip's current brightness, turning the strip on if it is off. Passing both `theme`
+and `palette` raises `ValueError`, and an unknown slug raises the same `KeyError` as
+`ThemeLibrary.get()`. Move carries no palette in its reply, so starting it ends the strip's
+`current_theme` or `current_mood`. Unlike `animate_mood()`, it captures no prior state, so
+`stop_effect()` leaves the painted colours showing.
+
+```python
+from lifx import Direction
+
+await light.set_move_effect(Direction.FORWARD, 5.0, theme="evening")
+await light.set_move_effect(Direction.FORWARD, 5.0, theme="evening", mood=True)
+```
+
 The builder form constructs the effect on its own and sends it through `set_effect()`. Unlike
 `set_move_effect()`, this path never paints a palette:
 
