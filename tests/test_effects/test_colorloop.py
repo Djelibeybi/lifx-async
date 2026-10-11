@@ -20,6 +20,7 @@ from lifx.effects.frame_effect import (
 )
 from lifx.exceptions import LifxTimeoutError
 from lifx.protocol.protocol_types import LightHsbk
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 
 def test_colorloop_default_parameters() -> None:
@@ -620,7 +621,7 @@ class TestColorloopWholeLight:
             await asyncio.sleep(0.01)
         (write,) = effect._writes.values()
         effect.stop()
-        await asyncio.wait_for(play, timeout=1.0)
+        await asyncio.wait_for(play, timeout=HANG_GUARD_TIMEOUT)
 
         assert write.cancelled()
         assert effect._writes == {}

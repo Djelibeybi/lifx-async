@@ -1113,7 +1113,7 @@ class TestDeviceConnectionRequestStream:
             )
             payload = b"TestLight\x00" + (b"\x00" * 23)
             conn._pending_requests[key].put_nowait((header, payload))
-            await asyncio.wait_for(task, timeout=1.0)
+            await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -1320,7 +1320,7 @@ class TestDiscoveryConnectionSerialUpdate:
             )
             payload = b"x".ljust(32, b"\x00")  # 32-byte StateLabel payload
             conn._pending_requests[key].put_nowait((header, payload))
-            await asyncio.wait_for(task, timeout=1.0)
+            await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -1386,7 +1386,7 @@ class TestDiscoveryConnectionSerialUpdate:
                 pkt_type=45,  # Acknowledgement
             )
             conn._pending_requests[key].put_nowait((header, b""))
-            await asyncio.wait_for(task, timeout=1.0)
+            await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -1424,7 +1424,7 @@ class TestDiscoveryConnectionSerialUpdate:
                     b"x".ljust(32, b"\x00"),
                 )
             )
-            await asyncio.wait_for(first, timeout=1.0)
+            await asyncio.wait_for(first, timeout=HANG_GUARD_TIMEOUT)
             first = None
 
             # Learned and visible in logs, but not yet adopted: the other
@@ -1547,7 +1547,7 @@ class TestMalformedDatagramHandling:
                 pkt_type=Device.StateLabel.PKT_TYPE,
             )
             conn._pending_requests[key].put_nowait((header, b"x".ljust(32, b"\x00")))
-            assert await asyncio.wait_for(task, timeout=1.0) is not None
+            assert await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT) is not None
         finally:
             await conn.close()
 

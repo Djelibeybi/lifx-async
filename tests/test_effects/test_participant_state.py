@@ -27,6 +27,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.effects.rainbow import EffectRainbow
 from lifx.effects.registry import get_effect_registry
 from lifx.effects.rule30 import EffectRule30
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 _TICKS = 40
 _SERIAL_A = "d073d5000001"
@@ -322,7 +323,7 @@ async def test_unsynchronised_colorloop_paints_both_rings_alike() -> None:
     effect.participants = [mirror, mirror]
     effect._animators = [front, back]
 
-    await asyncio.wait_for(effect.async_play(), timeout=1.0)
+    await asyncio.wait_for(effect.async_play(), timeout=HANG_GUARD_TIMEOUT)
 
     assert staged[0] == sent[0]
 

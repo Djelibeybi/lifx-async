@@ -13,6 +13,7 @@ from lifx.effects.fireworks import (
     _Rocket,
 )
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 # ---------------------------------------------------------------------------
 # Constructor defaults and validation
@@ -731,7 +732,7 @@ class TestFireworksFrameLoop:
         play_task = asyncio.create_task(effect.async_play())
         await asyncio.sleep(0.15)
         effect.stop()
-        await asyncio.wait_for(play_task, timeout=1.0)
+        await asyncio.wait_for(play_task, timeout=HANG_GUARD_TIMEOUT)
 
         assert animator.send_frame.call_count > 0
 
