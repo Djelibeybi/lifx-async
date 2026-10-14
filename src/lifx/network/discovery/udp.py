@@ -654,14 +654,16 @@ async def _discover_with_packet(
                 )
 
             except LifxProtocolError as e:
-                _LOGGER.warning(
+                # A stray or malformed datagram is expected on a broadcast
+                # socket. DEBUG with no traceback, as for invalid_packet_size:
+                # the reason is already in the message.
+                _LOGGER.debug(
                     {
                         "class": "_discover_with_packet",
                         "action": "malformed_response",
                         "reason": str(e),
                         "source_ip": addr[0],
-                    },
-                    exc_info=True,
+                    }
                 )
                 continue
             except Exception as e:

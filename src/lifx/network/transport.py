@@ -551,8 +551,10 @@ class UdpTransport:
             data, addr = await asyncio.wait_for(
                 self._protocol.queue.get(), timeout=timeout
             )
-        except TIMEOUT_ERRORS as e:
-            raise LifxTimeoutError(f"No data received within {timeout}s") from e
+        except TIMEOUT_ERRORS:
+            # An idle socket is expected; asyncio's TimeoutError adds nothing
+            # but a second traceback.
+            raise LifxTimeoutError(f"No data received within {timeout}s") from None
         except OSError as e:
             _LOGGER.error(self._log(method="receive", action="failed", reason=str(e)))
             raise LifxNetworkError(f"Failed to receive data: {e}") from e

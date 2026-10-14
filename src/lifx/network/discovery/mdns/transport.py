@@ -280,8 +280,10 @@ class MdnsTransport:
             # shared UDP protocol's dual-family sockaddr type at this IPv4-only
             # boundary instead of leaking an impossible four-tuple downstream.
             return data, (addr[0], addr[1])
-        except TIMEOUT_ERRORS as e:
-            raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from e
+        except TIMEOUT_ERRORS:
+            # An idle socket is expected; asyncio's TimeoutError adds nothing
+            # but a second traceback.
+            raise LifxTimeoutError(f"No mDNS data received within {timeout}s") from None
         except OSError as e:
             failure_log = {
                 "class": "MdnsTransport",
