@@ -50,6 +50,7 @@ from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import Light as LightPackets
 from lifx.protocol.protocol_types import DeviceService, LightHsbk
 from tests.conftest import (
+    HANG_GUARD_TIMEOUT,
     PROGRESS_TIMEOUT,
     _capture_discovery_observations,
     get_free_port,
@@ -305,7 +306,7 @@ class TestDiscoverUdpEntryGate:
                 method="test",
             )
         )
-        await asyncio.wait_for(construction_started.wait(), timeout=0.1)
+        await asyncio.wait_for(construction_started.wait(), timeout=HANG_GUARD_TIMEOUT)
 
         construction.cancel()
 
@@ -425,10 +426,10 @@ class TestDiscoverMerged:
         )
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        generator = discover(timeout=1.0)
+        generator = discover(timeout=10.0)
         first = asyncio.create_task(anext(generator))
         (udp_ready if first_source == "udp" else mdns_ready).set()
-        assert await asyncio.wait_for(first, timeout=0.1) is (
+        assert await asyncio.wait_for(first, timeout=HANG_GUARD_TIMEOUT) is (
             udp_device if first_source == "udp" else mdns_device
         )
         (mdns_ready if first_source == "udp" else udp_ready).set()
@@ -763,7 +764,7 @@ class TestMergedDiscoveryFailures:
                     cleanup_started["udp"].wait(),
                     cleanup_started["mdns"].wait(),
                 ),
-                timeout=0.1,
+                timeout=HANG_GUARD_TIMEOUT,
             )
             task.cancel()
             release_cleanup.set()
@@ -1027,7 +1028,7 @@ class TestMergedDiscoveryFailures:
         with pytest.raises(RuntimeError, match="synthetic invariant failure"):
             await asyncio.wait_for(
                 anext(discover(timeout=10.0)),
-                timeout=0.1,
+                timeout=HANG_GUARD_TIMEOUT,
             )
         assert udp_closed.is_set()
 
@@ -1180,14 +1181,14 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        lookup = asyncio.create_task(find_by_serial(serial, timeout=1.0))
+        lookup = asyncio.create_task(find_by_serial(serial, timeout=10.0))
         await asyncio.wait_for(
             asyncio.gather(started["udp"].wait(), started["mdns"].wait()),
-            timeout=0.1,
+            timeout=HANG_GUARD_TIMEOUT,
         )
         release[winner_source].set()
 
-        assert await asyncio.wait_for(lookup, timeout=0.1) is (
+        assert await asyncio.wait_for(lookup, timeout=HANG_GUARD_TIMEOUT) is (
             udp_device if winner_source == "udp" else mdns_device
         )
         assert closed == {"udp", "mdns"}
@@ -1227,8 +1228,8 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
         monkeypatch.setattr(DiscoveredDevice, "create_device", create_device)
 
-        lookup = asyncio.create_task(find_by_serial(serial, timeout=1.0))
-        await asyncio.wait_for(mdns_failed.wait(), timeout=0.1)
+        lookup = asyncio.create_task(find_by_serial(serial, timeout=10.0))
+        await asyncio.wait_for(mdns_failed.wait(), timeout=HANG_GUARD_TIMEOUT)
         assert not lookup.done()
         release_udp.set()
         assert await lookup is udp_device
@@ -1300,7 +1301,9 @@ class TestFindBySerialRace:
         monkeypatch.setattr(lifx.api, "_discover_verified_devices_mdns", mdns_source)
 
         with pytest.raises(RuntimeError, match="synthetic lookup invariant failure"):
-            await asyncio.wait_for(find_by_serial("d073d5123456"), timeout=0.1)
+            await asyncio.wait_for(
+                find_by_serial("d073d5123456"), timeout=HANG_GUARD_TIMEOUT
+            )
         assert udp_closed.is_set()
 
     async def test_find_by_serial_construction_crossing_deadline_returns_none(
@@ -1859,7 +1862,7 @@ class TestFindBySerialRaceLifecycle:
                 cleanup_started["udp"].wait(),
                 cleanup_started["mdns"].wait(),
             ),
-            timeout=0.1,
+            timeout=HANG_GUARD_TIMEOUT,
         )
         lookup.cancel()
         release_cleanup.set()

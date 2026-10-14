@@ -67,6 +67,16 @@ WINDOWS_IPV6_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
 # the behaviour those tests assert, and they stay at their own small literals.
 PROGRESS_TIMEOUT = 0.1  # ~6 Windows timer ticks
 
+# A wait on mocked work -- a stubbed source, transport or construction step
+# that runs as soon as the loop schedules it -- bounds nothing real, so a small
+# budget measures only runner latency, and a loaded CI runner can stall well
+# past 0.1 s. Such a wait is a hang guard: use HANG_GUARD_TIMEOUT. It outlasts
+# every API deadline these tests hand the library (at most the 15 s discovery
+# default), so a call that misses its result fails on the asserted value or
+# exception rather than on the guard, and stays inside the suite-wide 60 s
+# pytest timeout.
+HANG_GUARD_TIMEOUT = 30.0
+
 
 @pytest.fixture
 def _allow_public_mdns_discovery() -> None:

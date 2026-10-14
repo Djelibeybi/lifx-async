@@ -18,6 +18,7 @@ import pytest
 from lifx.network.connection import DeviceConnection
 from lifx.protocol import packets
 from lifx.protocol.header import LifxHeader
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 _OFFLINE_IP = "192.0.2.55"
 _OFFLINE_SERIAL = "d073d5010203"
@@ -79,7 +80,7 @@ async def _drive_one_response(
                 thread_connection=thread_connection,
             )
             conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-            await asyncio.wait_for(task, timeout=1.0)
+            await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
     finally:
         if task is not None and not task.done():

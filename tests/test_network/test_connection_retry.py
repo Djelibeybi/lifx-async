@@ -29,6 +29,7 @@ from lifx.protocol.header import LifxHeader
 from lifx.protocol.packets import Device
 from tests import conftest
 from tests.conftest import (
+    HANG_GUARD_TIMEOUT,
     _capture_request_observations,
     _RequestObservationSink,
 )
@@ -385,7 +386,7 @@ class TestListenDuringBackoff:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                response = await asyncio.wait_for(task, timeout=1.0)
+                response = await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
             elapsed = time.monotonic() - start
         finally:
@@ -436,7 +437,7 @@ class TestListenDuringBackoff:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
             elapsed = time.monotonic() - start
         finally:
@@ -487,7 +488,7 @@ class TestListenDuringBackoff:
                 _inject()
                 await asyncio.sleep(0.15)
                 _inject()
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -527,7 +528,7 @@ class TestListenDuringBackoff:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
             elapsed = time.monotonic() - start
         finally:
@@ -564,7 +565,7 @@ class TestCorrelationContract:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key0].put_nowait((header, _STATE_POWER_PAYLOAD))
-                response = await asyncio.wait_for(task, timeout=1.0)
+                response = await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -598,7 +599,7 @@ class TestCorrelationContract:
                     payload_len=0,
                 )
                 conn._pending_requests[key0].put_nowait((header, b""))
-                result = await asyncio.wait_for(task, timeout=1.0)
+                result = await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -639,7 +640,7 @@ class TestCorrelationContract:
                 payload_len=0,
             )
             conn._pending_requests[key].put_nowait((header, b""))
-            await asyncio.wait_for(task, timeout=1.0)
+            await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -669,7 +670,7 @@ class TestCorrelationContract:
             )
             conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
             with pytest.raises(LifxProtocolError):
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -697,7 +698,7 @@ class TestCorrelationContract:
             )
             conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
             with pytest.raises(LifxProtocolError):
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -725,7 +726,7 @@ class TestCorrelationContract:
             )
             conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
             with pytest.raises(LifxProtocolError):
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -769,7 +770,7 @@ class TestCorrelationContract:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -801,7 +802,7 @@ class TestCorrelationContract:
             )
             queue.put_nowait((header, _STATE_POWER_PAYLOAD))
             queue.put_nowait((header, _STATE_POWER_PAYLOAD))
-            response = await asyncio.wait_for(task, timeout=1.0)
+            response = await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
             task = None
         finally:
             if task is not None and not task.done():
@@ -858,7 +859,7 @@ class TestRequestObservation:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -912,7 +913,7 @@ class TestRequestObservation:
                     thread_connection=True,
                 )
                 conn._pending_requests[key].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -956,7 +957,7 @@ class TestRequestObservation:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key1].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -1012,7 +1013,7 @@ class TestRequestObservation:
                     payload_len=len(_STATE_POWER_PAYLOAD),
                 )
                 conn._pending_requests[key0].put_nowait((header, _STATE_POWER_PAYLOAD))
-                await asyncio.wait_for(task, timeout=1.0)
+                await asyncio.wait_for(task, timeout=HANG_GUARD_TIMEOUT)
                 task = None
         finally:
             if task is not None and not task.done():
@@ -1039,7 +1040,9 @@ class TestRequestObservation:
                     with pytest.raises(LifxTimeoutError):
                         await conn.request(Device.GetPower(), timeout=0.15)
 
-            await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+            await asyncio.wait_for(
+                asyncio.create_task(_drive()), timeout=HANG_GUARD_TIMEOUT
+            )
         finally:
             await conn.close()
         assert sink is not None
@@ -1072,7 +1075,9 @@ class TestRequestObservation:
                     ):
                         await conn.request(Device.GetPower(), timeout=2.0)
 
-            await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+            await asyncio.wait_for(
+                asyncio.create_task(_drive()), timeout=HANG_GUARD_TIMEOUT
+            )
         finally:
             await conn.close()
         assert sink is not None
@@ -1189,7 +1194,9 @@ class TestRequestObservation:
                         ):
                             await conn.request(Device.GetPower(), timeout=2.0)
 
-                await asyncio.wait_for(asyncio.create_task(_drive()), timeout=1.0)
+                await asyncio.wait_for(
+                    asyncio.create_task(_drive()), timeout=HANG_GUARD_TIMEOUT
+                )
         finally:
             await conn.close()
         assert sink is not None

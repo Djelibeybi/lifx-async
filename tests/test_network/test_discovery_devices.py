@@ -31,6 +31,7 @@ from lifx.network.discovery import (
     discover_devices,
 )
 from lifx.products.registry import ProductCapability, ProductInfo
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 
 def test_discovered_device_identity_uses_serial() -> None:
@@ -208,7 +209,9 @@ class TestDiscoveredDeviceValidationBoundary:
         construction = asyncio.create_task(discovered.create_device())
 
         with patch("lifx.devices.base.Device", return_value=temporary_device):
-            await asyncio.wait_for(capability_started.wait(), timeout=0.1)
+            await asyncio.wait_for(
+                capability_started.wait(), timeout=HANG_GUARD_TIMEOUT
+            )
             assert construction in discovered._construction_connections
 
             discovered._force_close_construction(construction)
