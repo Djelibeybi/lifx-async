@@ -811,6 +811,29 @@ class TestLightInitializeStateParallel:
             await light._initialize_state()
 
     @pytest.mark.asyncio
+    async def test_light_initialize_state_timeout_is_one_traceback(self, light):
+        """An unreachable device is expected, so its timeout carries the
+        inner reason in its own message and is not chained."""
+
+        async def mock_request(packet):
+            if isinstance(packet, packets.Device.GetVersion):
+                return packets.Device.StateVersion(vendor=1, product=32)
+            elif isinstance(packet, packets.Light.GetColor):
+                raise LifxTimeoutError("No response from 192.0.2.1 after 3 attempts")
+            return MagicMock()
+
+        light.connection.request.side_effect = mock_request
+
+        with pytest.raises(LifxTimeoutError) as exc_info:
+            await light._initialize_state()
+        assert str(exc_info.value) == (
+            f"Error initializing state for {light.serial}: "
+            "No response from 192.0.2.1 after 3 attempts"
+        )
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__
+
+    @pytest.mark.asyncio
     async def test_light_initialize_state_wraps_lifx_error(self, light):
         """Test Light._initialize_state() wraps LifxError with serial context."""
 
