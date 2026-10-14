@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.11.2 (2026-10-14)
+
+### Bug Fixes
+
+- **devices**: Stop chaining a second traceback onto state-init timeouts
+  ([#306](https://github.com/Djelibeybi/lifx-async/pull/306),
+  [`ba443e0`](https://github.com/Djelibeybi/lifx-async/commit/ba443e0922e50da77581c088867c8961e64e0c5e))
+
+
 ## v7.11.1 (2026-10-11)
 
 ### Bug Fixes
