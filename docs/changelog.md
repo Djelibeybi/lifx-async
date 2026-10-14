@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.11.3 (2026-10-14)
+
+### Bug Fixes
+
+- **network**: Drop redundant tracebacks from expected receive failures
+  ([#307](https://github.com/Djelibeybi/lifx-async/pull/307),
+  [`b818287`](https://github.com/Djelibeybi/lifx-async/commit/b81828761e03e7733d5898bb1c31aaa45e9147f8))
+
+
 ## v7.11.2 (2026-10-14)
 
 ### Bug Fixes
