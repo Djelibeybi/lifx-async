@@ -1451,7 +1451,12 @@ class Light(Device[LightState]):
             return self._state
 
         except LifxTimeoutError as e:
-            raise LifxTimeoutError(f"Error initializing state for {self.serial}") from e
+            # An unreachable device is an expected outcome, so fold the inner
+            # reason (address and attempt count) into one self-contained
+            # message rather than chaining a second traceback onto it.
+            raise LifxTimeoutError(
+                f"Error initializing state for {self.serial}: {e}"
+            ) from None
         except LifxError as e:
             raise LifxError(f"Error initializing state for {self.serial}") from e
 
