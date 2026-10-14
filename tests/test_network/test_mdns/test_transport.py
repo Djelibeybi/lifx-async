@@ -555,8 +555,10 @@ class TestMdnsTransportReceive:
         transport._protocol = MagicMock()
         transport._protocol.queue = asyncio.Queue()
 
-        with pytest.raises(LifxTimeoutError, match="No mDNS data received"):
+        with pytest.raises(LifxTimeoutError, match="No mDNS data received") as excinfo:
             await transport.receive(timeout=0.01)
+        assert excinfo.value.__cause__ is None
+        assert excinfo.value.__suppress_context__
 
     @pytest.mark.asyncio
     async def test_receive_returns_data(self) -> None:

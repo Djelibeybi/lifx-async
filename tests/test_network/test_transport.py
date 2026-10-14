@@ -89,8 +89,12 @@ class TestUdpTransport:
     async def test_receive_timeout(self) -> None:
         """Test receive timeout."""
         async with UdpTransport() as transport:
-            with pytest.raises(TimeoutError):
+            with pytest.raises(TimeoutError) as exc_info:
                 await transport.receive(timeout=0.1)
+        # An idle socket is expected, so the timeout is not chained onto
+        # asyncio's own TimeoutError traceback.
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__
 
     async def test_broadcast_mode(self) -> None:
         """Test transport with broadcast mode."""

@@ -252,7 +252,7 @@ class TestDiscoveryProtocolBoundaries:
     ) -> None:
         """A parser-level protocol error cannot abort the discovery sweep."""
         with (
-            caplog.at_level(logging.WARNING, logger="lifx.network.discovery.udp"),
+            caplog.at_level(logging.DEBUG, logger="lifx.network.discovery.udp"),
             patch(
                 "lifx.network.discovery.udp.parse_message",
                 side_effect=LifxProtocolError("synthetic malformed response"),
@@ -263,11 +263,17 @@ class TestDiscoveryProtocolBoundaries:
             )
 
         assert responses == []
-        assert any(
-            isinstance(record.msg, dict)
-            and record.msg.get("action") == "malformed_response"
+        # A stray datagram is expected on a broadcast socket: one DEBUG line,
+        # no traceback, matching the invalid-size branch.
+        malformed = [
+            record
             for record in caplog.records
-        )
+            if isinstance(record.msg, dict)
+            and record.msg.get("action") == "malformed_response"
+        ]
+        assert len(malformed) == 1
+        assert malformed[0].levelno == logging.DEBUG
+        assert malformed[0].exc_info is None
 
 
 class TestDiscoveryResponderAddressValidation:
