@@ -6,18 +6,25 @@ import dataclasses
 
 import pytest
 
+import lifx.onboard
 from lifx.onboard import (
     HomeNetwork,
     MissingCredentialsError,
     SoftApNetwork,
 )
 from lifx.onboard.models import WifiSecurity
+from lifx.protocol import protocol_types
 from lifx.protocol.models import Serial
 
 PASSWORD = "hunter2-synthetic"
 
 
 class TestWifiSecurity:
+    def test_is_the_generated_protocol_enum(self) -> None:
+        assert WifiSecurity is protocol_types.WifiSecurity
+        assert lifx.onboard.WifiSecurity is protocol_types.WifiSecurity
+        assert lifx.onboard.WifiInterface is protocol_types.WifiInterface
+
     def test_values(self) -> None:
         assert {member.name: int(member) for member in WifiSecurity} == {
             "UNKNOWN": 0,

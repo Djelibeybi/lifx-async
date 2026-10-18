@@ -4,8 +4,18 @@ from __future__ import annotations
 
 import pytest
 
+import lifx.onboard
 from lifx.exceptions import LifxError
-from lifx.onboard import LifxOnboardError, MissingCredentialsError, OnboardPhase
+from lifx.onboard import (
+    LegacyTlsUnavailableError,
+    LifxOnboardError,
+    MissingCredentialsError,
+    OnboardPhase,
+    SoftApDialError,
+    SoftApSendError,
+    SoftApUnreachableError,
+    errors,
+)
 
 
 def test_phase_members() -> None:
@@ -45,3 +55,37 @@ def test_missing_credentials_is_also_a_value_error() -> None:
     assert error.phase is OnboardPhase.CONFIGURE
     with pytest.raises(ValueError):
         raise error
+
+
+@pytest.mark.parametrize(
+    ("error_type", "phase"),
+    [
+        (SoftApUnreachableError, OnboardPhase.DIAL),
+        (SoftApDialError, OnboardPhase.DIAL),
+        (SoftApSendError, OnboardPhase.CONFIGURE),
+        (LegacyTlsUnavailableError, None),
+    ],
+)
+def test_softap_errors_default_their_phase(
+    error_type: type[LifxOnboardError], phase: OnboardPhase | None
+) -> None:
+    error = error_type("boom")
+    assert isinstance(error, LifxOnboardError)
+    assert error.phase is phase
+    assert str(error) == "boom"
+
+
+def test_softap_error_phase_can_be_overridden() -> None:
+    error = SoftApDialError("boom", phase=OnboardPhase.VERIFY)
+    assert error.phase is OnboardPhase.VERIFY
+
+
+def test_softap_errors_are_exported() -> None:
+    for name in (
+        "SoftApUnreachableError",
+        "SoftApDialError",
+        "SoftApSendError",
+        "LegacyTlsUnavailableError",
+    ):
+        assert name in lifx.onboard.__all__
+        assert getattr(lifx.onboard, name) is getattr(errors, name)
