@@ -567,10 +567,8 @@ class MultiZoneLight(PaintTracking, Light):
                     current_end - current_start + 1,
                     max(0, end - current_start + 1),
                 )
-                for i in range(zones_in_response):
-                    if i >= len(reply_colors):
-                        break
-                    colors.append(HSBK.from_protocol(reply_colors[i]))
+                for protocol_hsbk in reply_colors[:zones_in_response]:
+                    colors.append(HSBK.from_protocol(protocol_hsbk))
                 break  # Single response per request
 
             current_start += 8
