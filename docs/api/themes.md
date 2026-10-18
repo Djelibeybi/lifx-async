@@ -96,10 +96,12 @@ MORPH stands in for it.
 A Tile chain is painted as one image in chain order, as the app does, so tiles
 arranged in an L or a stack show the image in chain order rather than
 following their arrangement. A Tile whose accelerometer reports a rotation
-(left, right or upside down) is remapped; FaceUp and FaceDown are not. Only
-chain-capable products (the Tile) have their reported orientation applied;
-other matrix products, such as the Luna, are fixed panels whose accelerometer
-readings are not used. A chain scrolls as one canvas, in chain order.
+(left, right or upside down) is remapped; FaceUp and FaceDown are not. The
+Luna reads its accelerometer on its own axes and is remapped the same way: on
+its side, its 7x5 panel is painted as a 5 wide by 7 high canvas and turned
+onto the panel. Other matrix products, such as the Candle and Ceiling, are
+fixed panels whose accelerometer readings are not used. A chain scrolls as one
+canvas, in chain order.
 
 If a light is already running a mood effect, `apply_mood()` restarts that
 effect with the new theme instead of painting a still image.

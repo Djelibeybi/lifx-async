@@ -21,7 +21,12 @@ from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from lifx.animation.framebuffer import FrameBuffer
-from lifx.animation.orientation import Orientation, build_orientation_lut
+from lifx.animation.orientation import (
+    Orientation,
+    build_orientation_lut,
+    logical_tile_size,
+    nearest_orientation,
+)
 from lifx.animation.packets import MatrixPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
@@ -243,6 +248,9 @@ class MatrixEffect:
             ``UNKNOWN_<n>`` member rather than raising
         cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS sky type)
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS sky type)
+        soft_off: Turn the light off when the effect ends (SKY with SUNSET only).
+            On the wire this is the byte at offset 4 of the effect parameter,
+            which CLOUDS reads as ``cloud_saturation_min``
         from_device: Set when building this object from a device response. The
             validation and default-filling below are rules for values the
             caller is about to send: applying them to values the firmware
@@ -257,6 +265,7 @@ class MatrixEffect:
     sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE
     cloud_saturation_min: int = 0
     cloud_saturation_max: int = 0
+    soft_off: bool = False
     from_device: InitVar[bool] = False
 
     def __post_init__(self, from_device: bool) -> None:
@@ -279,6 +288,12 @@ class MatrixEffect:
         # Only validate palette if provided
         if self.palette is not None:
             self._validate_palette(self.palette)
+
+        if self.soft_off and not (
+            self.effect_type == FirmwareEffect.SKY
+            and self.sky_type == TileEffectSkyType.SUNSET
+        ):
+            raise ValueError("soft_off applies to the SKY effect with SUNSET only")
 
         self._validate_saturation(self.cloud_saturation_min, "cloud_saturation_min")
         self._validate_saturation(self.cloud_saturation_max, "cloud_saturation_max")
@@ -966,6 +981,7 @@ class MatrixLight(PaintTracking, Light):
             raise ValueError(f"y coordinate must be non-negative, got {y}")
         if width <= 0:
             raise ValueError(f"width must be positive, got {width}")
+        self._check_colors(*colors)
 
         _LOGGER.debug(
             "Setting 64 zones on tile %d (x=%d, y=%d, width=%d, fb=%d, "
@@ -1134,6 +1150,9 @@ class MatrixLight(PaintTracking, Light):
                 f"Color count mismatch: expected {tile.total_zones}, got {len(colors)}"
             )
 
+        # Checked before the first packet, so a rejected tile sends nothing
+        self._check_colors(*colors)
+
         # Check if all colors are the same (uint16 wire equality). The shortcut
         # below sends a device-wide SetColor, so it is only safe when the device
         # has a single tile — on a chain it would repaint every other tile too.
@@ -1239,14 +1258,22 @@ class MatrixLight(PaintTracking, Light):
             ]
         ]
 
+        parameter = response.settings.parameter
+        # The byte at offset 4 means the soft-off flag for a Sunset and the
+        # cloud saturation minimum otherwise.
+        is_sunset = (
+            response.settings.effect_type == FirmwareEffect.SKY
+            and parameter.sky_type == TileEffectSkyType.SUNSET
+        )
         effect = MatrixEffect(
             effect_type=response.settings.effect_type,
             speed=response.settings.speed,
             duration=response.settings.duration,
             palette=palette if palette else None,
-            sky_type=response.settings.parameter.sky_type,
-            cloud_saturation_min=response.settings.parameter.cloud_saturation_min,
-            cloud_saturation_max=response.settings.parameter.cloud_saturation_max,
+            sky_type=parameter.sky_type,
+            cloud_saturation_min=0 if is_sunset else parameter.cloud_saturation_min,
+            cloud_saturation_max=parameter.cloud_saturation_max,
+            soft_off=is_sunset and parameter.cloud_saturation_min == 1,
             from_device=True,
         )
 
@@ -1402,6 +1429,7 @@ class MatrixLight(PaintTracking, Light):
         sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE,
         cloud_saturation_min: int = 0,
         cloud_saturation_max: int = 0,
+        soft_off: bool = False,
     ) -> None:
         """Set matrix effect with configuration.
 
@@ -1437,6 +1465,10 @@ class MatrixLight(PaintTracking, Light):
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
+            soft_off: Turn the light off when a SUNSET ends. Valid for
+                SKY with SUNSET only. Verified on hardware (2026-10-18): a
+                Path with host firmware 4.200 reported power off at the end
+                of a 15 s Sunset
 
         Raises:
             LifxUnsupportedCommandError: If SKY is requested on a device that
@@ -1447,7 +1479,9 @@ class MatrixLight(PaintTracking, Light):
             LifxProtocolError: If MORPH is requested with no palette and the
                 colour read gets a malformed reply, or the device reports no
                 colours
-            ValueError: If speed is negative (checked before rounding), or a
+            ValueError: If ``soft_off`` is set for anything but the SKY
+                effect with SUNSET (checked before anything is sent), if
+                speed is negative (checked before rounding), or a
                 non-zero speed rounds to 0 ms for an active effect that does
                 not play once at speed 0, or another field fails
                 ``MatrixEffect`` validation
@@ -1472,24 +1506,6 @@ class MatrixLight(PaintTracking, Light):
             ...     speed=3.0,
             ... )
         """
-        if effect_type == FirmwareEffect.SKY:
-            try:
-                supported, reason = await self._resolve_sky_support()
-            except LifxTimeoutError:
-                # The support probe is best-effort. A device that fails to
-                # answer is not evidence of missing support, so the effect is
-                # still sent and the device's own reply decides the outcome.
-                _LOGGER.debug(
-                    "SKY support probe timed out for %s, sending the effect anyway",
-                    self.label or self.serial,
-                )
-            else:
-                if not supported:
-                    raise LifxUnsupportedCommandError(
-                        f"{self.label or self.serial} does not support the SKY"
-                        f" effect: {reason}"
-                    )
-
         _LOGGER.debug(
             "Setting matrix effect %s (speed=%gs) for %s",
             effect_type,
@@ -1528,13 +1544,38 @@ class MatrixLight(PaintTracking, Light):
             sky_type=sky_type,
             cloud_saturation_min=cloud_saturation_min,
             cloud_saturation_max=cloud_saturation_max,
+            soft_off=soft_off,
         )
+
+        if effect_type == FirmwareEffect.SKY:
+            try:
+                supported, reason = await self._resolve_sky_support()
+            except LifxTimeoutError:
+                # The support probe is best-effort. A device that fails to
+                # answer is not evidence of missing support, so the effect is
+                # still sent and the device's own reply decides the outcome.
+                _LOGGER.debug(
+                    "SKY support probe timed out for %s, sending the effect anyway",
+                    self.label or self.serial,
+                )
+            else:
+                if not supported:
+                    raise LifxUnsupportedCommandError(
+                        f"{self.label or self.serial} does not support the SKY"
+                        f" effect: {reason}"
+                    )
 
         if effect_type == FirmwareEffect.MORPH and palette is None:
             # Rebuild rather than assign effect.palette directly: replace()
             # reruns __post_init__, so a derived palette passes the same
             # size validation as a caller-supplied one.
             effect = replace(effect, palette=await self._derive_morph_palette())
+
+        # A firmware palette is clamped into the product's range, never refused
+        if effect.palette is not None:
+            clamped = self._clamp_colors(effect.palette)
+            if clamped != effect.palette:
+                effect = replace(effect, palette=clamped)
 
         # Convert to protocol format
         proto_palette = []
@@ -1555,7 +1596,13 @@ class MatrixLight(PaintTracking, Light):
             duration=effect.duration,
             parameter=TileEffectParameter(
                 sky_type=effect.sky_type,
-                cloud_saturation_min=effect.cloud_saturation_min,
+                # Sunset reads this byte as the soft-off flag
+                cloud_saturation_min=(
+                    int(effect.soft_off)
+                    if effect.effect_type == FirmwareEffect.SKY
+                    and effect.sky_type == TileEffectSkyType.SUNSET
+                    else effect.cloud_saturation_min
+                ),
                 cloud_saturation_max=effect.cloud_saturation_max,
             ),
             palette_count=palette_count,
@@ -1624,12 +1671,18 @@ class MatrixLight(PaintTracking, Light):
         await self.ensure_capabilities()
         has_chain = bool(self.capabilities and self.capabilities.has_chain)
 
-        # Render the theme across the whole chain in one pass
+        # Render the theme across the whole chain in one pass. A fixed panel
+        # on its side (a Luna) is rendered on the canvas it presents, 5 wide
+        # by 7 high, and turned onto the tile below.
         if has_chain:
             generator = MatrixGenerator.from_tiles(tiles)
         else:
-            generator = MatrixGenerator([((0, 0), (t.width, t.height)) for t in tiles])
-        tile_colors = generator.get_theme_colors(theme)
+            generator = MatrixGenerator(
+                [((0, 0), self._logical_size(t)) for t in tiles]
+            )
+        tile_colors = [
+            self._clamp_colors(colors) for colors in generator.get_theme_colors(theme)
+        ]
 
         # Power only matters when asked to turn the light on, so GetPower is
         # sent only then
@@ -1641,7 +1694,7 @@ class MatrixLight(PaintTracking, Light):
             # The canvas renders in row-major screen order, so a physically
             # rotated tile needs the same orientation remapping the animation
             # layer applies in FrameBuffer._for_multi_tile().
-            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            oriented = self._to_painted(tile, colors)
             painted.append(oriented)
 
             # Apply with appropriate timing
@@ -1657,14 +1710,79 @@ class MatrixLight(PaintTracking, Light):
             await self.set_power(True, duration=duration)
         self._record_tile_paint("theme", theme, self._shown_colors(tiles, painted))
 
+    def _tile_orientation(self, tile: TileInfo) -> str | None:
+        """The orientation to apply to a tile, or None to leave it alone.
+
+        A chain-capable device is a Tile and reads its accelerometer on the Tile
+        axes. Otherwise the product's orientation group (a Luna) decides, and a
+        product in no group is never rotated, whatever its accelerometer says.
+        """
+        if self.capabilities and self.capabilities.has_chain:
+            return tile.nearest_orientation
+        if self.capabilities is None:
+            return None
+        return nearest_orientation(
+            self.capabilities.pid,
+            tile.accel_meas_x,
+            tile.accel_meas_y,
+            tile.accel_meas_z,
+        )
+
+    def _logical_size(self, tile: TileInfo) -> tuple[int, int]:
+        """The canvas a tile presents, as (width, height).
+
+        A tile on its side presents a canvas of swapped size: a 7x5 Luna
+        lying on a side is painted 5 wide by 7 high. A tile whose product
+        applies no orientation keeps its own size.
+        """
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return tile.width, tile.height
+        return logical_tile_size(
+            tile.width, tile.height, Orientation.from_string(orientation)
+        )
+
+    def _to_physical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Remap canvas colors for the tile if its product applies orientation."""
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return colors
+        return self._orient_tile_colors(tile, colors, orientation)
+
+    def _to_painted(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """The colors a paint writes: physical order, hidden cells sent dark.
+
+        Rendering keeps the full rectangle; the cells with no LED are turned off
+        here, once, at paint time. Caller writes and state restore go through
+        :meth:`set_matrix_colors` and are never masked.
+
+        ``Animator._mask_hidden_cells`` applies the same mask to protocol
+        tuples on the animation hot path; keep the two in step.
+        """
+        physical = self._to_physical(tile, colors)
+        masked = self.capabilities.masked_zones if self.capabilities else frozenset()
+        if not masked:
+            return physical
+        return [
+            HSBK(c.hue, c.saturation, 0.0, c.kelvin) if index in masked else c
+            for index, c in enumerate(physical)
+        ]
+
+    def _to_logical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Undo :meth:`_to_physical` for colors read back from the tile."""
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return colors
+        return self._unorient_tile_colors(tile, colors, orientation)
+
     @staticmethod
-    def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+    def _orient_tile_colors(
+        tile: TileInfo, colors: list[HSBK], orientation_name: str | None = None
+    ) -> list[HSBK]:
         """Remap row-major canvas colours into the tile's physical orientation.
 
-        Only meaningful for chain-capable devices: the LIFX Tile is the only
-        product whose reported orientation is applied. Other matrix products
-        are fixed panels whose accelerometer readings are not used. Callers
-        must gate on ``has_chain``.
+        Only meaningful for products in an orientation group (the LIFX Tile and
+        the Luna); callers go through :meth:`_to_physical`, which skips others.
 
         Args:
             tile: Tile the colours are destined for
@@ -1675,7 +1793,9 @@ class MatrixLight(PaintTracking, Light):
             input unchanged when the tile is upright or the count does not match
             the tile's pixel grid.
         """
-        orientation = Orientation.from_string(tile.nearest_orientation)
+        orientation = Orientation.from_string(
+            orientation_name or tile.nearest_orientation
+        )
         if orientation == Orientation.RIGHT_SIDE_UP:
             return colors
 
@@ -1686,12 +1806,14 @@ class MatrixLight(PaintTracking, Light):
         return [colors[src_idx] for src_idx in lut]
 
     @staticmethod
-    def _unorient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+    def _unorient_tile_colors(
+        tile: TileInfo, colors: list[HSBK], orientation_name: str | None = None
+    ) -> list[HSBK]:
         """Map colours read back from a tile into row-major canvas order.
 
         The inverse of ``_orient_tile_colors``: a Tile reports its physical
         buffer, so a rotated Tile's readback is put back into the order a
-        caller painted it in. Callers must gate on ``has_chain``.
+        caller painted it in. Callers go through :meth:`_to_logical`.
 
         Args:
             tile: Tile the colours were read from
@@ -1702,7 +1824,9 @@ class MatrixLight(PaintTracking, Light):
             The colours in row-major screen order, or the input unchanged when
             the tile is upright.
         """
-        orientation = Orientation.from_string(tile.nearest_orientation)
+        orientation = Orientation.from_string(
+            orientation_name or tile.nearest_orientation
+        )
         if orientation == Orientation.RIGHT_SIDE_UP:
             return colors
 
@@ -1730,7 +1854,6 @@ class MatrixLight(PaintTracking, Light):
         if not tiles:
             return []
         await self.ensure_capabilities()
-        has_chain = bool(self.capabilities and self.capabilities.has_chain)
         generator = MoodGenerator(theme)
         if len(tiles) > 1:
             first = tiles[0]
@@ -1739,14 +1862,16 @@ class MatrixLight(PaintTracking, Light):
             )
         else:
             vertical = bool(self.version and has_vertical_theme(self.version.product))
+            width, height = self._logical_size(tiles[0])
             frames = [
                 generator.get_matrix_colors(
-                    tiles[0].width, tiles[0].height, brightness, vertical=vertical
+                    width, height, brightness, vertical=vertical
                 )
             ]
+        frames = [self._clamp_colors(frame) for frame in frames]
 
         async def write(duration: float) -> None:
-            await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
+            await self._write_mood_frames(tiles, frames, duration)
 
         await self._write_mood(write, power_on)
         self._record_tile_paint(
@@ -1755,7 +1880,7 @@ class MatrixLight(PaintTracking, Light):
             self._shown_colors(
                 tiles,
                 [
-                    self._orient_tile_colors(tile, colors) if has_chain else colors
+                    self._to_painted(tile, colors)
                     for tile, colors in zip(tiles, frames, strict=True)
                 ],
             ),
@@ -1767,8 +1892,6 @@ class MatrixLight(PaintTracking, Light):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write one frame per tile.
 
@@ -1777,7 +1900,7 @@ class MatrixLight(PaintTracking, Light):
         """
         self._mood_frames_writing += 1
         try:
-            await self._write_frames(tiles, frames, duration, has_chain=has_chain)
+            await self._write_frames(tiles, frames, duration)
         finally:
             self._mood_frames_writing -= 1
 
@@ -1786,12 +1909,10 @@ class MatrixLight(PaintTracking, Light):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write one frame per tile, remapping a rotated Tile."""
         for tile, colors in zip(tiles, frames, strict=True):
-            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            oriented = self._to_painted(tile, colors)
             await self.set_matrix_colors(
                 tile.tile_index, oriented, duration=round(duration * 1000)
             )
@@ -1971,6 +2092,7 @@ class MatrixLight(PaintTracking, Light):
             speed: Morph speed in seconds
             duration: Effect duration in nanoseconds (0 for infinite)
         """
+        palette = self._clamp_colors(palette)
         await self.set_effect(
             FirmwareEffect.MORPH, speed=speed, duration=duration, palette=palette
         )

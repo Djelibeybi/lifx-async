@@ -81,6 +81,7 @@ def _light(serial: str) -> MagicMock:
     light = MagicMock()
     light.serial = serial
     light.set_power = AsyncMock()
+    light._clamp_frame.side_effect = lambda frame: frame
     return light
 
 

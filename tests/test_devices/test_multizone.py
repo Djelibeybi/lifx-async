@@ -1167,6 +1167,7 @@ class TestSetAllColorZones:
         light = MultiZoneLight(serial="d073d5010203", ip="192.168.1.100")
         light._capabilities = MagicMock()
         light._capabilities.has_extended_multizone = extended
+        light._capabilities.temperature_range = None
         light._zone_count = zone_count
         light.set_color_zones = AsyncMock()
         light.set_extended_color_zones = AsyncMock()

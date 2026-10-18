@@ -16,6 +16,7 @@ from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
 from tests.test_devices.test_component_transitions import Rig, build_rig
+from tests.test_products.test_hidden_cell_support import darkened
 
 _SET64_COLOURS = HEADER_SIZE + 10
 
@@ -99,7 +100,7 @@ class TestComponentSlots:
             8,
             8,
         )
-        assert tile[:UPLIGHT] == frame[:UPLIGHT]
+        assert tile[:UPLIGHT] == darkened(frame, 176)[:UPLIGHT]
         assert tile[UPLIGHT] == DIM_BLUE.as_tuple()
 
     async def test_an_uplight_frame_is_one_pixel_beside_the_held_downlight(
@@ -126,7 +127,7 @@ class TestComponentSlots:
         downlight.send_frame(frame)
         uplight.send_frame([RED])
 
-        assert _tiles(sent)[-1] == frame[:UPLIGHT] + [RED]
+        assert _tiles(sent)[-1] == darkened(frame[:UPLIGHT] + [RED], 176)
         assert ceiling.get_all_tile_colors.await_count == 1
 
     async def test_an_idle_component_change_rides_on_the_next_frame(
@@ -185,7 +186,7 @@ class TestComponentSlots:
         halfway = DIM_BLUE.lerp_hsb(AMBER, 0.5).with_kelvin(3100)
         assert hold.tuples_at(101.0)[UPLIGHT] == halfway.as_tuple()
         assert hold.tuples_at(103.0)[UPLIGHT] == AMBER.as_tuple()
-        assert hold.tuples_at(101.0)[0] == _tiles(sent)[-1][0]
+        assert hold.tuples_at(101.0)[2] == _tiles(sent)[-1][2]
 
     async def test_a_released_writer_draws_nothing(self, sent: list[bytes]) -> None:
         ceiling = _ceiling()
@@ -272,7 +273,7 @@ class TestComponentSlots:
         writer.send_frame(raw[::-1])
 
         whole, composed = _tiles(sent)
-        assert whole == raw
+        assert whole == darkened(raw, 176)
         assert composed[UPLIGHT] == DIM_BLUE.as_tuple()
 
     async def test_a_slot_frame_can_carry_its_own_duration(
@@ -350,7 +351,7 @@ class TestComponentSlots:
 
         (tile,) = _tiles(sent)
         halfway = GREEN.lerp_hsb(AMBER, 0.5).with_kelvin(3100)
-        assert tile[0] == halfway.as_tuple()
+        assert tile[2] == halfway.as_tuple()
         assert tile[UPLIGHT] == RED
 
     async def test_a_settled_tile_carries_another_slots_fade_as_of_its_end(
@@ -379,7 +380,7 @@ class TestComponentSlots:
         start = HSBK.from_protocol(LightHsbk(*RED))
         end = HSBK.from_protocol(LightHsbk(*CYAN))
         halfway = start.lerp_hsb(end, 0.5).as_tuple()
-        assert _tiles(sent)[-1][0] == halfway
+        assert _tiles(sent)[-1][2] == halfway
         assert _tiles(sent)[-1][UPLIGHT] == RED
 
     async def test_a_slot_fade_starts_where_the_last_one_was_and_ends_on_target(
@@ -405,8 +406,8 @@ class TestComponentSlots:
                 uplight.send_frame([RED], duration_ms=0, settled=True)
 
         began, ended = _tiles(sent)
-        assert began[0] == CYAN
-        assert ended[0] == RED
+        assert began[2] == CYAN
+        assert ended[2] == RED
 
     async def test_a_fade_after_a_frame_of_another_size_starts_at_its_target(
         self, sent: list[bytes]
@@ -422,7 +423,7 @@ class TestComponentSlots:
         downlight.stage([CYAN] * 64, settled=True, duration_ms=60000)
         uplight.send_frame([RED], duration_ms=0, settled=True)
 
-        assert _tiles(sent)[-1][0] == CYAN
+        assert _tiles(sent)[-1][2] == CYAN
 
     async def test_a_writer_sees_the_soonest_fade_on_another_slot(self) -> None:
         ceiling = _ceiling()
@@ -470,7 +471,7 @@ class TestComponentSlots:
         uplight.send_frame([RED], duration_ms=1000, settled=True)
         uplight.close()
 
-        assert _tiles(sent)[-1] == frame[:UPLIGHT] + [RED]
+        assert _tiles(sent)[-1] == darkened(frame[:UPLIGHT] + [RED], 176)
         assert ceiling.animator._held_tile()[UPLIGHT] == HSBK.from_protocol(
             LightHsbk(*RED)
         )

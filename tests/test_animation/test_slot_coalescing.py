@@ -20,6 +20,7 @@ from tests.test_animation.test_component_slots import (
 from tests.test_animation.test_component_slots import (
     sent as sent,  # noqa: F401 - fixture
 )
+from tests.test_products.test_hidden_cell_support import darkened
 
 ORANGE = HSBK(30, 1, 1, 3500)
 VIOLET = HSBK(270, 1, 1, 3500)
@@ -59,7 +60,7 @@ class TestSlotCoalescing:
 
         (tile,) = _tiles(sent)
         assert tile[UPLIGHT] == ORANGE.as_tuple()
-        assert tile[:UPLIGHT] == [VIOLET.as_tuple()] * UPLIGHT
+        assert tile[:UPLIGHT] == darkened([VIOLET.as_tuple()] * 64, 176)[:UPLIGHT]
         assert [ctx.elapsed_s for ctx in effect.contexts] == [
             effect.contexts[0].elapsed_s
         ] * 2
@@ -79,7 +80,7 @@ class TestSlotCoalescing:
         downlight.send_frame(frame)
 
         assert gated.gated
-        assert _tiles(sent)[-1] == frame[:UPLIGHT] + [RED]
+        assert _tiles(sent)[-1] == darkened(frame[:UPLIGHT] + [RED], 176)
 
     async def test_two_component_effects_never_exceed_one_lights_traffic(
         self, sent: list[bytes]

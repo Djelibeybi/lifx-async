@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 
+from lifx.animation.transitions import TransitionWrite, clip_transitions
 from lifx.color import HSBK
 from lifx.const import MOOD_SCROLL_MAX_FADE_SECONDS, MOOD_SCROLL_STEP_SECONDS
 from lifx.devices.light import Light
@@ -128,7 +129,6 @@ class EffectScroll(LIFXEffect):
             matrix = light
             tiles = await matrix.get_device_chain()
             await matrix.ensure_capabilities()
-            has_chain = bool(matrix.capabilities and matrix.capabilities.has_chain)
             if self.frame is not None:
                 frames = self.frame
             else:
@@ -136,11 +136,7 @@ class EffectScroll(LIFXEffect):
                 # own cells; the scroll and its writes work in the logical
                 # canvas, so trim it and undo a rotated Tile's orientation.
                 frames = [
-                    matrix._unorient_tile_colors(
-                        tile, colors[: tile.width * tile.height]
-                    )
-                    if has_chain
-                    else colors[: tile.width * tile.height]
+                    matrix._to_logical(tile, colors[: tile.width * tile.height])
                     for tile, colors in zip(
                         tiles, await matrix.get_all_tile_colors(), strict=False
                     )
@@ -152,9 +148,17 @@ class EffectScroll(LIFXEffect):
                 raise ValueError(
                     f"frame does not match {matrix.label or matrix.serial}'s tiles"
                 )
-            plans.append((matrix, tiles, frames, has_chain))
+            plans.append((matrix, tiles, frames))
 
-        fade = min(MOOD_SCROLL_STEP_SECONDS, MOOD_SCROLL_MAX_FADE_SECONDS)
+        # One step's fade, clipped to the gap before the next step's write.
+        fade = clip_transitions(
+            [
+                TransitionWrite(0.0, "scroll", MOOD_SCROLL_MAX_FADE_SECONDS),
+                TransitionWrite(
+                    MOOD_SCROLL_STEP_SECONDS, "scroll", MOOD_SCROLL_MAX_FADE_SECONDS
+                ),
+            ]
+        )[0].duration
         step = 0
         while True:
             step += 1
@@ -164,15 +168,14 @@ class EffectScroll(LIFXEffect):
                         tiles,
                         scrolled(
                             frames,
-                            [t.width for t in tiles],
-                            tiles[0].height,
+                            [matrix._logical_size(t)[0] for t in tiles],
+                            matrix._logical_size(tiles[0])[1],
                             step,
                             vertical=self.vertical,
                         ),
                         fade,
-                        has_chain=has_chain,
                     )
-                    for matrix, tiles, frames, has_chain in plans
+                    for matrix, tiles, frames in plans
                 )
             )
             await asyncio.sleep(MOOD_SCROLL_STEP_SECONDS)

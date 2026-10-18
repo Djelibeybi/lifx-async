@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from functools import lru_cache
+from typing import NamedTuple
 
 
 class Orientation(IntEnum):
@@ -79,6 +80,103 @@ class Orientation(IntEnum):
         return mapping[orientation_str]
 
 
+class OrientationAxes(NamedTuple):
+    """The orientation each accelerometer axis reads as when it dominates.
+
+    The values are the strings :meth:`Orientation.from_string` accepts.
+    """
+
+    x_pos: str
+    x_neg: str
+    y_pos: str
+    y_neg: str
+    z_pos: str
+    z_neg: str
+
+
+TILE_PRODUCT_ID = 55
+LUNA_PRODUCT_IDS = (219, 220)
+
+#: Axis maps by orientation group. Products in no group have no orientation.
+ORIENTATION_GROUPS: dict[str, OrientationAxes] = {
+    "Tile": OrientationAxes(
+        x_pos="RotatedRight",
+        x_neg="RotatedLeft",
+        y_pos="UpsideDown",
+        y_neg="Upright",
+        z_pos="FaceDown",
+        z_neg="FaceUp",
+    ),
+    "Luna": OrientationAxes(
+        x_pos="UpsideDown",
+        x_neg="Upright",
+        y_pos="FaceDown",
+        y_neg="FaceUp",
+        z_pos="RotatedLeft",
+        z_neg="RotatedRight",
+    ),
+}
+
+#: Which group each product belongs to.
+ORIENTATION_GROUP_BY_PRODUCT: dict[int, str] = {
+    TILE_PRODUCT_ID: "Tile",
+    **dict.fromkeys(LUNA_PRODUCT_IDS, "Luna"),
+}
+
+#: Date the Luna axis map was checked on a physical Luna: upright, on each
+#: side, upside down, face up and face down all read as the matching
+#: orientation. "pending" would mean the maintainer has not run that check.
+LUNA_AXIS_MAP_VERIFIED = "2026-10-18"
+
+
+def orientation_group(product_id: int) -> str | None:
+    """Return the orientation group a product belongs to, or None."""
+    return ORIENTATION_GROUP_BY_PRODUCT.get(product_id)
+
+
+def nearest_orientation(product_id: int, x: int, y: int, z: int) -> str | None:
+    """Read an accelerometer vector on the product's own axes.
+
+    Args:
+        product_id: LIFX product ID, which picks the axis map
+        x: Accelerometer X reading
+        y: Accelerometer Y reading
+        z: Accelerometer Z reading
+
+    Returns:
+        A string for :meth:`Orientation.from_string`, or None when the product
+        is in no orientation group and so has no orientation to apply.
+    """
+    group = orientation_group(product_id)
+    if group is None:
+        return None
+    axes = ORIENTATION_GROUPS[group]
+    abs_x, abs_y, abs_z = abs(x), abs(y), abs(z)
+
+    if x == -1 and y == -1 and z == -1:
+        # Invalid data, assume right-side up.
+        return "Upright"
+    if abs_x > abs_y and abs_x > abs_z:
+        return axes.x_pos if x > 0 else axes.x_neg
+    if abs_z > abs_x and abs_z > abs_y:
+        return axes.z_pos if z > 0 else axes.z_neg
+    return axes.y_pos if y > 0 else axes.y_neg
+
+
+def logical_tile_size(
+    width: int, height: int, orientation: Orientation
+) -> tuple[int, int]:
+    """The canvas a tile presents in its orientation, as (width, height).
+
+    A tile on its side (ROTATED_90 or ROTATED_270) shows its height across
+    and its width down, so a 7x5 Luna lying on a side is drawn as 5 wide by
+    7 high. Every other orientation keeps the tile's own size.
+    """
+    if orientation in (Orientation.ROTATED_90, Orientation.ROTATED_270):
+        return height, width
+    return width, height
+
+
 @lru_cache(maxsize=64)
 def build_orientation_lut(
     width: int,
@@ -89,6 +187,10 @@ def build_orientation_lut(
 
     The LUT maps physical tile positions to row-major framebuffer indices.
     For a pixel at physical position i, lut[i] gives the framebuffer index.
+    The framebuffer is the logical canvas of :func:`logical_tile_size`: for
+    a quarter turn of a non-square tile its rows are ``height`` wide, so a
+    7x5 tile on its side reads a 5 wide by 7 high canvas. A square tile's
+    canvas has the tile's own shape in every orientation.
 
     This is LRU-cached because tiles typically have standard dimensions (8x8)
     and there are only 6 orientations, so the cache will be highly effective.
@@ -114,47 +216,35 @@ def build_orientation_lut(
     """
     size = width * height
     lut: list[int] = [0] * size
+    canvas_width, _ = logical_tile_size(width, height, orientation)
 
     for y in range(height):
         for x in range(width):
             # Physical position in row-major order
             physical_idx = y * width + x
 
-            # Calculate source position based on orientation
-            if orientation == Orientation.RIGHT_SIDE_UP:
-                # No transformation
-                src_x, src_y = x, y
-            elif orientation == Orientation.ROTATED_90:
-                # 90 degrees clockwise: (x, y) -> (height - 1 - y, x)
-                # Note: Only valid for square tiles. Non-square tiles would require
-                # a source buffer with swapped dimensions (e.g., 5x7 for a 7x5 tile).
-                # For non-square tiles, fall back to identity transformation.
-                if width == height:
-                    src_x = height - 1 - y
-                    src_y = x
-                else:
-                    src_x, src_y = x, y
+            # Calculate source position on the logical canvas
+            if orientation == Orientation.ROTATED_90:
+                # 90 degrees clockwise: (x, y) -> (height - 1 - y, x), so the
+                # canvas top row lands on the physical left column
+                src_x = height - 1 - y
+                src_y = x
             elif orientation == Orientation.ROTATED_180:
                 # 180 degrees: (x, y) -> (width - 1 - x, height - 1 - y)
-                # Works for both square and non-square tiles
                 src_x = width - 1 - x
                 src_y = height - 1 - y
             elif orientation == Orientation.ROTATED_270:
-                # 270 degrees (90 counter-clockwise): (x, y) -> (y, width - 1 - x)
-                # Note: Only valid for square tiles. For non-square tiles,
-                # fall back to identity transformation.
-                if width == height:
-                    src_x = y
-                    src_y = width - 1 - x
-                else:
-                    src_x, src_y = x, y
+                # 270 degrees (90 counter-clockwise): (x, y) -> (y, width - 1 - x),
+                # so the canvas top row lands on the physical right column
+                src_x = y
+                src_y = width - 1 - x
             else:
-                # FACE_UP and FACE_DOWN: treat as right-side-up (no x/y rotation)
-                # The z-axis orientation doesn't affect 2D pixel mapping
+                # RIGHT_SIDE_UP, FACE_UP and FACE_DOWN: no x/y rotation. The
+                # z-axis orientation doesn't affect 2D pixel mapping
                 src_x, src_y = x, y
 
-            # Source index in row-major order
-            src_idx = src_y * width + src_x
+            # Source index in row-major order on the logical canvas
+            src_idx = src_y * canvas_width + src_x
             lut[physical_idx] = src_idx
 
     return tuple(lut)

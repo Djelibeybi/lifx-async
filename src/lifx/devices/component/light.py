@@ -542,6 +542,9 @@ class ComponentMatrixLight(MatrixLight):
             self._known_tile = dict(enumerate(tile_colors))
             self._publish_tile(tile_colors)
             return
+        # The side being written was checked on the way in; the other side was
+        # read back from the device, so it is clamped rather than refused.
+        tile_colors = self._clamp_colors(tile_colors)
         self._writing_tile = True
         self._observed_positions.clear()
         self._changed_positions.clear()
@@ -600,6 +603,7 @@ class ComponentMatrixLight(MatrixLight):
         if isinstance(colors, HSBK):
             if is_dark([colors]):
                 raise ValueError(zero_message)
+            self._check_colors(colors)
             return [colors] * count
         if is_dark(colors):
             raise ValueError(zero_message)
@@ -607,6 +611,7 @@ class ComponentMatrixLight(MatrixLight):
             raise ValueError(
                 f"Expected {count} colors for {component}, got {len(colors)}"
             )
+        self._check_colors(*colors)
         return list(colors)
 
     async def _set_component_colors(
@@ -968,8 +973,6 @@ class ComponentMatrixLight(MatrixLight):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write the one shared tile through the component-aware path."""
-        await self._write_tile(frames[0], duration)
+        await self._write_tile(self._to_painted(tiles[0], frames[0]), duration)

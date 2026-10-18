@@ -69,7 +69,18 @@ from lifx.animation.packets import (
     PacketTemplate,
 )
 
+# Transition clipping
+from lifx.animation.transitions import (
+    MIN_TRANSITION_SECONDS,
+    TransitionWrite,
+    clip_transitions,
+)
+
 __all__ = [
+    # Transition clipping
+    "MIN_TRANSITION_SECONDS",
+    "TransitionWrite",
+    "clip_transitions",
     # Animator (high-level API)
     "Animator",
     "AnimatorStats",

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from lifx.animation.orientation import Orientation, build_orientation_lut
 from lifx.color import HSBK
 from lifx.const import MOOD_FADE_SECONDS
 from lifx.devices.ceiling import CeilingLight
@@ -15,6 +16,7 @@ from lifx.devices.mirror import MirrorLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.protocol.protocol_types import FirmwareEffect
 from lifx.theme import MoodGenerator, Theme
+from tests.test_products.test_hidden_cell_support import darkened
 from tests.test_theme.conftest import make_tile
 
 RED = HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)
@@ -138,6 +140,21 @@ class TestMatrixApplyMood:
         )
         await matrix_light.apply_mood(GRID)
         assert len(matrix_light.set_matrix_colors.await_args.args[1]) == 30
+
+    async def test_a_luna_on_its_side_is_painted_5_wide_by_7_high(
+        self, luna_light: MatrixLight
+    ) -> None:
+        reading(luna_light, on=True, brightness=1.0)
+        luna_light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=7, height=5, accel=(0, 0, -1))]
+        )
+        canvas = MoodGenerator(STRIPES).get_matrix_colors(5, 7, 1.0)
+        lut = build_orientation_lut(7, 5, Orientation.ROTATED_90)
+
+        await luna_light.apply_mood(STRIPES)
+
+        sent = luna_light.set_matrix_colors.await_args.args[1]
+        assert sent == darkened([canvas[src] for src in lut], 219)
 
     async def test_chain_is_painted_in_chain_order(
         self, tile_light: MatrixLight

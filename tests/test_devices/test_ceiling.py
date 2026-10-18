@@ -23,7 +23,6 @@ from lifx.devices.component.state import (
 )
 from lifx.devices.matrix import MatrixLight
 from lifx.exceptions import LifxError
-from lifx.products import get_ceiling_layout
 
 
 def _make_mock_state(power: int = 65535) -> MagicMock:
@@ -40,126 +39,70 @@ def _make_mock_state(power: int = 65535) -> MagicMock:
 class TestCeilingLightComponentDetection:
     """Tests for component detection and configuration."""
 
-    def test_create_ceiling_light_176(self) -> None:
-        """Test creating Ceiling light (product 176 - US)."""
-        ceiling = CeilingLight(
-            serial="d073d5010203",
-            ip="192.168.1.100",
-        )
-        assert ceiling.serial == "d073d5010203"
-        assert ceiling.ip == "192.168.1.100"
+    @pytest.mark.parametrize(
+        ("product", "width", "zone"),
+        [
+            (176, 8, 63),
+            (177, 8, 63),
+            (265, 8, 63),
+            (266, 8, 63),
+            (201, 16, 127),
+            (202, 16, 127),
+        ],
+    )
+    def test_uplight_zone_derived_from_uplight_coords(
+        self, product: int, width: int, zone: int
+    ) -> None:
+        """The uplight zone is x + y * the width the device reports."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
+        ceiling._version = MagicMock()
+        ceiling._version.product = product
+        ceiling._device_chain = [MagicMock(width=width)]
 
-        # Verify component layout for 8x8 ceiling (product 176)
-        layout = get_ceiling_layout(176)
-        assert layout is not None
-        assert layout.uplight_zone == 63
-        assert layout.downlight_zones == slice(0, 63)
+        assert ceiling.uplight_zone == zone
+        assert ceiling.downlight_zones == slice(0, zone)
+        assert ceiling.downlight_zone_count == zone
 
-    def test_create_ceiling_light_177(self) -> None:
-        """Test creating Ceiling light (product 177 - Intl)."""
-        ceiling = CeilingLight(
-            serial="d073d5010204",
-            ip="192.168.1.101",
-        )
-        assert ceiling.serial == "d073d5010204"
-        assert ceiling.ip == "192.168.1.101"
+    def test_uplight_zone_follows_reported_width(self) -> None:
+        """A wider reported tile moves the zone, proving the width is read."""
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=10)]
 
-        # Verify component layout for 8x8 ceiling (product 177)
-        layout = get_ceiling_layout(177)
-        assert layout is not None
-        assert layout.uplight_zone == 63
-        assert layout.downlight_zones == slice(0, 63)
+        assert ceiling.uplight_zone == 7 + 7 * 10
 
-    def test_create_ceiling_light_201(self) -> None:
-        """Test creating Ceiling Capsule (product 201 - US)."""
-        ceiling = CeilingLight(
-            serial="d073d5010205",
-            ip="192.168.1.102",
-        )
-        assert ceiling.serial == "d073d5010205"
-        assert ceiling.ip == "192.168.1.102"
+    def test_uplight_zone_requires_version(self) -> None:
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
 
-        # Verify component layout for 16x8 ceiling (product 201)
-        layout = get_ceiling_layout(201)
-        assert layout is not None
-        assert layout.uplight_zone == 127
-        assert layout.downlight_zones == slice(0, 127)
+        with pytest.raises(LifxError, match="version not available"):
+            _ = ceiling.uplight_zone
 
-    def test_create_ceiling_light_202(self) -> None:
-        """Test creating Ceiling Capsule (product 202 - Intl)."""
-        ceiling = CeilingLight(
-            serial="d073d5010206",
-            ip="192.168.1.103",
-        )
-        assert ceiling.serial == "d073d5010206"
-        assert ceiling.ip == "192.168.1.103"
+    def test_uplight_zone_rejects_non_ceiling_product(self) -> None:
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 27
+        ceiling._device_chain = [MagicMock(width=8)]
 
-        # Verify component layout for 16x8 ceiling (product 202)
-        layout = get_ceiling_layout(202)
-        assert layout is not None
-        assert layout.uplight_zone == 127
-        assert layout.downlight_zones == slice(0, 127)
+        with pytest.raises(LifxError, match="not a Ceiling light"):
+            _ = ceiling.uplight_zone
 
-    def test_create_ceiling_light_265(self) -> None:
-        """Test creating Ceiling 13" (product 265 - US)."""
-        ceiling = CeilingLight(
-            serial="d073d5010207",
-            ip="192.168.1.104",
-        )
-        assert ceiling.serial == "d073d5010207"
-        assert ceiling.ip == "192.168.1.104"
+    def test_uplight_zone_rejects_unknown_product(self) -> None:
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 99999
+        ceiling._device_chain = [MagicMock(width=8)]
 
-        # Verify component layout for 8x8 ceiling (product 265)
-        layout = get_ceiling_layout(265)
-        assert layout is not None
-        assert layout.width == 8
-        assert layout.height == 8
-        assert layout.uplight_zone == 63
-        assert layout.downlight_zones == slice(0, 63)
+        with pytest.raises(LifxError, match="not a Ceiling light"):
+            _ = ceiling.uplight_zone
 
-    def test_create_ceiling_light_266(self) -> None:
-        """Test creating Ceiling 13" (product 266 - Intl)."""
-        ceiling = CeilingLight(
-            serial="d073d5010208",
-            ip="192.168.1.105",
-        )
-        assert ceiling.serial == "d073d5010208"
-        assert ceiling.ip == "192.168.1.105"
+    def test_uplight_zone_requires_tile_chain(self) -> None:
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
+        ceiling._version = MagicMock()
+        ceiling._version.product = 176
 
-        # Verify component layout for 8x8 ceiling (product 266)
-        layout = get_ceiling_layout(266)
-        assert layout is not None
-        assert layout.width == 8
-        assert layout.height == 8
-        assert layout.uplight_zone == 63
-        assert layout.downlight_zones == slice(0, 63)
-
-    def test_uplight_zone_property(self) -> None:
-        """Test uplight_zone property returns correct zone index."""
-        ceiling_176 = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
-        # Mock version property
-        ceiling_176._version = MagicMock()
-        ceiling_176._version.product = 176
-
-        ceiling_201 = CeilingLight(serial="d073d5010205", ip="192.168.1.102")
-        ceiling_201._version = MagicMock()
-        ceiling_201._version.product = 201
-
-        assert ceiling_176.uplight_zone == 63
-        assert ceiling_201.uplight_zone == 127
-
-    def test_downlight_zones_property(self) -> None:
-        """Test downlight_zones property returns correct slice."""
-        ceiling_176 = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
-        ceiling_176._version = MagicMock()
-        ceiling_176._version.product = 176
-
-        ceiling_201 = CeilingLight(serial="d073d5010205", ip="192.168.1.102")
-        ceiling_201._version = MagicMock()
-        ceiling_201._version.product = 201
-
-        assert ceiling_176.downlight_zones == slice(0, 63)
-        assert ceiling_201.downlight_zones == slice(0, 127)
+        with pytest.raises(LifxError, match="Tile chain not available"):
+            _ = ceiling.uplight_zone
 
 
 class TestCeilingLightGetMethods:
@@ -174,6 +117,7 @@ class TestCeilingLightGetMethods:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         return ceiling
 
     async def test_get_uplight_color(self, ceiling_176: CeilingLight) -> None:
@@ -235,6 +179,7 @@ class TestCeilingLightSetMethods:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -370,6 +315,7 @@ class TestCeilingLightTurnOnOff:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -732,6 +678,7 @@ class TestCeilingLightProperties:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         return ceiling
 
     def test_uplight_is_on_when_on(self, ceiling_176: CeilingLight) -> None:
@@ -826,6 +773,7 @@ class TestCeilingLightStatePersistence:
             # Mock version for product detection
             ceiling._version = MagicMock()
             ceiling._version.product = 176
+            ceiling._device_chain = [MagicMock(width=8)]
             yield ceiling
 
     async def test_state_file_created_on_save(self, ceiling_176: CeilingLight) -> None:
@@ -937,6 +885,7 @@ class TestCeilingLightStatePersistence:
         second._state = _make_mock_state()
         second._version = MagicMock()
         second._version.product = 176
+        second._device_chain = [MagicMock(width=8)]
 
         colour = HSBK(hue=60, saturation=0.5, brightness=0.7, kelvin=4000)
         ceiling_176.state.stored_uplight_color = colour
@@ -1060,6 +1009,7 @@ class TestCeilingLightBackwardCompatibility:
         # Mock version for product detection
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         return ceiling
 
     async def test_set_color_affects_both_components(
@@ -1574,6 +1524,7 @@ class TestCeilingLightTurnDownlightOffWithList:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -1637,6 +1588,7 @@ class TestCeilingLightBrightnessInference:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -1827,6 +1779,7 @@ class TestCeilingLightSetDownlightSingleZeroBrightness:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -1858,6 +1811,7 @@ class TestCeilingLightSetPowerOverride:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -2140,6 +2094,7 @@ class TestCeilingLightSetPowerOverride:
         ceiling.connection = AsyncMock()
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         # State is NOT initialised (self._state is None)
 
         mock_state = _make_mock_state()
@@ -2168,6 +2123,7 @@ class TestCeilingLightSetPowerOverride:
         ceiling.connection = AsyncMock()
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         # State is NOT initialised (self._state is None)
 
         mock_state = _make_mock_state()
@@ -2207,6 +2163,7 @@ class TestCeilingLightTurnOnPowerBehavior:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -2558,6 +2515,7 @@ class TestCeilingLightTurnOffPowerBehavior:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -2760,6 +2718,7 @@ class TestCeilingLightStateCoverage:
 
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         ceiling.get_power = AsyncMock(return_value=65535)
         return ceiling
 
@@ -2779,6 +2738,7 @@ class TestCeilingLightStateCoverage:
         ceiling._state = _make_mock_state()
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         # Monkey-patch downlight_zones to return slice with stop=None
         none_slice = property(lambda self: slice(0, None))
         with patch.object(
@@ -3137,6 +3097,7 @@ class TestCeilingLightStateCoverage:
             ceiling._state = _make_mock_state()
             ceiling._version = MagicMock()
             ceiling._version.product = 176
+            ceiling._device_chain = [MagicMock(width=8)]
 
             await ceiling._load_state_from_file()
 
@@ -3163,6 +3124,7 @@ class TestCeilingLightTransitions:
         ceiling.get_power = AsyncMock(return_value=65535)
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
         return ceiling
 
     async def test_switch_mid_fade_carries_the_other_target(
@@ -3276,6 +3238,7 @@ class TestCeilingLightMirrorParity:
         ceiling._save_state_to_file = AsyncMock()
         ceiling._version = MagicMock()
         ceiling._version.product = 176
+        ceiling._device_chain = [MagicMock(width=8)]
 
         async def get_all_tile_colors() -> list[list[HSBK]]:
             return [list(device["tile"])]

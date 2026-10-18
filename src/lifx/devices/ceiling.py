@@ -41,7 +41,7 @@ from lifx.devices.component.state import (
 )
 from lifx.devices.matrix import MatrixLightState
 from lifx.exceptions import LifxError
-from lifx.products import get_ceiling_layout, is_ceiling_product
+from lifx.products import get_product, is_ceiling_product
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -492,39 +492,48 @@ class CeilingLight(ComponentMatrixLight):
     def uplight_zone(self) -> int:
         """Zone index of the uplight component.
 
+        Derived from the product's published ``uplight_coords`` and the tile
+        width the device reports: ``x + y * width``.
+
         Returns:
             Zone index (63 for standard Ceiling, 127 for Ceiling 13x26)
 
+        The tile chain must be loaded first, which the async context manager
+        does on entry.
+
         Raises:
-            LifxError: If device version is not available or not a Ceiling product
+            LifxError: If the device version or the tile chain has not been
+                loaded (use the async context manager), or the device is not a
+                Ceiling product
         """
         if not self.version:
             raise LifxError("Device version not available. Use async context manager.")
 
-        layout = get_ceiling_layout(self.version.product)
-        if not layout:
+        product = get_product(self.version.product)
+        if product is None or product.uplight_coords is None:
             raise LifxError(f"Product ID {self.version.product} is not a Ceiling light")
 
-        return layout.uplight_zone
+        chain = self.device_chain
+        if not chain:
+            raise LifxError("Tile chain not available. Use async context manager.")
+
+        x, y = product.uplight_coords
+        return x + y * chain[0].width
 
     @property
     def downlight_zones(self) -> slice:
         """Slice representing the downlight component zones.
 
+        The downlight is every zone before the uplight zone.
+
         Returns:
             Slice object (slice(0, 63) for standard, slice(0, 127) for Ceiling 13x26)
 
         Raises:
-            LifxError: If device version is not available or not a Ceiling product
+            LifxError: If the device version or tile chain is not available, or
+                the device is not a Ceiling product
         """
-        if not self.version:
-            raise LifxError("Device version not available. Use async context manager.")
-
-        layout = get_ceiling_layout(self.version.product)
-        if not layout:
-            raise LifxError(f"Product ID {self.version.product} is not a Ceiling light")
-
-        return layout.downlight_zones
+        return slice(0, self.uplight_zone)
 
     @property
     def downlight_zone_count(self) -> int:

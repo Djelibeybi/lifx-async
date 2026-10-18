@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
+import secrets
 import time
 import uuid
 from collections.abc import Coroutine
@@ -23,6 +25,7 @@ from lifx.const import (
     UNKNOWN_RANGE_MAX_KELVIN,
     UNKNOWN_RANGE_MIN_KELVIN,
 )
+from lifx.devices.probe import is_known_product, resolve_product_info
 from lifx.exceptions import (
     LifxDeviceNotFoundError,
     LifxError,
@@ -676,6 +679,7 @@ class Device(Generic[StateT]):
         )
 
         # State storage: Cached values from device
+        self._ping_counter = itertools.count()
         self._label: str | None = None
         self._version: DeviceVersion | None = None
         self._host_firmware: FirmwareInfo | None = None
@@ -738,6 +742,57 @@ class Device(Generic[StateT]):
         # path and connectivity silently falls back to discovery metadata.
         # An unobserved donor never erases an observation already made here.
         self.connection._adopt_thread_connection(source.connection.thread_connection)
+
+    def update_address(self, ip: str, port: int = LIFX_UDP_PORT) -> bool:
+        """Follow this device to a new IP address or port.
+
+        Call this when you learn from outside the library (a DHCP lease list,
+        a router, your own discovery) that the device with this serial now
+        lives somewhere else. The same object keeps working: ``ip`` and
+        ``port`` change, requests already in flight retransmit to the new
+        address, and replies from the old address are ignored from now on.
+
+        A light's Animator, and every writer borrowed from it, moves with
+        the device: its next frame goes to the new endpoint over a fresh
+        socket, and probes still awaiting an ack from the old endpoint no
+        longer gate it.
+
+        Nothing else changes. Cached label, firmware, group, location,
+        capabilities, discovery metadata and the device's own transport report
+        are kept and nothing is re-read, and no color, power or restore write
+        is sent. Discovery calls this for you when it is given this device
+        through ``known_devices`` and finds its serial elsewhere; see the
+        discovery guide.
+
+        An IPv6 zone change counts as a move. Passing the current address is a
+        no-op.
+
+        Args:
+            ip: New IPv4 or IPv6 address (IPv6 link-local needs a zone).
+            port: New UDP port (default 56700).
+
+        Returns:
+            ``True`` if the address changed, ``False`` if it was already
+            current.
+
+        Raises:
+            ValueError: If the address or port is not a usable device
+                endpoint. The device is left unchanged.
+        """
+        _validate_device_endpoint(ip, port, class_name=type(self).__name__)
+        if not self.connection.update_address(ip, port):
+            return False
+        self.ip = ip
+        self.port = port
+        self._endpoint_moved()
+        return True
+
+    def _endpoint_moved(self) -> None:
+        """Tell anything else that sends to this device that it has moved.
+
+        A plain device sends only through its connection, which has already
+        followed the move. A light overrides this to move its Animator too.
+        """
 
     @classmethod
     async def from_ip(
@@ -964,10 +1019,9 @@ class Device(Generic[StateT]):
         try:
             # Get version to determine product
             version = await temp_device.get_version()
-            product_info = get_product(version.product)
-
-            if product_info is None:
-                raise LifxDeviceNotFoundError(f"Unknown product ID: {version.product}")
+            product_info = await resolve_product_info(
+                temp_device.connection, version.product
+            )
 
             # Step 4: Determine correct device class based on capabilities
             from lifx.devices.detection import (
@@ -988,6 +1042,10 @@ class Device(Generic[StateT]):
                 fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
             )
+
+            if not is_known_product(version.product):
+                # The probe already ran; do not repeat it on first use
+                device._capabilities = product_info
 
             # Type system note: device._state is guaranteed non-None after
             # _initialize_state().
@@ -1082,6 +1140,34 @@ class Device(Generic[StateT]):
 
         self._resolve_capabilities(version.product, host_firmware)
 
+    async def _load_capabilities(
+        self, version: DeviceVersion, host_firmware: FirmwareInfo
+    ) -> None:
+        """Load capabilities, probing the device when the registry lacks its product.
+
+        A known product resolves from the registry without any traffic. An
+        unknown one is probed (see :mod:`lifx.devices.probe`), so it connects
+        as the device class its answers imply. No-op if capabilities are set.
+
+        Args:
+            version: Device version info (vendor, product)
+            host_firmware: Host firmware info for firmware-dependent capabilities
+        """
+        if self._capabilities is not None:
+            return
+
+        if not is_known_product(version.product):
+            self._capabilities = await resolve_product_info(
+                self.connection, version.product
+            )
+            self._capabilities_firmware = (
+                host_firmware.version_major,
+                host_firmware.version_minor,
+            )
+            return
+
+        self._process_capabilities(version, host_firmware)
+
     def _resolve_capabilities(self, product: int, host_firmware: FirmwareInfo) -> None:
         """Resolve the registry entry for a product on the given host firmware.
 
@@ -1117,7 +1203,7 @@ class Device(Generic[StateT]):
         # Get device version to determine product ID
         version = await self.get_version()
         host_firmware = await self.get_host_firmware()
-        self._process_capabilities(version, host_firmware)
+        await self._load_capabilities(version, host_firmware)
 
     async def ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
@@ -1127,6 +1213,19 @@ class Device(Generic[StateT]):
         the async context manager).
         """
         await self._ensure_capabilities()
+
+    @property
+    def is_unknown_product(self) -> bool:
+        """Whether the product registry lacks this device's product.
+
+        True for a product newer than the bundled registry. Its capabilities
+        are inferred by probing the device and are named
+        ``Unknown product <id>``. False for a known product and before
+        capabilities have loaded.
+        """
+        return self._capabilities is not None and not is_known_product(
+            self._capabilities.pid
+        )
 
     @property
     def capabilities(self) -> ProductInfo | None:
@@ -1340,6 +1439,32 @@ class Device(Generic[StateT]):
         if result and self._state is not None:
             await self._schedule_refresh()
 
+    async def ping(self) -> float:
+        """Measure the round-trip time to the device without changing its state.
+
+        Sends an echo request whose 64-byte payload is an 8-byte counter
+        followed by random bytes, and waits for the echo response carrying
+        the same payload. Responses with a different payload are ignored.
+        The connection's normal retransmission applies.
+
+        Returns:
+            Round-trip time in seconds
+
+        Raises:
+            LifxTimeoutError: If no matching response arrives before the deadline
+            LifxConnectionError: If the connection fails
+
+        Example:
+            ```python
+            rtt = await device.ping()
+            print(f"{rtt * 1000:.1f} ms")
+            ```
+        """
+        payload = next(self._ping_counter).to_bytes(8, "big") + secrets.token_bytes(56)
+        started = time.perf_counter()
+        await self.connection.echo(payload)
+        return time.perf_counter() - started
+
     async def get_version(self) -> DeviceVersion:
         """Get device version information.
 
@@ -1515,6 +1640,7 @@ class Device(Generic[StateT]):
         if (
             self._capabilities is not None
             and self._capabilities_firmware is not None
+            and not self.is_unknown_product
             and self._capabilities_firmware
             != (firmware.version_major, firmware.version_minor)
         ):
@@ -2491,7 +2617,7 @@ class Device(Generic[StateT]):
             await self._await_batch(pending)
             host_firmware = requests.host_firmware.result()
             if requests.version is not None:
-                self._process_capabilities(requests.version.result(), host_firmware)
+                await self._load_capabilities(requests.version.result(), host_firmware)
         except BaseException:
             await self._discard_pending(pending)
             raise

@@ -13,7 +13,7 @@ class LifxDeviceNotFoundError(LifxError):
     """Raised when a device cannot be found or reached.
 
     Raised by ``Device.from_ip()`` and ``Device.connect()`` when the target
-    device does not respond or has an unknown product ID.
+    device does not respond.
     """
 
     pass
@@ -82,7 +82,7 @@ class LifxUnsupportedDeviceError(LifxError):
     and returns ``None`` instead of exposing the exception.
 
     This is distinct from ``LifxDeviceNotFoundError`` which indicates the
-    device could not be reached or has an unknown product ID.
+    device could not be reached.
     """
 
     pass

@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.12.0 (2026-10-18)
+
+### Features
+
+- Adopt reference-library behaviours and add a device watcher
+  ([#323](https://github.com/Djelibeybi/lifx-async/pull/323),
+  [`ce2e303`](https://github.com/Djelibeybi/lifx-async/commit/ce2e303f071324609b75691fec6cbbdbb0eee661))
+
+
 ## v7.11.3 (2026-10-14)
 
 ### Bug Fixes

@@ -19,6 +19,7 @@ from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
 from tests.test_devices import test_component_transitions as transitions
+from tests.test_products.test_hidden_cell_support import darkened
 
 GREEN = HSBK.from_protocol(transitions.GREEN.to_protocol())
 BLUE = HSBK.from_protocol(transitions.BLUE.to_protocol())
@@ -244,7 +245,9 @@ class TestEmulatedWholeLightEffects:
             await conductor.start(_SolidFrames(GREEN), [ceiling])
 
             async def showing_frames() -> bool:
-                return (await ceiling.get_all_tile_colors())[0] == [GREEN] * 128
+                return (await ceiling.get_all_tile_colors())[0] == darkened(
+                    [GREEN] * 128, 201
+                )
 
             await _eventually(showing_frames)
             await conductor.stop([ceiling])
@@ -275,11 +278,9 @@ class TestEmulatedWholeLightEffects:
             await conductor.start(_SolidFrames(red), [ceiling])
 
             async def powered_and_showing_frames() -> bool:
-                return (
-                    await ceiling.get_power() == 65535
-                    and (await ceiling.get_all_tile_colors())[0]
-                    == [HSBK.from_protocol(red.to_protocol())] * 128
-                )
+                return await ceiling.get_power() == 65535 and (
+                    await ceiling.get_all_tile_colors()
+                )[0] == darkened([HSBK.from_protocol(red.to_protocol())] * 128, 201)
 
             await _eventually(powered_and_showing_frames)
             await conductor.stop([ceiling])
@@ -297,6 +298,8 @@ def _mock_matrix() -> MagicMock:
     light.set_matrix_colors = AsyncMock()
     light.set_color = AsyncMock()
     light.set_power = AsyncMock()
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
     return light
 
 
@@ -348,6 +351,7 @@ async def test_component_light_without_state_restores_tile_and_power():
 
 async def test_non_matrix_light_still_gets_a_startup_colour():
     light = MagicMock(spec=Light)
+    light._clamp_color.side_effect = lambda color: color
     light.get_power = AsyncMock(return_value=False)
     light.set_color = AsyncMock()
     light.set_power = AsyncMock()

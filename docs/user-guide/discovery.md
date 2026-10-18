@@ -95,6 +95,174 @@ provide the other two targeted lookups — by serial number and by device
 label/name respectively. See the [High-Level API reference](../api/high-level.md)
 for their full signatures.
 
+## When a device moves
+
+A device can come back on a different IP address or port after a router
+restart, a DHCP change or a move between access points. Its serial does not
+change, so the library follows the serial: the device object you already hold
+keeps working and nothing you cached on it is thrown away.
+
+Pass the objects you hold to discovery with `known_devices` (or `device` for
+`find_by_serial()`). When a result reports one of those serials at a different
+address, that object is moved to the new address and yielded in place of a new
+object:
+
+```python
+from lifx import Light, discover_udp
+
+lights: list[Light] = [...]  # objects you created or discovered earlier
+
+async for device in discover_udp(known_devices=lights):
+    print(device.serial, device.ip, device.port)  # same objects, current address
+```
+
+`discover()`, `discover_udp()`, `discover_mdns()` and `find_by_serial()` all
+accept it. If you learn the new address some other way, apply it yourself:
+
+```python
+light.update_address("192.0.2.40", 56700)
+```
+
+What a move does:
+
+- `device.ip` and `device.port` report the new address.
+- A request that was in flight is not failed. Its next retransmission goes to
+  the new address, so it completes there.
+- A late reply from an address the connection has left is ignored (logged at
+  debug level), so it cannot be mistaken for an answer from the device. Only
+  endpoints the connection has moved away from are filtered: a connection that
+  never moved still accepts a reply by source, sequence and serial alone, as
+  before.
+- The cached label, firmware, group, location, product capabilities and the
+  device's own `connectivity` report are kept. Nothing is re-read.
+- No color, power or restore write is ever sent. A move only changes where
+  packets go.
+- The light's Animator, and any software effect running through it, sends its
+  next frame to the new address. Probes still awaiting an ack from the old
+  address no longer gate it.
+- Announcing the address a device already has changes nothing. A change of IPv6
+  zone counts as a move.
+
+`Device.update_address()` returns `True` when the address changed and `False`
+when it was already current. It raises `ValueError` for an address or port the
+library cannot use, and leaves the device unchanged.
+
+Discovery is unauthenticated UDP, so the library does not arbitrate between
+conflicting announcements: a second host that claims a serial can move the
+object. Use `device.connection.address_epoch`, which counts moves, if you need
+to tell that one happened.
+
+## Watching devices continuously
+
+`discover()` answers "what is on the network now". To keep an application in
+step with the network over hours, open a `DeviceWatcher`. It hands you one
+device object per serial, keeps those objects current, and tells you when a
+device appears, changes or goes quiet.
+
+```python
+from lifx import DeviceEventType, DeviceWatcher
+
+async with DeviceWatcher() as watcher:
+    # The initial discovery has finished; watcher.devices is populated.
+    async for event in watcher:
+        if event.type is DeviceEventType.UPDATED:
+            print(event.serial, dict(event.changes))
+```
+
+On entry the watcher runs one discovery. After that it sweeps every
+`sweep_interval` seconds (default 30) through the same process-wide sweep
+coordinator `discover()` uses, so several consumers do not multiply broadcast
+traffic. Pass `mdns=True` to add an mDNS leg for Thread and IPv6 devices.
+`await watcher.sweep()` forces a sweep now.
+
+### Events
+
+| Event | Meaning |
+|-------|---------|
+| `ADDED` | A serial was seen for the first time, or answered again after `REMOVED` |
+| `UPDATED` | A tracked field changed |
+| `REMOVED` | The device has been silent for longer than the threshold |
+
+`event.device` is always the same object for a serial, and `watcher.get(serial)`
+and `watcher.devices` return it too. `UPDATED` carries `event.changes`, a
+mapping from each changed field (`address`, `label`, `group`, `location`,
+`host_firmware`, `wifi_firmware`) to its `(old, new)` values. A device that
+restarts on a new address produces one `UPDATED` with an `address` change,
+through [endpoint migration](#when-a-device-moves), not a `REMOVED` followed by
+an `ADDED`. Label, group, location and firmware are reported when the cached
+values on the device object change, for example after you call `get_label()`.
+
+Read events with `async for event in watcher`, or register callbacks:
+
+```python
+remove = watcher.add_listener(lambda event: print(event.type, event.serial))
+```
+
+Callbacks run inside the sweep, see every event in order, and a callback that
+raises is logged without affecting the others. The iterator reads from a queue
+of `max_queue_size` events (default 256). When it is full the oldest event is
+dropped and `watcher.dropped_events` increases; a slow consumer never delays a
+sweep.
+
+### Liveness
+
+A device is silent when it has answered nothing, neither a discovery reply nor
+any request on its connection, for longer than `silence_threshold`. The default
+is the larger of 30 seconds and five sweep intervals. Silence is measured from
+the connection's `last_response_at`, so a device you are talking to is never
+removed while it answers, even if sweeps miss it. A silent device's object is
+kept. When it answers again `ADDED` is emitted for the same object.
+
+Only a correlated response counts as an answer. A UDP discovery reply is one. An
+mDNS advertisement is not: a Thread border router keeps advertising a device
+after it stops responding (see [Limitations](#limitations)), so the watcher's
+mDNS leg sends each advertised endpoint one bounded read-only request and
+treats the device as seen only when it answers. An advertisement that never
+answers is never added, and a tracked device whose advertisements continue but
+whose requests all fail is removed at the silence threshold like any other.
+
+### State polling
+
+By default the watcher sends nothing but discovery traffic. Two optional polls
+keep device state fresh without a loop of your own. Each has its own flag and
+interval, and both are off by default.
+
+```python
+async with DeviceWatcher(
+    high_frequency_polling=True,    # color and power, plus zones or tiles
+    high_frequency_interval=10.0,   # seconds, the default
+    low_frequency_polling=True,     # label, firmware, group, location
+    low_frequency_interval=300.0,   # seconds, the default
+) as watcher:
+    async for event in watcher:
+        ...
+```
+
+| Flag | Reads | Reported field names |
+|------|-------|----------------------|
+| `high_frequency_polling` | color and power; zones on a multizone light; tiles on a matrix light | `color`, `power`, `zones`, `tiles` |
+| `low_frequency_polling` | label, host firmware, wifi firmware, group, location | `label`, `host_firmware`, `wifi_firmware`, `group`, `location` |
+
+A poll refreshes the device's cached state and any difference from the previous
+reading is an `UPDATED` event whose `changes` names the fields. The first
+reading of a field is a baseline and is not reported. Polls run on their own
+timers, so an interval shorter than `sweep_interval` is honored. A device that
+is silent is not polled.
+
+A device evidenced as Thread gets no high-frequency polling, because a Thread
+mesh is not built for that traffic. Pass `enable_thread=True`, the same opt-in
+the software effect path uses, to poll it anyway. Low-frequency polling still
+reads a Thread device, except for wifi firmware, which Thread firmware cannot
+answer.
+
+A poll that fails is logged. It does not stop the polls of other devices and
+does not by itself mark the device silent; only the silence threshold does
+that. Polling only reads.
+
+The watcher listens, discovers and, when asked, polls. It never writes color or
+power, and it closes no device object: leaving the `async with` block stops the
+sweeps and polls and leaves the devices you hold open for you.
+
 ## Choosing a discovery method
 
 | Scenario | Recommended method |

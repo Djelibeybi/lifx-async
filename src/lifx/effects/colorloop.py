@@ -310,6 +310,8 @@ class EffectColorloop(FrameEffect):
             # The slot's fade starts from the colour of the moment.
             writer.stage(frame)
             target_frame = [color.as_tuple() for color in target]
+            if idx < len(self.participants):
+                target_frame = self.participants[idx]._clamp_frame(target_frame)
             duration_ms = round(duration * 1000)
             if staged:
                 writer.stage(target_frame, settled=True, duration_ms=duration_ms)
@@ -354,7 +356,7 @@ class EffectColorloop(FrameEffect):
     async def _set_color(self, light: Light, color: HSBK, duration: float) -> None:
         """Write one step's colour, logging a failure; the next step retries."""
         try:
-            await light.set_color(color, duration=duration)
+            await light.set_color(light._clamp_color(color), duration=duration)
         except Exception as error:
             _LOGGER.warning(
                 {

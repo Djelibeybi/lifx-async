@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.color import HSBK
+from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.effects.models import PreState
 from lifx.effects.state_manager import DeviceStateManager
@@ -23,6 +24,8 @@ def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
     return light
 
 
@@ -31,6 +34,7 @@ def mock_multizone_light() -> MagicMock:
     """Create a mock multizone light device."""
     light = MagicMock(spec=MultiZoneLight)
     light.serial = "d073d5abcdef"
+    light._clamp_colors.side_effect = lambda colors: colors
     light.capabilities = MagicMock()
     return light
 
@@ -271,6 +275,7 @@ async def test_restore_state_multizone_chunks_past_the_extended_limit(
     light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
     light._capabilities = MagicMock()
     light._capabilities.has_extended_multizone = True
+    light._capabilities.temperature_range = None
     light._zone_count = 128
     light.set_extended_color_zones = AsyncMock()
     light.set_color = AsyncMock()
@@ -396,6 +401,7 @@ async def test_restore_state_multizone_keeps_its_zones(state_manager) -> None:
     light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
     light._capabilities = MagicMock()
     light._capabilities.has_extended_multizone = True
+    light._capabilities.temperature_range = None
     light._zone_count = 4
     zone_colors = [
         HSBK(hue=i * 90, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(4)
@@ -417,3 +423,323 @@ async def test_restore_state_multizone_keeps_its_zones(state_manager) -> None:
 
     assert shown == zone_colors
     light.set_color.assert_not_awaited()
+
+
+class _FakeClock:
+    """A clock the test advances by hand."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _color_light(serial: str = "d073d5000099") -> MagicMock:
+    light = MagicMock()
+    light.serial = serial
+    light.set_color = AsyncMock()
+    light.set_power = AsyncMock()
+    # Captured off, so a restore turns the light off and asks until it
+    # reports off before writing its color back.
+    light.get_power = AsyncMock(return_value=0)
+    light._state_writes = 0
+    light.get_color = AsyncMock(
+        return_value=(HSBK(hue=10, saturation=1.0, brightness=0.5, kelvin=3500), 0, "")
+    )
+    return light
+
+
+class TestSettleWindow:
+    """A capture soon after a restore returns what was restored."""
+
+    async def test_capture_inside_the_window_returns_the_restored_prestate(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+        # The device is mid-fade and would report something else.
+        light.get_color.return_value = (
+            HSBK(hue=200, saturation=1.0, brightness=1.0, kelvin=3500),
+            65535,
+            "",
+        )
+
+        clock.now += 4.9
+        second = await manager.capture_state(light)
+
+        assert second == first
+        light.get_color.assert_not_called()
+
+    async def test_capture_past_the_window_reads_the_device(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 5.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_fresh_read_ends_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        clock.now += 6.0
+        await manager.capture_state(light)
+        light.get_color.reset_mock()
+
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_light_that_was_not_restored_is_read(self) -> None:
+        manager = DeviceStateManager(clock=_FakeClock())
+        restored = _color_light("d073d5000001")
+        other = _color_light("d073d5000002")
+        await manager.restore_state(restored, await manager.capture_state(restored))
+
+        await manager.capture_state(other)
+
+        other.get_color.assert_awaited_once()
+
+    async def test_zero_disables_the_window(self) -> None:
+        manager = DeviceStateManager(settle_window=0, clock=_FakeClock())
+        light = _color_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_the_window_is_configurable(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(settle_window=1.0, clock=clock)
+        assert manager.settle_window == 1.0
+        light = _color_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        clock.now += 0.9
+        await manager.capture_state(light)
+        light.get_color.assert_not_called()
+
+        clock.now += 0.2
+        await manager.capture_state(light)
+        light.get_color.assert_awaited_once()
+
+    def test_a_negative_window_is_refused(self) -> None:
+        with pytest.raises(ValueError):
+            DeviceStateManager(settle_window=-1)
+
+    async def test_a_caller_write_after_the_restore_ends_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        light._state_writes += 1
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+
+def _zoned_light(serial: str = "d073d5000098") -> MagicMock:
+    light = MagicMock(spec=MultiZoneLight)
+    light.serial = serial
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
+    light.capabilities = MagicMock(has_extended_multizone=True)
+    light._state_writes = 0
+    light._paint_record = None
+    light.set_color = AsyncMock()
+    light.set_power = AsyncMock()
+    light.set_all_color_zones = AsyncMock()
+    light.get_power = AsyncMock(return_value=65535)
+    light.get_color = AsyncMock(
+        return_value=(
+            HSBK(hue=10, saturation=1.0, brightness=0.5, kelvin=3500),
+            65535,
+            "",
+        )
+    )
+    light.get_zone_count = AsyncMock(return_value=2)
+    light.get_extended_color_zones = AsyncMock(
+        return_value=[
+            HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500),
+            HSBK(hue=120, saturation=1.0, brightness=1.0, kelvin=3500),
+        ]
+    )
+    return light
+
+
+def _tiled_light(serial: str = "d073d5000097") -> MagicMock:
+    light = MagicMock(spec=MatrixLight)
+    light.serial = serial
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
+    light._state_writes = 0
+    light._paint_record = None
+    light.set_color = AsyncMock()
+    light.set_power = AsyncMock()
+    light.set_matrix_colors = AsyncMock()
+    light.get_power = AsyncMock(return_value=65535)
+    light.get_color = AsyncMock(
+        return_value=(
+            HSBK(hue=10, saturation=1.0, brightness=0.5, kelvin=3500),
+            65535,
+            "",
+        )
+    )
+    light.get_all_tile_colors = AsyncMock(
+        return_value=[[HSBK(hue=0, saturation=1.0, brightness=1.0, kelvin=3500)] * 4]
+    )
+    return light
+
+
+class TestSettleWindowNeedsACompleteRestore:
+    """Only a restore that put the light back opens the settle window."""
+
+    async def test_a_failed_color_write_leaves_the_next_capture_reading(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        first = await manager.capture_state(light)
+        light.set_color.side_effect = LifxTimeoutError("no reply")
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_failed_power_write_leaves_the_next_capture_reading(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        light.get_color.return_value = (
+            HSBK(hue=10, saturation=1.0, brightness=0.5, kelvin=3500),
+            65535,
+            "",
+        )
+        first = await manager.capture_state(light)
+        light.set_power.side_effect = LifxTimeoutError("no reply")
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_zone_fallback_to_one_color_leaves_the_next_capture_reading(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _zoned_light()
+        first = await manager.capture_state(light)
+        light.set_all_color_zones.side_effect = LifxTimeoutError("no reply")
+        await manager.restore_state(light, first)
+        light.set_color.assert_awaited_once()
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_restored_strip_opens_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _zoned_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        second = await manager.capture_state(light)
+
+        assert second == first
+        light.get_color.assert_not_called()
+
+    async def test_a_failed_tile_write_leaves_the_next_capture_reading(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _tiled_light()
+        first = await manager.capture_state(light)
+        light.set_matrix_colors.side_effect = LifxTimeoutError("no reply")
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_restored_matrix_opens_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _tiled_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        second = await manager.capture_state(light)
+
+        assert second == first
+        light.get_color.assert_not_called()
+
+    async def test_skipped_colors_after_a_power_off_leave_the_next_capture_reading(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setattr("lifx.devices.light.POWER_OFF_WAIT_SECONDS", 0.05)
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        light.get_power = AsyncMock(return_value=65535)  # never reports off
+        first = await manager.capture_state(light)
+        assert first.power is False
+        await manager.restore_state(light, first)
+        light.set_color.assert_not_called()
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_an_incomplete_restore_ends_an_earlier_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _color_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        clock.now += 1.0
+        light.set_color.side_effect = LifxTimeoutError("no reply")
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()

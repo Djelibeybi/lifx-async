@@ -93,6 +93,7 @@ from lifx.protocol.protocol_types import (
     TileEffectSkyType,
 )
 from lifx.theme import Theme, ThemeLibrary, get_theme
+from lifx.watcher import DeviceEvent, DeviceEventType, DeviceWatcher
 
 __version__ = get_version("lifx-async")  # type: ignore
 
@@ -172,6 +173,9 @@ __all__ = [
     "get_theme",
     # High-level API
     "DeviceGroup",
+    "DeviceWatcher",
+    "DeviceEvent",
+    "DeviceEventType",
     "discover",
     "discover_udp",
     "discover_mdns",
