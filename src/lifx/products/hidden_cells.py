@@ -9,9 +9,11 @@ A hidden cell is a mask, not a reshape: rendering keeps the full rectangle and
 the cells are sent as off (brightness 0) when a frame is assembled. Reads and
 state restore still cover every cell.
 
-Each family records the date it was verified on the test fleet, by painting a
-single bright color and confirming the listed cells show nothing. ``"pending"``
-marks a family whose hardware check has not been run yet.
+Each family records the date it was verified on the test fleet by painting the
+whole buffer and confirming the listed positions have no LED behind them: the
+Ceilings are round, so their corner positions do not exist; the Candle's tip
+row and the Luna's rounded corners likewise. ``"pending"`` would mark a family
+whose hardware check has not been run yet.
 
 This module must not import the product registry: ``ProductInfo`` imports it.
 """
@@ -66,7 +68,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=5,
         height=6,
         zones=frozenset({2, 3, 4}),
-        verified="pending",  # filled by the single-bright-color check
+        verified="2026-10-18",  # whole-buffer paint on the test fleet
     ),
     HiddenCellFamily(
         name="Ceiling 8x8",
@@ -74,7 +76,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=8,
         height=8,
         zones=frozenset({0, 1, 6, 7, 56, 57, 62, 63}),
-        verified="pending",  # filled by the single-bright-color check
+        verified="2026-10-18",  # whole-buffer paint on the test fleet
         uplight_zone=63,
     ),
     HiddenCellFamily(
@@ -83,7 +85,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=16,
         height=8,
         zones=frozenset({0, 1, 14, 15, 112, 113, 126, 127}),
-        verified="pending",  # filled by the single-bright-color check
+        verified="2026-10-18",  # whole-buffer paint on the test fleet
         uplight_zone=127,
     ),
     HiddenCellFamily(
@@ -92,7 +94,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=7,
         height=5,
         zones=frozenset({0, 6, 28, 34}),
-        verified="pending",  # filled by the single-bright-color check
+        verified="2026-10-18",  # whole-buffer paint on the test fleet
     ),
 )
 

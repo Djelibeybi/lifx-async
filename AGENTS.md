@@ -285,7 +285,7 @@ gh workflow run docs.yml
    - `products/`: Product registry module
      - `products/__init__.py`: Public API exports
      - `products/registry.py`: Auto-generated product database (from products.json)
-     - `products/hidden_cells.py`: Hand-maintained cells with no LED per Candle, Ceiling and Luna family (`ProductInfo.hidden_zones`); each family's `verified` field stays "pending" until the maintainer verifies it on hardware
+     - `products/hidden_cells.py`: Hand-maintained cells with no LED per Candle, Ceiling and Luna family (`ProductInfo.hidden_zones`); each family's `verified` field records the date the maintainer verified it on hardware, or "pending" until then
      - `products/generator.py`: Generator to download and parse products.json
 
 ### Device Capabilities Matrix

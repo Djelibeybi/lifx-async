@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from lifx.products import get_product
@@ -72,8 +74,10 @@ def test_ceiling_mask_keeps_the_uplight_addressable() -> None:
     assert candle.masked_zones == candle.hidden_zones
 
 
-def test_every_family_is_awaiting_hardware_verification() -> None:
-    assert {family.verified for family in HIDDEN_CELL_FAMILIES} == {"pending"}
+def test_every_family_records_its_hardware_verification_date() -> None:
+    for family in HIDDEN_CELL_FAMILIES:
+        assert family.verified != "pending"
+        date.fromisoformat(family.verified)
 
 
 def test_every_candle_in_the_registry_is_in_the_table() -> None:
