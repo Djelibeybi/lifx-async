@@ -93,6 +93,28 @@ async def _tile(mirror: MirrorLight) -> list[HSBK]:
     return (await mirror.get_all_tile_colors())[0]
 
 
+def _near(shown: HSBK, want: HSBK) -> bool:
+    """Whether a colour read mid-animation is ``want`` to within one wire unit.
+
+    Every frame restarts the tile's 75 ms transition (1.5 frames at 20 fps)
+    from the colour the device is showing, rounded to uint16. Two ring writers
+    on one tile send frames about every 25 ms, so a transition never runs past
+    a third of its length before the next restart, and the last unit of the
+    way to the target is never closed: the device reports the target to within
+    one unit per channel for as long as the frames keep coming. The emulator
+    has modelled fades this way since lifx-emulator-core 3.13.0.
+    """
+    a, b = shown.as_tuple(), want.as_tuple()
+    hue = abs(a[0] - b[0])
+    return min(hue, 65536 - hue) <= 1 and all(
+        abs(x - y) <= 1 for x, y in zip(a[1:], b[1:])
+    )
+
+
+def _near_all(shown: list[HSBK], want: list[HSBK]) -> bool:
+    return len(shown) == len(want) and all(map(_near, shown, want))
+
+
 async def _rings(mirror: MirrorLight) -> tuple[list[HSBK], list[HSBK]]:
     """The front and back rings as the tile reports them, in zone order."""
     tile = await _tile(mirror)
@@ -109,7 +131,8 @@ async def _shows(
     want_back = back if isinstance(back, list) else [back] * RING
 
     async def check() -> bool:
-        return await _rings(mirror) == (want_front, want_back)
+        front_now, back_now = await _rings(mirror)
+        return _near_all(front_now, want_front) and _near_all(back_now, want_back)
 
     await _eventually(check)
 
@@ -121,7 +144,9 @@ async def _holds(
     want_front = front if isinstance(front, list) else [front] * RING
     want_back = back if isinstance(back, list) else [back] * RING
     for _ in range(5):
-        assert await _rings(mirror) == (want_front, want_back)
+        front_now, back_now = await _rings(mirror)
+        assert _near_all(front_now, want_front), front_now
+        assert _near_all(back_now, want_back), back_now
         await asyncio.sleep(0.05)
 
 
@@ -218,7 +243,7 @@ class TestMirrorRingEffects:
             await _eventually(back_dark)
             assert not mirror.back_is_on
             assert await mirror.get_power() == 65535
-            assert (await _rings(mirror))[0] == ZONES
+            assert _near_all((await _rings(mirror))[0], ZONES)
 
             await mirror.turn_back_on()
             await _shows(mirror, ZONES, GREEN)
@@ -332,7 +357,7 @@ class TestMirrorRingEffects:
             assert not mirror.back_is_on
 
             async def front_red() -> bool:
-                return (await _rings(mirror))[0] == [RED] * RING
+                return _near_all((await _rings(mirror))[0], [RED] * RING)
 
             await _eventually(front_red)
             for _ in range(5):  # the back stays dark under the frames
