@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.12.1 (2026-10-18)
+
+### Bug Fixes
+
+- **devices**: Read StateZone replies in get_color_zones
+  ([#325](https://github.com/Djelibeybi/lifx-async/pull/325),
+  [`88982e0`](https://github.com/Djelibeybi/lifx-async/commit/88982e089e65ef662c8c2a6eb3ec3412e86a9f3f))
+
+
 ## v7.12.0 (2026-10-18)
 
 ### Features
