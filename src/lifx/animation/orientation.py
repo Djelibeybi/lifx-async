@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from functools import lru_cache
+from typing import NamedTuple
 
 
 class Orientation(IntEnum):
@@ -77,6 +78,88 @@ class Orientation(IntEnum):
         if orientation_str not in mapping:
             raise ValueError(f"Unknown orientation: {orientation_str}")
         return mapping[orientation_str]
+
+
+class OrientationAxes(NamedTuple):
+    """The orientation each accelerometer axis reads as when it dominates.
+
+    The values are the strings :meth:`Orientation.from_string` accepts.
+    """
+
+    x_pos: str
+    x_neg: str
+    y_pos: str
+    y_neg: str
+    z_pos: str
+    z_neg: str
+
+
+TILE_PRODUCT_ID = 55
+LUNA_PRODUCT_IDS = (219, 220)
+
+#: Axis maps by orientation group. Products in no group have no orientation.
+ORIENTATION_GROUPS: dict[str, OrientationAxes] = {
+    "Tile": OrientationAxes(
+        x_pos="RotatedRight",
+        x_neg="RotatedLeft",
+        y_pos="UpsideDown",
+        y_neg="Upright",
+        z_pos="FaceDown",
+        z_neg="FaceUp",
+    ),
+    "Luna": OrientationAxes(
+        x_pos="UpsideDown",
+        x_neg="Upright",
+        y_pos="FaceDown",
+        y_neg="FaceUp",
+        z_pos="RotatedLeft",
+        z_neg="RotatedRight",
+    ),
+}
+
+#: Which group each product belongs to.
+ORIENTATION_GROUP_BY_PRODUCT: dict[int, str] = {
+    TILE_PRODUCT_ID: "Tile",
+    **dict.fromkeys(LUNA_PRODUCT_IDS, "Luna"),
+}
+
+#: Date the Luna axis map was checked on a physical Luna standing upright and
+#: lying on each side. "pending" until the maintainer has run that check.
+LUNA_AXIS_MAP_VERIFIED = "pending"
+
+
+def orientation_group(product_id: int) -> str | None:
+    """Return the orientation group a product belongs to, or None."""
+    return ORIENTATION_GROUP_BY_PRODUCT.get(product_id)
+
+
+def nearest_orientation(product_id: int, x: int, y: int, z: int) -> str | None:
+    """Read an accelerometer vector on the product's own axes.
+
+    Args:
+        product_id: LIFX product ID, which picks the axis map
+        x: Accelerometer X reading
+        y: Accelerometer Y reading
+        z: Accelerometer Z reading
+
+    Returns:
+        A string for :meth:`Orientation.from_string`, or None when the product
+        is in no orientation group and so has no orientation to apply.
+    """
+    group = orientation_group(product_id)
+    if group is None:
+        return None
+    axes = ORIENTATION_GROUPS[group]
+    abs_x, abs_y, abs_z = abs(x), abs(y), abs(z)
+
+    if x == -1 and y == -1 and z == -1:
+        # Invalid data, assume right-side up.
+        return "Upright"
+    if abs_x > abs_y and abs_x > abs_z:
+        return axes.x_pos if x > 0 else axes.x_neg
+    if abs_z > abs_x and abs_z > abs_y:
+        return axes.z_pos if z > 0 else axes.z_neg
+    return axes.y_pos if y > 0 else axes.y_neg
 
 
 @lru_cache(maxsize=64)

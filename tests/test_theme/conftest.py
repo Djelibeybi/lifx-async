@@ -300,3 +300,26 @@ def ceiling_light(mock_device_factory) -> CeilingLight:
     device.get_power = AsyncMock(return_value=False)
     device.get_device_chain = AsyncMock(return_value=[])
     return device
+
+
+def _matrix_with_theme_mocks(mock_device_factory, product: int) -> MatrixLight:
+    device = mock_device_factory(MatrixLight, product=product)
+    device.set_color = AsyncMock()
+    device.set_matrix_colors = AsyncMock()
+    device.set_power = AsyncMock()
+    device.get_power = AsyncMock(return_value=False)
+    device.get_device_chain = AsyncMock(return_value=[])
+    return device
+
+
+@pytest.fixture
+def luna_light(mock_device_factory) -> MatrixLight:
+    """Create a test LIFX Luna (product 219) with mocked theme methods."""
+    return _matrix_with_theme_mocks(mock_device_factory, 219)
+
+
+@pytest.fixture
+def candle_light(mock_device_factory) -> MatrixLight:
+    """Create a test LIFX Candle (product 57), a matrix product in no orientation
+    group."""
+    return _matrix_with_theme_mocks(mock_device_factory, 57)

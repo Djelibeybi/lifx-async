@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.animation.framebuffer import FrameBuffer, TileRegion
+from lifx.animation.orientation import Orientation, build_orientation_lut
 
 
 class TestFrameBuffer:
@@ -135,6 +136,30 @@ class TestFrameBufferClassMethods:
         assert fb.canvas_width == 8
         assert fb.canvas_height == 8
         assert fb.tile_regions is None  # No tile regions for non-chain devices
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_orients_a_luna_by_its_own_axes(
+        self, mock_tile_upright
+    ) -> None:
+        """Test a Luna, which has no chain, still gets an orientation LUT."""
+        mock_tile_upright.accel_meas_x = 0
+        mock_tile_upright.accel_meas_y = 0
+        mock_tile_upright.accel_meas_z = 100  # RotatedLeft on a Luna
+        device = MagicMock()
+        device.device_chain = [mock_tile_upright]
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = False
+        device.capabilities.pid = 219
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert fb.tile_regions is not None
+        assert len(fb.tile_regions) == 1
+        assert fb.tile_regions[0].x == 0
+        assert fb.tile_regions[0].y == 0
+        assert fb.tile_regions[0].orientation_lut == build_orientation_lut(
+            8, 8, Orientation.ROTATED_270
+        )
 
     @pytest.mark.asyncio
     async def test_for_matrix_loads_capabilities_when_none(

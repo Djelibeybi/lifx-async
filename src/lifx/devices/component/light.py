@@ -968,8 +968,6 @@ class ComponentMatrixLight(MatrixLight):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write the one shared tile through the component-aware path."""
         await self._write_tile(frames[0], duration)

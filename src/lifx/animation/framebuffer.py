@@ -40,6 +40,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from lifx.animation.orientation import (
+    Orientation,
+    build_orientation_lut,
+    nearest_orientation,
+)
+
 if TYPE_CHECKING:
     from lifx.devices.light import Light
     from lifx.devices.matrix import MatrixLight, TileInfo
@@ -215,17 +221,48 @@ class FrameBuffer:
         if device.capabilities is None:
             await device.ensure_capabilities()
 
-        # Only build canvas mapping for devices with chain capability.
-        # The original LIFX Tile is the only matrix device whose reported
-        # orientation and tile positions are applied. Other matrix devices
-        # (Ceiling, Luna, Candle, Path, etc.) are fixed panels whose
-        # accelerometer readings are not used (a Luna reports RotatedLeft when
-        # standing upright).
+        # Tile positions are applied only for devices with chain capability (the
+        # original LIFX Tile). Orientation is applied for products in an
+        # orientation group: the Tile, and the Luna on its own axes. Other matrix
+        # devices (Ceiling, Candle, Path, etc.) are fixed panels whose
+        # accelerometer readings are not used.
         if device.capabilities and device.capabilities.has_chain:
             return cls._for_multi_tile(tiles, pixel_count)
         else:
-            # Single tile device - simple passthrough
             first_tile = tiles[0]
+            orientation = (
+                nearest_orientation(
+                    device.capabilities.pid,
+                    first_tile.accel_meas_x,
+                    first_tile.accel_meas_y,
+                    first_tile.accel_meas_z,
+                )
+                if device.capabilities
+                else None
+            )
+            if orientation is not None:
+                # A fixed panel with an orientation group (a Luna): one tile at
+                # the canvas origin, remapped by its own axis map.
+                lut = build_orientation_lut(
+                    first_tile.width,
+                    first_tile.height,
+                    Orientation.from_string(orientation),
+                )
+                return cls(
+                    pixel_count=pixel_count,
+                    canvas_width=first_tile.width,
+                    canvas_height=first_tile.height,
+                    tile_regions=[
+                        TileRegion(
+                            x=0,
+                            y=0,
+                            width=first_tile.width,
+                            height=first_tile.height,
+                            orientation_lut=lut,
+                        )
+                    ],
+                )
+            # Everything else - simple passthrough
             return cls(
                 pixel_count=pixel_count,
                 canvas_width=first_tile.width,
@@ -250,7 +287,6 @@ class FrameBuffer:
         Each tile contributes its own width and height to the canvas bounds, so
         a chain of mixed geometry maps correctly.
         """
-        from lifx.animation.orientation import Orientation, build_orientation_lut
         from lifx.geometry import tile_origin_pixels
 
         if not tiles:  # pragma: no cover

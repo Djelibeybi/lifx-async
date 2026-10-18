@@ -21,7 +21,11 @@ from dataclasses import InitVar, asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from lifx.animation.framebuffer import FrameBuffer
-from lifx.animation.orientation import Orientation, build_orientation_lut
+from lifx.animation.orientation import (
+    Orientation,
+    build_orientation_lut,
+    nearest_orientation,
+)
 from lifx.animation.packets import MatrixPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
@@ -1641,7 +1645,7 @@ class MatrixLight(PaintTracking, Light):
             # The canvas renders in row-major screen order, so a physically
             # rotated tile needs the same orientation remapping the animation
             # layer applies in FrameBuffer._for_multi_tile().
-            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            oriented = self._to_physical(tile, colors)
             painted.append(oriented)
 
             # Apply with appropriate timing
@@ -1657,14 +1661,46 @@ class MatrixLight(PaintTracking, Light):
             await self.set_power(True, duration=duration)
         self._record_tile_paint("theme", theme, self._shown_colors(tiles, painted))
 
+    def _tile_orientation(self, tile: TileInfo) -> str | None:
+        """The orientation to apply to a tile, or None to leave it alone.
+
+        A chain-capable device is a Tile and reads its accelerometer on the Tile
+        axes. Otherwise the product's orientation group (a Luna) decides, and a
+        product in no group is never rotated, whatever its accelerometer says.
+        """
+        if self.capabilities and self.capabilities.has_chain:
+            return tile.nearest_orientation
+        if self.capabilities is None:
+            return None
+        return nearest_orientation(
+            self.capabilities.pid,
+            tile.accel_meas_x,
+            tile.accel_meas_y,
+            tile.accel_meas_z,
+        )
+
+    def _to_physical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Remap canvas colors for the tile if its product applies orientation."""
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return colors
+        return self._orient_tile_colors(tile, colors, orientation)
+
+    def _to_logical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """Undo :meth:`_to_physical` for colors read back from the tile."""
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return colors
+        return self._unorient_tile_colors(tile, colors, orientation)
+
     @staticmethod
-    def _orient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+    def _orient_tile_colors(
+        tile: TileInfo, colors: list[HSBK], orientation_name: str | None = None
+    ) -> list[HSBK]:
         """Remap row-major canvas colours into the tile's physical orientation.
 
-        Only meaningful for chain-capable devices: the LIFX Tile is the only
-        product whose reported orientation is applied. Other matrix products
-        are fixed panels whose accelerometer readings are not used. Callers
-        must gate on ``has_chain``.
+        Only meaningful for products in an orientation group (the LIFX Tile and
+        the Luna); callers go through :meth:`_to_physical`, which skips others.
 
         Args:
             tile: Tile the colours are destined for
@@ -1675,7 +1711,9 @@ class MatrixLight(PaintTracking, Light):
             input unchanged when the tile is upright or the count does not match
             the tile's pixel grid.
         """
-        orientation = Orientation.from_string(tile.nearest_orientation)
+        orientation = Orientation.from_string(
+            orientation_name or tile.nearest_orientation
+        )
         if orientation == Orientation.RIGHT_SIDE_UP:
             return colors
 
@@ -1686,12 +1724,14 @@ class MatrixLight(PaintTracking, Light):
         return [colors[src_idx] for src_idx in lut]
 
     @staticmethod
-    def _unorient_tile_colors(tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+    def _unorient_tile_colors(
+        tile: TileInfo, colors: list[HSBK], orientation_name: str | None = None
+    ) -> list[HSBK]:
         """Map colours read back from a tile into row-major canvas order.
 
         The inverse of ``_orient_tile_colors``: a Tile reports its physical
         buffer, so a rotated Tile's readback is put back into the order a
-        caller painted it in. Callers must gate on ``has_chain``.
+        caller painted it in. Callers go through :meth:`_to_logical`.
 
         Args:
             tile: Tile the colours were read from
@@ -1702,7 +1742,9 @@ class MatrixLight(PaintTracking, Light):
             The colours in row-major screen order, or the input unchanged when
             the tile is upright.
         """
-        orientation = Orientation.from_string(tile.nearest_orientation)
+        orientation = Orientation.from_string(
+            orientation_name or tile.nearest_orientation
+        )
         if orientation == Orientation.RIGHT_SIDE_UP:
             return colors
 
@@ -1730,7 +1772,6 @@ class MatrixLight(PaintTracking, Light):
         if not tiles:
             return []
         await self.ensure_capabilities()
-        has_chain = bool(self.capabilities and self.capabilities.has_chain)
         generator = MoodGenerator(theme)
         if len(tiles) > 1:
             first = tiles[0]
@@ -1746,7 +1787,7 @@ class MatrixLight(PaintTracking, Light):
             ]
 
         async def write(duration: float) -> None:
-            await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
+            await self._write_mood_frames(tiles, frames, duration)
 
         await self._write_mood(write, power_on)
         self._record_tile_paint(
@@ -1755,7 +1796,7 @@ class MatrixLight(PaintTracking, Light):
             self._shown_colors(
                 tiles,
                 [
-                    self._orient_tile_colors(tile, colors) if has_chain else colors
+                    self._to_physical(tile, colors)
                     for tile, colors in zip(tiles, frames, strict=True)
                 ],
             ),
@@ -1767,8 +1808,6 @@ class MatrixLight(PaintTracking, Light):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write one frame per tile.
 
@@ -1777,7 +1816,7 @@ class MatrixLight(PaintTracking, Light):
         """
         self._mood_frames_writing += 1
         try:
-            await self._write_frames(tiles, frames, duration, has_chain=has_chain)
+            await self._write_frames(tiles, frames, duration)
         finally:
             self._mood_frames_writing -= 1
 
@@ -1786,12 +1825,10 @@ class MatrixLight(PaintTracking, Light):
         tiles: list[TileInfo],
         frames: list[list[HSBK]],
         duration: float,
-        *,
-        has_chain: bool,
     ) -> None:
         """Write one frame per tile, remapping a rotated Tile."""
         for tile, colors in zip(tiles, frames, strict=True):
-            oriented = self._orient_tile_colors(tile, colors) if has_chain else colors
+            oriented = self._to_physical(tile, colors)
             await self.set_matrix_colors(
                 tile.tile_index, oriented, duration=round(duration * 1000)
             )
