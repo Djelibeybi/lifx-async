@@ -25,6 +25,10 @@ from lifx.const import (
     IDLE_TIMEOUT_MULTIPLIER,
     LIFX_UDP_PORT,
 )
+from lifx.devices.base import Connectivity
+from lifx.devices.light import Light
+from lifx.devices.matrix import MatrixLight
+from lifx.devices.multizone import MultiZoneLight
 from lifx.network import connection as _connection
 from lifx.protocol.models import Serial
 
@@ -44,6 +48,12 @@ MIN_SILENCE_THRESHOLD = 30.0
 # Sweep intervals of silence in the default threshold.
 SILENCE_INTERVALS = 5
 
+# Seconds between high-frequency polls (color, power, zones, tiles).
+DEFAULT_HIGH_FREQUENCY_INTERVAL = 10.0
+
+# Seconds between low-frequency polls (label, firmware, group, location).
+DEFAULT_LOW_FREQUENCY_INTERVAL = 300.0
+
 # Events held for the async iterator before the oldest is dropped.
 DEFAULT_MAX_QUEUE_SIZE = 256
 
@@ -58,6 +68,10 @@ _TRACKED_FIELDS = (
     "host_firmware",
     "wifi_firmware",
 )
+
+# Names that exist only once polling has read them. The first reading sets the
+# baseline silently; later readings that differ are reported.
+_POLLED_FIELDS = ("color", "power", "zones", "tiles")
 
 
 class DeviceEventType(str, Enum):
@@ -104,9 +118,15 @@ def _normalise(serial: str) -> str:
     return Serial.from_string(serial).to_string()
 
 
-def _snapshot(device: Device[Any]) -> dict[str, object]:
-    """The tracked fields of ``device`` as they stand now (no network I/O)."""
+def _snapshot(
+    device: Device[Any], polled: Mapping[str, object] | None = None
+) -> dict[str, object]:
+    """The tracked fields of ``device`` as they stand now (no network I/O).
+
+    ``polled`` holds the readings polling has taken so far.
+    """
     return {
+        **(polled or {}),
         "address": (device.ip, device.port),
         "label": device.label,
         "group": device.group,
@@ -138,7 +158,21 @@ class DeviceWatcher:
     than ``silence_threshold``. The device object is kept; when it answers
     again ``ADDED`` is emitted for the same object.
 
-    The watcher only listens and discovers. It never writes color or power.
+    The watcher listens, discovers and, only when asked, reads. It never
+    writes color or power. Two optional polls are off by default:
+
+    - High-frequency polling reads color and power, plus zones on a multizone
+      light and tiles on a matrix light. A device evidenced as Thread is not
+      polled this way unless ``enable_thread`` is True, the same opt-in the
+      software effect path uses.
+    - Low-frequency polling reads label, host firmware, wifi firmware (not on
+      a Thread device, which cannot answer it), group and location.
+
+    Each poll refreshes the device's cached state and is reported as
+    ``UPDATED`` with the changed fields. A poll that fails is logged and does
+    not stop other devices or mark the device silent; silence still comes only
+    from the liveness threshold. The first reading of a field is a baseline
+    and is not reported.
 
     Example:
         ```python
@@ -161,6 +195,11 @@ class DeviceWatcher:
         device_timeout: Request timeout set on devices the watcher builds.
         max_retries: Max retries per request set on those devices.
         max_queue_size: Events held for the iterator. Must be positive.
+        high_frequency_polling: Poll color, power, zones and tiles.
+        high_frequency_interval: Seconds between those polls. Must be positive.
+        low_frequency_polling: Poll label, firmware, group and location.
+        low_frequency_interval: Seconds between those polls. Must be positive.
+        enable_thread: Also poll Thread devices at high frequency.
     """
 
     def __init__(
@@ -176,12 +215,26 @@ class DeviceWatcher:
         device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
         max_retries: int | None = DEFAULT_MAX_RETRIES,
         max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
+        high_frequency_polling: bool = False,
+        high_frequency_interval: float = DEFAULT_HIGH_FREQUENCY_INTERVAL,
+        low_frequency_polling: bool = False,
+        low_frequency_interval: float = DEFAULT_LOW_FREQUENCY_INTERVAL,
+        enable_thread: bool = False,
     ) -> None:
         if sweep_interval <= 0:
             raise ValueError("sweep_interval must be positive")
         if max_queue_size < 1:
             raise ValueError("max_queue_size must be at least 1")
+        if high_frequency_interval <= 0:
+            raise ValueError("high_frequency_interval must be positive")
+        if low_frequency_interval <= 0:
+            raise ValueError("low_frequency_interval must be positive")
         self.sweep_interval = sweep_interval
+        self.high_frequency_polling = high_frequency_polling
+        self.high_frequency_interval = high_frequency_interval
+        self.low_frequency_polling = low_frequency_polling
+        self.low_frequency_interval = low_frequency_interval
+        self.enable_thread = enable_thread
         self.silence_threshold = (
             max(MIN_SILENCE_THRESHOLD, SILENCE_INTERVALS * sweep_interval)
             if silence_threshold is None
@@ -199,6 +252,10 @@ class DeviceWatcher:
         self._devices: dict[str, Device[Any]] = {}
         self._snapshots: dict[str, dict[str, object]] = {}
         self._heard: dict[str, float] = {}
+        self._polled: dict[str, dict[str, object]] = {}
+        self._next_high: dict[str, float] = {}
+        self._next_low: dict[str, float] = {}
+        self._polled_now: set[str] = set()
         self._silent: set[str] = set()
         self._queue: deque[DeviceEvent] = deque()
         self._wakeup = asyncio.Event()
@@ -207,6 +264,7 @@ class DeviceWatcher:
         self._sweeps = 0
         self._sweep_lock = asyncio.Lock()
         self._task: asyncio.Task[None] | None = None
+        self._poll_task: asyncio.Task[None] | None = None
         self._open = False
         self._closed = False
 
@@ -314,6 +372,8 @@ class DeviceWatcher:
         self._open = True
         await self.sweep()
         self._task = asyncio.ensure_future(self._run())
+        if self.high_frequency_polling or self.low_frequency_polling:
+            self._poll_task = asyncio.ensure_future(self._run_polls())
         return self
 
     async def __aexit__(
@@ -324,10 +384,11 @@ class DeviceWatcher:
     ) -> None:
         """Stop sweeping. Device objects stay open for whoever holds them."""
         self._closed = True
-        task, self._task = self._task, None
-        if task is not None:
+        tasks = [t for t in (self._task, self._poll_task) if t is not None]
+        self._task = self._poll_task = None
+        for task in tasks:
             task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+        await asyncio.gather(*tasks, return_exceptions=True)
         self._wakeup.set()
 
     async def _run(self) -> None:
@@ -337,6 +398,23 @@ class DeviceWatcher:
                 await self.sweep()
             except Exception:
                 _LOGGER.warning("device watcher sweep failed", exc_info=True)
+
+    async def _run_polls(self) -> None:
+        """Poll between sweeps, so a poll interval shorter than a sweep holds."""
+        intervals = []
+        if self.high_frequency_polling:
+            intervals.append(self.high_frequency_interval)
+        if self.low_frequency_polling:
+            intervals.append(self.low_frequency_interval)
+        tick = min(intervals)
+        while True:
+            await asyncio.sleep(tick)
+            try:
+                async with self._sweep_lock:
+                    await self._poll_devices()
+                    self._reconcile()
+            except Exception:
+                _LOGGER.warning("device watcher poll failed", exc_info=True)
 
     # ---- sweeping -----------------------------------------------------
 
@@ -392,16 +470,89 @@ class DeviceWatcher:
         self._heard[serial] = self._now()
         if serial not in self._devices:
             self._devices[serial] = device
-            self._snapshots[serial] = _snapshot(device)
+            self._snapshots[serial] = _snapshot(device, self._polled.get(serial))
             self._emit(DeviceEventType.ADDED, serial)
 
     async def _poll_devices(self) -> None:
-        """Seam for opt-in periodic per-device refresh.
+        """Read the state the caller asked to keep fresh, for devices that are due.
 
         Runs once per sweep, after discovery and before change detection, so
-        anything it refreshes on a held device is reported as ``UPDATED`` by
-        the same sweep. The watcher sends nothing here by default.
+        whatever it refreshes on a held device is reported as ``UPDATED`` by
+        the same sweep. With both polls off it sends nothing. Devices are
+        polled concurrently; a failure on one never reaches the others.
         """
+        if not (self.high_frequency_polling or self.low_frequency_polling):
+            return
+        now = self._now()
+        jobs = []
+        for serial, device in self._devices.items():
+            if serial in self._silent:
+                continue
+            if self.high_frequency_polling and now >= self._next_high.get(
+                serial, float("-inf")
+            ):
+                self._next_high[serial] = now + self.high_frequency_interval
+                self._polled_now.add(serial)
+                jobs.append(self._poll_high(serial, device))
+            if self.low_frequency_polling and now >= self._next_low.get(
+                serial, float("-inf")
+            ):
+                self._next_low[serial] = now + self.low_frequency_interval
+                self._polled_now.add(serial)
+                jobs.append(self._poll_low(device))
+        for result in await asyncio.gather(*jobs, return_exceptions=True):
+            if isinstance(result, BaseException):
+                _LOGGER.warning("device watcher poll failed", exc_info=result)
+        for serial in self._polled_now:
+            self._baseline_unread_fields(serial)
+        self._polled_now.clear()
+
+    def _baseline_unread_fields(self, serial: str) -> None:
+        """Adopt first readings silently.
+
+        A field that was never read (``None``) and is read by a poll for the
+        first time has no previous value to change from, so it is a baseline
+        and not an update.
+        """
+        current = _snapshot(self._devices[serial], self._polled.get(serial))
+        snapshot = self._snapshots[serial]
+        for name, value in snapshot.items():
+            if value is None:
+                snapshot[name] = current[name]
+
+    async def _poll_high(self, serial: str, device: Device[Any]) -> None:
+        """Read color and power, plus zones or tiles, and record the readings."""
+        if (
+            device._evidenced_connectivity() is Connectivity.THREAD
+            and not self.enable_thread
+        ):
+            return
+        if not isinstance(device, Light):
+            return
+        polled = self._polled.setdefault(serial, {})
+        color, power, _label = await device.get_color()
+        polled["color"] = color
+        polled["power"] = power
+        if isinstance(device, MultiZoneLight):
+            polled["zones"] = tuple(await device.get_all_color_zones())
+        elif isinstance(device, MatrixLight):
+            polled["tiles"] = tuple(
+                tuple(tile) for tile in await device.get_all_tile_colors()
+            )
+
+    async def _poll_low(self, device: Device[Any]) -> None:
+        """Refresh label, firmware, group and location in the device's cache."""
+        queries = [
+            device.get_label(),
+            device.get_host_firmware(),
+            device.get_group(),
+            device.get_location(),
+        ]
+        if device._evidenced_connectivity() is not Connectivity.THREAD:
+            queries.append(device.get_wifi_firmware())
+        for result in await asyncio.gather(*queries, return_exceptions=True):
+            if isinstance(result, BaseException):
+                _LOGGER.warning("device watcher poll failed", exc_info=result)
 
     def _now(self) -> float:
         return _connection.monotonic_now()
@@ -419,7 +570,9 @@ class DeviceWatcher:
             if serial in self._silent:
                 if not silent:
                     self._silent.discard(serial)
-                    self._snapshots[serial] = _snapshot(self._devices[serial])
+                    self._snapshots[serial] = _snapshot(
+                        self._devices[serial], self._polled.get(serial)
+                    )
                     self._emit(DeviceEventType.ADDED, serial)
                 continue
             if silent:
@@ -430,12 +583,12 @@ class DeviceWatcher:
 
     def _report_changes(self, serial: str) -> None:
         old = self._snapshots[serial]
-        new = _snapshot(self._devices[serial])
+        new = _snapshot(self._devices[serial], self._polled.get(serial))
         changes = {
             name: (old[name], new[name])
-            for name in _TRACKED_FIELDS
-            if old[name] != new[name]
+            for name in (*_TRACKED_FIELDS, *_POLLED_FIELDS)
+            if name in old and name in new and old[name] != new[name]
         }
+        self._snapshots[serial] = new
         if changes:
-            self._snapshots[serial] = new
             self._emit(DeviceEventType.UPDATED, serial, changes)

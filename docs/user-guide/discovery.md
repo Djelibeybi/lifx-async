@@ -207,9 +207,47 @@ the connection's `last_response_at`, so a device you are talking to is never
 removed while it answers, even if sweeps miss it. A silent device's object is
 kept. When it answers again `ADDED` is emitted for the same object.
 
-The watcher listens and discovers only. It never writes color or power, and it
-closes no device object: leaving the `async with` block stops the sweeps and
-leaves the devices you hold open for you.
+### State polling
+
+By default the watcher sends nothing but discovery traffic. Two optional polls
+keep device state fresh without a loop of your own. Each has its own flag and
+interval, and both are off by default.
+
+```python
+async with DeviceWatcher(
+    high_frequency_polling=True,    # color and power, plus zones or tiles
+    high_frequency_interval=10.0,   # seconds, the default
+    low_frequency_polling=True,     # label, firmware, group, location
+    low_frequency_interval=300.0,   # seconds, the default
+) as watcher:
+    async for event in watcher:
+        ...
+```
+
+| Flag | Reads | Reported field names |
+|------|-------|----------------------|
+| `high_frequency_polling` | color and power; zones on a multizone light; tiles on a matrix light | `color`, `power`, `zones`, `tiles` |
+| `low_frequency_polling` | label, host firmware, wifi firmware, group, location | `label`, `host_firmware`, `wifi_firmware`, `group`, `location` |
+
+A poll refreshes the device's cached state and any difference from the previous
+reading is an `UPDATED` event whose `changes` names the fields. The first
+reading of a field is a baseline and is not reported. Polls run on their own
+timers, so an interval shorter than `sweep_interval` is honored. A device that
+is silent is not polled.
+
+A device evidenced as Thread gets no high-frequency polling, because a Thread
+mesh is not built for that traffic. Pass `enable_thread=True`, the same opt-in
+the software effect path uses, to poll it anyway. Low-frequency polling still
+reads a Thread device, except for wifi firmware, which Thread firmware cannot
+answer.
+
+A poll that fails is logged. It does not stop the polls of other devices and
+does not by itself mark the device silent; only the silence threshold does
+that. Polling only reads.
+
+The watcher listens, discovers and, when asked, polls. It never writes color or
+power, and it closes no device object: leaving the `async with` block stops the
+sweeps and polls and leaves the devices you hold open for you.
 
 ## Choosing a discovery method
 
