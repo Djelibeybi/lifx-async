@@ -1,8 +1,8 @@
 """Tests for the SoftAP TLS client against an in-process fake access point.
 
-No test here unpacks a ``Wifi.SetAccessPoint`` while ``caplog`` captures at
-DEBUG: ``Packet.unpack`` logs every field, which would leak the password into
-the captured log text. Assertions are made on raw bytes instead.
+Assertions are made on the raw bytes the fake access point receives, never by
+unpacking a ``Wifi.SetAccessPoint``: the client itself never unpacks anything,
+and the no-leak test below must observe exactly what the client logs.
 """
 
 from __future__ import annotations
