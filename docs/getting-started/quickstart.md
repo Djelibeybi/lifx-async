@@ -208,6 +208,37 @@ purple = HSBK.from_rgb(0.5, 0.0, 0.5)
 await light.set_color(purple)
 ```
 
+### Color temperature range
+
+Every product has its own color temperature range, read from the product
+registry for the light's current firmware: `light.min_kelvin` and
+`light.max_kelvin`. Many newer lights widen from 1500-9000 K to 1000-10000 K
+after a firmware upgrade.
+
+A color you pass to a write is checked against that range. A kelvin outside
+it raises `ValueError`, naming the light and its range, and nothing is sent:
+
+```python
+from lifx import HSBK
+
+# On a light with a 2500-9000 K range
+await light.set_color(HSBK(0, 0, 1.0, 1500))
+# ValueError: Kelvin 1500 is outside the 2500-9000 range of d073d5...
+```
+
+This covers `set_color()`, `set_kelvin()`, waveforms such as `pulse()` and
+`breathe()`, zone and tile writes, the Ceiling and Mirror component writes and
+`DeviceGroup` writes. A group checks every light before it sends to any, so one
+light with a narrower range does not leave the others already changed. Kelvin
+0, which lights report for a color with no white component, is always
+accepted. When the range is not yet known, any value from 1000 to 10000 is
+accepted.
+
+Colors the library generates are clamped into the range instead of refused, so
+they paint on every product. That covers themes, moods, software effects and
+the palettes of firmware effects such as Morph. A theme that holds 1500 K
+paints as 2500 K on a light that stops at 2500 K.
+
 ### Waveforms
 
 Create visual waveforms:

@@ -203,7 +203,7 @@ class EffectPulse(LIFXEffect):
         """
         try:
             await light.set_waveform(
-                color=color,
+                color=light._clamp_color(color),
                 period=self.period,
                 cycles=self.cycles,
                 waveform=self.waveform,

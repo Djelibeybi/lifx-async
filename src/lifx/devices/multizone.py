@@ -785,9 +785,10 @@ class MultiZoneLight(PaintTracking, Light):
             ```
         """
         if start < 0 or end < start:
-            raise ValueError(
-                f"Invalid zone range: {start}-{end}"
-            )  # Convert to protocol HSBK
+            raise ValueError(f"Invalid zone range: {start}-{end}")
+        self._check_colors(color)
+
+        # Convert to protocol HSBK
         protocol_color = color.to_protocol()
 
         # Convert duration to milliseconds
@@ -883,6 +884,8 @@ class MultiZoneLight(PaintTracking, Light):
             raise ValueError(f"Too many colors: {len(colors)} (max 82 per request)")
         if len(colors) == 0:
             raise ValueError("Colors list cannot be empty")
+
+        self._check_colors(*colors)
 
         # Convert to protocol HSBK
         protocol_colors = [color.to_protocol() for color in colors]
@@ -1427,6 +1430,9 @@ class MultiZoneLight(PaintTracking, Light):
         if self.capabilities is None:
             await self._ensure_capabilities()
 
+        # Checked before the first packet, so a rejected window sends nothing
+        self._check_colors(*colors[start : end + 1])
+
         # Only the window is transmitted. Note the run-length encoding below
         # runs over the window rather than the whole list, so colors just
         # outside it cannot extend a run and spill the write onto zones the
@@ -1517,7 +1523,7 @@ class MultiZoneLight(PaintTracking, Light):
 
         # Use proper multizone generator with blending
         generator = MultiZoneGenerator()
-        colors = generator.get_theme_colors(theme, zone_count)
+        colors = self._clamp_colors(generator.get_theme_colors(theme, zone_count))
 
         # Check if light is on
         is_on = await self.get_power()
@@ -1544,7 +1550,9 @@ class MultiZoneLight(PaintTracking, Light):
     ) -> list[list[HSBK]]:
         """Paint the mood across every zone of the strip."""
         zone_count = await self.get_zone_count()
-        colors = MoodGenerator(theme).get_multizone_colors(zone_count, brightness)
+        colors = self._clamp_colors(
+            MoodGenerator(theme).get_multizone_colors(zone_count, brightness)
+        )
         await self._write_mood(
             lambda duration: self.set_all_color_zones(colors, duration=duration),
             power_on,

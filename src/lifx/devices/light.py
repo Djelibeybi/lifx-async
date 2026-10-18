@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,6 +15,7 @@ from lifx.animation.packets import LightPacketGenerator, PacketGenerator
 from lifx.color import HSBK
 from lifx.const import (
     INVALID_AMBIENT_LIGHT_RESPONSE,
+    KELVIN_SATURATED,
     MAX_BRIGHTNESS,
     MAX_HUE,
     MAX_KELVIN,
@@ -403,6 +404,8 @@ class Light(Device[LightState]):
             await light.set_color(HSBK.from_rgb(0.0, 0.0, 1.0), duration=2.0)
             ```
         """
+        self._check_colors(color)
+
         # Convert to protocol HSBK
         protocol_color = color.to_protocol()
 
@@ -491,7 +494,8 @@ class Light(Device[LightState]):
             duration: Transition duration in seconds (default 0.0)
 
         Raises:
-            ValueError: If kelvin is out of range
+            ValueError: If kelvin is outside the 1000-10000 range, or outside
+                the range of this light's product when that is known
             LifxDeviceNotFoundError: If device is not connected
             LifxTimeoutError: If device does not respond
 
@@ -835,6 +839,8 @@ class Light(Device[LightState]):
                 f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
             )
 
+        self._check_colors(color)
+
         # Convert to protocol values
         protocol_color = color.to_protocol()
         period_ms = int(period * 1000)
@@ -958,6 +964,9 @@ class Light(Device[LightState]):
             raise ValueError(
                 f"Skew ratio must be between 0.0 and 1.0, got {skew_ratio}"
             )
+
+        if set_kelvin:
+            self._check_colors(color)
 
         # Convert to protocol values
         protocol_color = color.to_protocol()
@@ -1087,6 +1096,72 @@ class Light(Device[LightState]):
             transient=True,
         )
 
+    def _kelvin_range(self) -> tuple[int, int] | None:
+        """The firmware-resolved kelvin range, or None when it is not known."""
+        low, high = self.min_kelvin, self.max_kelvin
+        if low is None or high is None:
+            return None
+        return low, high
+
+    def _check_colors(self, *colors: HSBK) -> None:
+        """Reject a caller-supplied colour outside this light's kelvin range.
+
+        This is the one validation point for caller writes. Kelvin 0 (no white
+        component) always passes, and an unknown range leaves only the
+        1000-10000 check that ``HSBK`` already makes.
+
+        Raises:
+            ValueError: If a colour's kelvin is outside the range
+        """
+        bounds = self._kelvin_range()
+        if bounds is None:
+            return
+        low, high = bounds
+        for color in colors:
+            if color.kelvin != KELVIN_SATURATED and not low <= color.kelvin <= high:
+                raise ValueError(
+                    f"Kelvin {color.kelvin} is outside the {low}-{high} range "
+                    f"of {self.serial}"
+                )
+
+    def _clamp_color(self, color: HSBK) -> HSBK:
+        """Clamp a library-generated colour into this light's kelvin range.
+
+        Kelvin 0 is kept, and a colour already in range is returned as is.
+        """
+        bounds = self._kelvin_range()
+        if bounds is None or color.kelvin == KELVIN_SATURATED:
+            return color
+        kelvin = min(max(color.kelvin, bounds[0]), bounds[1])
+        return color if kelvin == color.kelvin else color.with_kelvin(kelvin)
+
+    def _clamp_colors(self, colors: Sequence[HSBK]) -> list[HSBK]:
+        """Clamp every library-generated colour in ``colors``."""
+        return [self._clamp_color(color) for color in colors]
+
+    def _clamp_frame(
+        self, frame: list[tuple[int, int, int, int]]
+    ) -> list[tuple[int, int, int, int]]:
+        """Clamp a software effect frame of protocol tuples into the range.
+
+        Args:
+            frame: ``(hue, saturation, brightness, kelvin)`` per pixel
+
+        Returns:
+            ``frame`` itself when the range is unknown or every kelvin is in
+            range, otherwise a clamped copy. Kelvin 0 is kept.
+        """
+        bounds = self._kelvin_range()
+        if bounds is None:
+            return frame
+        low, high = bounds
+        if all(k == KELVIN_SATURATED or low <= k <= high for _, _, _, k in frame):
+            return frame
+        return [
+            (h, s, b, k if k == KELVIN_SATURATED else min(max(k, low), high))
+            for h, s, b, k in frame
+        ]
+
     # Cached value properties
     @property
     def min_kelvin(self) -> int | None:
@@ -1150,7 +1225,7 @@ class Light(Device[LightState]):
             return
 
         # Select a random color from theme
-        color = theme.random()
+        color = self._clamp_color(theme.random())
 
         # Check if light is on
         is_on = await self.get_power()
@@ -1289,6 +1364,7 @@ class Light(Device[LightState]):
         color = bulb_color
         if color is None:
             color = MoodGenerator(theme).get_bulb_colors([brightness])[0]
+        color = self._clamp_color(color)
         await self._write_mood(
             lambda duration: self.set_color(color, duration=duration), power_on
         )

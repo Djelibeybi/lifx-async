@@ -495,6 +495,8 @@ def _light() -> MagicMock:
     light = MagicMock()
     light.serial = "d073d5000001"
     light.set_color = AsyncMock()
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_frame.side_effect = lambda frame: frame
     return light
 
 
@@ -661,6 +663,23 @@ class TestColorloopComponent:
         writer.send_frame.assert_called_once_with(
             [_hue_at(1.0)], duration_ms=700, settled=True
         )
+
+    def test_a_slot_target_is_clamped_into_the_lights_range(self) -> None:
+        effect = _loop()
+        effect._initial_colors = [
+            HSBK(hue=120, saturation=1.0, brightness=0.8, kelvin=1500)
+        ]
+        light = _light()
+        light._clamp_frame.side_effect = lambda frame: [
+            (h, s, b, max(k, 2500)) for h, s, b, k in frame
+        ]
+        effect.participants = [light]
+        writer = _slot_writer()
+
+        effect._deliver(0, writer, [_hue_at(0.0)], _ctx(0.0), False)
+
+        sent = writer.send_frame.call_args.args[0]
+        assert [k for _, _, _, k in sent] == [2500]
 
     def test_a_held_fade_on_wifi_is_streamed(self) -> None:
         effect = _loop()
