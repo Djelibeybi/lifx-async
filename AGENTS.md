@@ -483,7 +483,9 @@ Local generator quirks:
   injects them, each only while absent, so an upstream definition would win unchanged. It is the
   only locally injected packet. The layout comes from two third-party sources, lifxjs `Protocol.md`
   and tserong's `onboard.py`. The fields are bytes, as `label` is on other packets, and the
-  validator checks that the field sizes sum to the declared 98 bytes
+  validator checks that the field sizes sum to the declared 98 bytes.
+  The `Password` field carries `"sensitive": True`, so it is excluded from the dataclass repr and
+  redacted in the `Packet.unpack()` debug log
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 

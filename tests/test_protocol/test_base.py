@@ -87,3 +87,14 @@ class TestPacketUnpackDebugGuard:
                 mock_asdict.assert_called_once()
             finally:
                 logger.setLevel(original_level)
+
+
+class TestPacketUnpackLogsNonSensitiveValues:
+    """Packets without sensitive fields log their values unchanged."""
+
+    def test_values_logged_verbatim(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.DEBUG, logger="lifx.protocol.base"):
+            packets.Device.SetLabel.unpack(b"kitchen".ljust(32, b"\0"))
+
+        assert "kitchen" in caplog.text
+        assert "<redacted>" not in caplog.text

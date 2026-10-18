@@ -12,7 +12,7 @@ Each packet inherits from base Packet class which provides generic pack/unpack.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
 from lifx.protocol.base import Packet
@@ -1381,7 +1381,12 @@ class Wifi(Packet):
         _fields: ClassVar[list[dict[str, Any]]] = [
             {"name": "Interface", "type": "<WifiInterface>", "size_bytes": 1},
             {"name": "Ssid", "type": "[32]byte", "size_bytes": 32},
-            {"name": "Password", "type": "[64]byte", "size_bytes": 64},
+            {
+                "name": "Password",
+                "type": "[64]byte",
+                "size_bytes": 64,
+                "sensitive": True,
+            },
             {"name": "Security", "type": "<WifiSecurity>", "size_bytes": 1},
         ]
 
@@ -1392,7 +1397,7 @@ class Wifi(Packet):
 
         interface: WifiInterface
         ssid: bytes
-        password: bytes
+        password: bytes = field(repr=False)
         security: WifiSecurity
 
 
