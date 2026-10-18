@@ -123,9 +123,10 @@ ORIENTATION_GROUP_BY_PRODUCT: dict[int, str] = {
     **dict.fromkeys(LUNA_PRODUCT_IDS, "Luna"),
 }
 
-#: Date the Luna axis map was checked on a physical Luna standing upright and
-#: lying on each side. "pending" until the maintainer has run that check.
-LUNA_AXIS_MAP_VERIFIED = "pending"
+#: Date the Luna axis map was checked on a physical Luna: upright, on each
+#: side, upside down, face up and face down all read as the matching
+#: orientation. "pending" would mean the maintainer has not run that check.
+LUNA_AXIS_MAP_VERIFIED = "2026-10-18"
 
 
 def orientation_group(product_id: int) -> str | None:
