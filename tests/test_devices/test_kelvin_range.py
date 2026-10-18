@@ -278,6 +278,8 @@ def _component(device: Any, product: int, size: int) -> Any:
     _ranged(device, caps=ProductCapability.MATRIX)
     device._version = MagicMock()
     device._version.product = product
+    # The Ceiling uplight zone is derived from the reported tile width.
+    device._device_chain = [MagicMock(width=8)]
     device._state = MagicMock()
     device._state.power = 65535
     for name in (
