@@ -1711,3 +1711,132 @@ class TestMorphLongPalette:
         palette = [HSBK(h, 1.0, 1.0, 3500) for h in (0, 120, 240)]
         await matrix_light.set_effect(FirmwareEffect.MORPH, speed=3.0, palette=palette)
         assert matrix_light._tile_effect.palette == palette
+
+
+class TestSunsetSoftOff:
+    """Sunset takes a soft-off flag in the byte Clouds uses for saturation."""
+
+    # Product 176 (Ceiling) has the matrix capability.
+    MATRIX_PRODUCT = 176
+
+    @classmethod
+    def _matrix_light(cls, mock_device_factory) -> MatrixLight:
+        matrix = mock_device_factory(MatrixLight)
+        matrix._capabilities = get_product(cls.MATRIX_PRODUCT)
+        matrix.get_host_firmware = AsyncMock(
+            return_value=FirmwareInfo(build=0, version_major=4, version_minor=4)
+        )
+        return matrix
+
+    @staticmethod
+    def _sent_parameter_bytes(matrix: MatrixLight) -> bytes:
+        sent = matrix.connection.request.call_args[0][0]
+        return sent.settings.parameter.pack()
+
+    @pytest.mark.parametrize(("soft_off", "byte"), [(True, 1), (False, 0)])
+    async def test_sunset_sends_flag_at_offset_4(
+        self, mock_device_factory, soft_off: bool, byte: int
+    ) -> None:
+        matrix = self._matrix_light(mock_device_factory)
+        await matrix.set_effect(
+            FirmwareEffect.SKY,
+            speed=3.0,
+            sky_type=TileEffectSkyType.SUNSET,
+            soft_off=soft_off,
+        )
+        assert self._sent_parameter_bytes(matrix)[4] == byte
+        assert matrix._tile_effect.soft_off is soft_off
+
+    @pytest.mark.parametrize(
+        ("effect_type", "sky_type"),
+        [
+            (FirmwareEffect.SKY, TileEffectSkyType.CLOUDS),
+            (FirmwareEffect.SKY, TileEffectSkyType.SUNRISE),
+            (FirmwareEffect.MORPH, TileEffectSkyType.SUNSET),
+            (FirmwareEffect.FLAME, TileEffectSkyType.SUNSET),
+        ],
+    )
+    async def test_soft_off_elsewhere_raises_and_sends_nothing(
+        self, mock_device_factory, effect_type, sky_type
+    ) -> None:
+        matrix = self._matrix_light(mock_device_factory)
+        matrix.connection.request.reset_mock()
+        with pytest.raises(ValueError, match="soft_off"):
+            await matrix.set_effect(
+                effect_type,
+                speed=3.0,
+                palette=[HSBK(0, 1.0, 1.0, 3500)],
+                sky_type=sky_type,
+                soft_off=True,
+            )
+        matrix.connection.request.assert_not_called()
+        matrix.get_host_firmware.assert_not_called()
+
+    def test_model_rejects_soft_off_for_clouds(self) -> None:
+        with pytest.raises(ValueError, match="soft_off"):
+            MatrixEffect(
+                effect_type=FirmwareEffect.SKY,
+                speed=1000,
+                sky_type=TileEffectSkyType.CLOUDS,
+                soft_off=True,
+            )
+
+    @staticmethod
+    def _state_effect(
+        sky_type: TileEffectSkyType, byte: int
+    ) -> packets.Tile.StateEffect:
+        return packets.Tile.StateEffect(
+            settings=TileEffectSettings(
+                instanceid=1,
+                effect_type=FirmwareEffect.SKY,
+                speed=1000,
+                duration=0,
+                parameter=TileEffectParameter(
+                    sky_type=sky_type,
+                    cloud_saturation_min=byte,
+                    cloud_saturation_max=0,
+                ),
+                palette_count=0,
+                palette=[],
+            )
+        )
+
+    async def test_get_effect_reports_soft_off_for_sunset(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        matrix_light.connection.request.return_value = self._state_effect(
+            TileEffectSkyType.SUNSET, 1
+        )
+        effect = await matrix_light.get_effect()
+        assert effect.soft_off is True
+        assert effect.cloud_saturation_min == 0
+
+    async def test_get_effect_reports_soft_off_clear_for_sunset(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        matrix_light.connection.request.return_value = self._state_effect(
+            TileEffectSkyType.SUNSET, 0
+        )
+        effect = await matrix_light.get_effect()
+        assert effect.soft_off is False
+
+    async def test_get_effect_clouds_keeps_saturation(
+        self, matrix_light: MatrixLight
+    ) -> None:
+        matrix_light.connection.request.return_value = self._state_effect(
+            TileEffectSkyType.CLOUDS, 1
+        )
+        effect = await matrix_light.get_effect()
+        assert effect.soft_off is False
+        assert effect.cloud_saturation_min == 1
+
+    @pytest.mark.emulator
+    async def test_emulated_sunset_round_trip(self, ceiling_device) -> None:
+        async with ceiling_device as matrix:
+            await matrix.set_effect(
+                FirmwareEffect.SKY,
+                speed=2.0,
+                sky_type=TileEffectSkyType.SUNSET,
+                soft_off=True,
+            )
+            assert (await matrix.get_effect()).soft_off is True
