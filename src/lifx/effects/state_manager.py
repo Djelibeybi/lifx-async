@@ -317,7 +317,7 @@ class DeviceStateManager:
             # capabilities and chunks past the 82-color extended limit, so a
             # strip longer than that restores instead of raising ValueError.
             await light.set_all_color_zones(
-                zone_colors,
+                light._clamp_colors(zone_colors),
                 duration=0.0,
                 apply=MultiZoneApplicationRequest.APPLY,
             )
@@ -374,7 +374,9 @@ class DeviceStateManager:
         """
         try:
             for tile_index, colors in enumerate(tile_colors):
-                await light.set_matrix_colors(tile_index, colors, duration=0)
+                await light.set_matrix_colors(
+                    tile_index, light._clamp_colors(colors), duration=0
+                )
             await asyncio.sleep(ZONE_UPDATE_SETTLE_DELAY)
             return True
         except Exception as e:
@@ -397,7 +399,7 @@ class DeviceStateManager:
             color: HSBK color to restore
         """
         try:
-            await light.set_color(color, duration=0.0)
+            await light.set_color(light._clamp_color(color), duration=0.0)
             await asyncio.sleep(COLOR_UPDATE_SETTLE_DELAY)  # Let color update
         except Exception as e:
             _LOGGER.warning(

@@ -297,6 +297,8 @@ def _mock_matrix() -> MagicMock:
     light.set_matrix_colors = AsyncMock()
     light.set_color = AsyncMock()
     light.set_power = AsyncMock()
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
     return light
 
 
@@ -348,6 +350,7 @@ async def test_component_light_without_state_restores_tile_and_power():
 
 async def test_non_matrix_light_still_gets_a_startup_colour():
     light = MagicMock(spec=Light)
+    light._clamp_color.side_effect = lambda color: color
     light.get_power = AsyncMock(return_value=False)
     light.set_color = AsyncMock()
     light.set_power = AsyncMock()

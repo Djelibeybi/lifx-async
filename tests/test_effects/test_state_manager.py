@@ -23,6 +23,8 @@ def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
     return light
 
 
@@ -31,6 +33,7 @@ def mock_multizone_light() -> MagicMock:
     """Create a mock multizone light device."""
     light = MagicMock(spec=MultiZoneLight)
     light.serial = "d073d5abcdef"
+    light._clamp_colors.side_effect = lambda colors: colors
     light.capabilities = MagicMock()
     return light
 
@@ -271,6 +274,7 @@ async def test_restore_state_multizone_chunks_past_the_extended_limit(
     light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
     light._capabilities = MagicMock()
     light._capabilities.has_extended_multizone = True
+    light._capabilities.temperature_range = None
     light._zone_count = 128
     light.set_extended_color_zones = AsyncMock()
     light.set_color = AsyncMock()
@@ -396,6 +400,7 @@ async def test_restore_state_multizone_keeps_its_zones(state_manager) -> None:
     light = MultiZoneLight(serial="d073d5abcdef", ip="192.168.1.100")
     light._capabilities = MagicMock()
     light._capabilities.has_extended_multizone = True
+    light._capabilities.temperature_range = None
     light._zone_count = 4
     zone_colors = [
         HSBK(hue=i * 90, saturation=1.0, brightness=0.8, kelvin=3500) for i in range(4)

@@ -463,12 +463,28 @@ class DeviceGroup:
         """
         await asyncio.gather(*(light.set_power(on, duration) for light in self.lights))
 
+    def _check_colors(self, color: HSBK) -> None:
+        """Reject a colour any light in the group cannot show.
+
+        Checked for every light before the first packet, so one light with a
+        narrower kelvin range does not leave the rest already changed.
+
+        Raises:
+            ValueError: If the color is outside a light's kelvin range
+        """
+        for light in self.lights:
+            light._check_colors(color)
+
     async def set_color(self, color: HSBK, duration: float = 0.0) -> None:
         """Set color for all Light devices in the group.
 
         Args:
             color: HSBK color to set
             duration: Transition duration in seconds (default 0.0)
+
+        Raises:
+            ValueError: If the color's kelvin is outside the range of any light
+                in the group. Nothing is sent to any light.
 
         Example:
             ```python
@@ -479,6 +495,7 @@ class DeviceGroup:
             await group.set_color(HSBK.from_rgb(1.0, 0.0, 0.0), duration=2.0)
             ```
         """
+        self._check_colors(color)
         await asyncio.gather(
             *(light.set_color(color, duration) for light in self.lights)
         )
@@ -522,6 +539,7 @@ class DeviceGroup:
             await group.pulse(Colors.RED, period=1.0, cycles=1.0)
             ```
         """
+        self._check_colors(color)
         await asyncio.gather(
             *(light.pulse(color, period, cycles) for light in self.lights)
         )

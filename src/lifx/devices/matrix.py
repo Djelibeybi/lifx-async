@@ -966,6 +966,7 @@ class MatrixLight(PaintTracking, Light):
             raise ValueError(f"y coordinate must be non-negative, got {y}")
         if width <= 0:
             raise ValueError(f"width must be positive, got {width}")
+        self._check_colors(*colors)
 
         _LOGGER.debug(
             "Setting 64 zones on tile %d (x=%d, y=%d, width=%d, fb=%d, "
@@ -1133,6 +1134,9 @@ class MatrixLight(PaintTracking, Light):
             raise ValueError(
                 f"Color count mismatch: expected {tile.total_zones}, got {len(colors)}"
             )
+
+        # Checked before the first packet, so a rejected tile sends nothing
+        self._check_colors(*colors)
 
         # Check if all colors are the same (uint16 wire equality). The shortcut
         # below sends a device-wide SetColor, so it is only safe when the device
@@ -1536,6 +1540,12 @@ class MatrixLight(PaintTracking, Light):
             # size validation as a caller-supplied one.
             effect = replace(effect, palette=await self._derive_morph_palette())
 
+        # A firmware palette is clamped into the product's range, never refused
+        if effect.palette is not None:
+            clamped = self._clamp_colors(effect.palette)
+            if clamped != effect.palette:
+                effect = replace(effect, palette=clamped)
+
         # Convert to protocol format
         proto_palette = []
         palette_count = 0
@@ -1629,7 +1639,9 @@ class MatrixLight(PaintTracking, Light):
             generator = MatrixGenerator.from_tiles(tiles)
         else:
             generator = MatrixGenerator([((0, 0), (t.width, t.height)) for t in tiles])
-        tile_colors = generator.get_theme_colors(theme)
+        tile_colors = [
+            self._clamp_colors(colors) for colors in generator.get_theme_colors(theme)
+        ]
 
         # Power only matters when asked to turn the light on, so GetPower is
         # sent only then
@@ -1744,6 +1756,7 @@ class MatrixLight(PaintTracking, Light):
                     tiles[0].width, tiles[0].height, brightness, vertical=vertical
                 )
             ]
+        frames = [self._clamp_colors(frame) for frame in frames]
 
         async def write(duration: float) -> None:
             await self._write_mood_frames(tiles, frames, duration, has_chain=has_chain)
@@ -1971,6 +1984,7 @@ class MatrixLight(PaintTracking, Light):
             speed: Morph speed in seconds
             duration: Effect duration in nanoseconds (0 for infinite)
         """
+        palette = self._clamp_colors(palette)
         await self.set_effect(
             FirmwareEffect.MORPH, speed=speed, duration=duration, palette=palette
         )
