@@ -25,6 +25,7 @@ from lifx.const import (
     UNKNOWN_RANGE_MAX_KELVIN,
     UNKNOWN_RANGE_MIN_KELVIN,
 )
+from lifx.devices.probe import is_known_product, resolve_product_info
 from lifx.exceptions import (
     LifxDeviceNotFoundError,
     LifxError,
@@ -1005,10 +1006,9 @@ class Device(Generic[StateT]):
         try:
             # Get version to determine product
             version = await temp_device.get_version()
-            product_info = get_product(version.product)
-
-            if product_info is None:
-                raise LifxDeviceNotFoundError(f"Unknown product ID: {version.product}")
+            product_info = await resolve_product_info(
+                temp_device.connection, version.product
+            )
 
             # Step 4: Determine correct device class based on capabilities
             from lifx.devices.detection import (
@@ -1029,6 +1029,10 @@ class Device(Generic[StateT]):
                 fetch_radio_info=fetch_radio_info,
                 fetch_ambient_light=fetch_ambient_light,
             )
+
+            if not is_known_product(version.product):
+                # The probe already ran; do not repeat it on first use
+                device._capabilities = product_info
 
             # Type system note: device._state is guaranteed non-None after
             # _initialize_state().
@@ -1123,6 +1127,34 @@ class Device(Generic[StateT]):
 
         self._resolve_capabilities(version.product, host_firmware)
 
+    async def _load_capabilities(
+        self, version: DeviceVersion, host_firmware: FirmwareInfo
+    ) -> None:
+        """Load capabilities, probing the device when the registry lacks its product.
+
+        A known product resolves from the registry without any traffic. An
+        unknown one is probed (see :mod:`lifx.devices.probe`), so it connects
+        as the device class its answers imply. No-op if capabilities are set.
+
+        Args:
+            version: Device version info (vendor, product)
+            host_firmware: Host firmware info for firmware-dependent capabilities
+        """
+        if self._capabilities is not None:
+            return
+
+        if not is_known_product(version.product):
+            self._capabilities = await resolve_product_info(
+                self.connection, version.product
+            )
+            self._capabilities_firmware = (
+                host_firmware.version_major,
+                host_firmware.version_minor,
+            )
+            return
+
+        self._process_capabilities(version, host_firmware)
+
     def _resolve_capabilities(self, product: int, host_firmware: FirmwareInfo) -> None:
         """Resolve the registry entry for a product on the given host firmware.
 
@@ -1158,7 +1190,7 @@ class Device(Generic[StateT]):
         # Get device version to determine product ID
         version = await self.get_version()
         host_firmware = await self.get_host_firmware()
-        self._process_capabilities(version, host_firmware)
+        await self._load_capabilities(version, host_firmware)
 
     async def ensure_capabilities(self) -> None:
         """Ensure device capabilities are populated.
@@ -1168,6 +1200,19 @@ class Device(Generic[StateT]):
         the async context manager).
         """
         await self._ensure_capabilities()
+
+    @property
+    def is_unknown_product(self) -> bool:
+        """Whether the product registry lacks this device's product.
+
+        True for a product newer than the bundled registry. Its capabilities
+        are inferred by probing the device and are named
+        ``Unknown product <id>``. False for a known product and before
+        capabilities have loaded.
+        """
+        return self._capabilities is not None and not is_known_product(
+            self._capabilities.pid
+        )
 
     @property
     def capabilities(self) -> ProductInfo | None:
@@ -1582,6 +1627,7 @@ class Device(Generic[StateT]):
         if (
             self._capabilities is not None
             and self._capabilities_firmware is not None
+            and not self.is_unknown_product
             and self._capabilities_firmware
             != (firmware.version_major, firmware.version_minor)
         ):
@@ -2558,7 +2604,7 @@ class Device(Generic[StateT]):
             await self._await_batch(pending)
             host_firmware = requests.host_firmware.result()
             if requests.version is not None:
-                self._process_capabilities(requests.version.result(), host_firmware)
+                await self._load_capabilities(requests.version.result(), host_firmware)
         except BaseException:
             await self._discard_pending(pending)
             raise
