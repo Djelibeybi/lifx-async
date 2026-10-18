@@ -1,4 +1,9 @@
-"""Fixtures for the onboarding tests: an in-process fake LIFX SoftAP."""
+"""Fixtures for the onboarding tests.
+
+An in-process fake LIFX SoftAP exercises the real TLS client; scripted fakes
+for the ``Scanner``, ``Joiner`` and ``SoftApClient`` protocols drive the state
+machine without a socket.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +11,23 @@ import asyncio
 import socket
 import ssl
 import warnings
+from collections import deque
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+from lifx.onboard import (
+    SOFTAP_ADDRESS,
+    SOFTAP_PORT,
+    HomeNetwork,
+    SoftApNetwork,
+    SoftApUnreachableError,
+)
+from lifx.protocol.models import Serial
+from tests.conftest import HANG_GUARD_TIMEOUT
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAKE_AP_CERT = FIXTURES / "lifx-fake-ap.crt"
@@ -102,3 +119,241 @@ def closed_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+# ---- fakes for the state machine -----------------------------------------
+
+#: A clearly synthetic SoftAP name and the serial it encodes.
+SOFTAP_SSID = "LIFX Candle Color 0a0b0c"
+SOFTAP_SERIAL = Serial.from_string("d073d50a0b0c")
+#: A second device in setup mode, for target selection tests.
+OTHER_SOFTAP_SSID = "LIFX Beam 0d0e0f"
+HOME_SSID = "Home-Network"
+HOME_PASSWORD = "correct-horse-battery-staple"
+ORIGINAL_SSID = "Office-Network"
+
+
+def softap_network(ssid: str = SOFTAP_SSID, rssi: float = -40.0) -> SoftApNetwork:
+    """A LIFX SoftAP as a scanner would report it."""
+    return SoftApNetwork.from_ssid(ssid, rssi=rssi)
+
+
+@pytest.fixture
+def home_network() -> HomeNetwork:
+    return HomeNetwork(HOME_SSID, HOME_PASSWORD)
+
+
+class FakeScanner:
+    """A scripted ``Scanner``.
+
+    Each ``scan()`` consumes the next entry of ``results``: a list of networks
+    to return or an exception to raise. The last entry repeats forever, and no
+    entries at all means every scan is empty.
+    """
+
+    interface = "fake0"
+
+    def __init__(self, *results: list[SoftApNetwork] | BaseException) -> None:
+        self.results = list(results)
+        self.calls: list[dict[str, Any]] = []
+
+    async def scan(
+        self, *, min_rssi: float = 0.0, include_non_lifx: bool = False
+    ) -> list[SoftApNetwork]:
+        self.calls.append({"min_rssi": min_rssi, "include_non_lifx": include_non_lifx})
+        if not self.results:
+            return []
+        item = self.results.pop(0) if len(self.results) > 1 else self.results[0]
+        if isinstance(item, BaseException):
+            raise item
+        return list(item)
+
+
+class FakeJoiner:
+    """A recording ``Joiner`` whose optional capabilities are mixed in.
+
+    ``calls`` records every method call in order so tests can assert on the
+    sequence. ``current`` is the network the fake believes the host is on;
+    ``join()``, ``rejoin()`` and ``disassociate()`` update it, and each
+    ``current_ssid()`` poll first pops the next entry of ``ssid_sequence``
+    into it, which is how a test scripts what the OS reports over time. The
+    ``after_join`` and ``after_disassociate`` lists are appended to
+    ``ssid_sequence`` when those calls succeed.
+    """
+
+    def __init__(
+        self,
+        *,
+        current: str | None = None,
+        join_failures: int = 0,
+        rejoin_failures: int = 0,
+        rejoin_failures_for: str | None = None,
+        rejoin_error_lands_anyway: bool = False,
+        rejoin_hangs: bool = False,
+        forget_error: BaseException | None = None,
+        disassociate_error: BaseException | None = None,
+        rejoin_error_echoes_password: bool = False,
+    ) -> None:
+        self.rejoin_error_echoes_password = rejoin_error_echoes_password
+        self.forget_error = forget_error
+        self.disassociate_error = disassociate_error
+        self.current = current
+        self.join_failures = join_failures
+        self.rejoin_failures = rejoin_failures
+        self.rejoin_failures_for = rejoin_failures_for
+        self.rejoin_error_lands_anyway = rejoin_error_lands_anyway
+        self.rejoin_hangs = rejoin_hangs
+        self.calls: list[str] = []
+        self.joins: list[SoftApNetwork] = []
+        self.rejoins: list[tuple[str, str]] = []
+        self.forgotten: list[str] = []
+        self.ssid_sequence: deque[str | None] = deque()
+        self.after_join: list[str | None] = []
+        self.after_disassociate: list[str | None] = []
+
+    async def join(self, network: SoftApNetwork) -> None:
+        self.calls.append("join")
+        if self.join_failures > 0:
+            self.join_failures -= 1
+            raise OSError("could not find network")
+        self.joins.append(network)
+        self.current = network.ssid
+        self.ssid_sequence.extend(self.after_join)
+
+    async def rejoin(self, ssid: str, password: str = "") -> None:
+        self.calls.append("rejoin")
+        self.rejoins.append((ssid, password))
+        if self.rejoin_hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
+        applies = self.rejoin_failures_for is None or self.rejoin_failures_for == ssid
+        if applies and self.rejoin_failures > 0:
+            self.rejoin_failures -= 1
+            if self.rejoin_error_lands_anyway:
+                self.current = ssid
+                self.ssid_sequence.clear()
+            if self.rejoin_error_echoes_password:
+                # A subprocess backend echoing its argv would do this.
+                raise RuntimeError(f"nmcli dev wifi connect {ssid} password {password}")
+            raise OSError("join failed")
+        self.current = ssid
+
+
+class _Reports:
+    async def current_ssid(self: Any) -> str | None:
+        self.calls.append("current_ssid")
+        if self.ssid_sequence:
+            self.current = self.ssid_sequence.popleft()
+        return self.current
+
+
+class _Forgets:
+    async def forget(self: Any, ssid: str) -> None:
+        self.calls.append("forget")
+        if self.forget_error is not None:
+            raise self.forget_error
+        self.forgotten.append(ssid)
+
+
+class _Disassociates:
+    async def disassociate(self: Any) -> None:
+        self.calls.append("disassociate")
+        if self.disassociate_error is not None:
+            raise self.disassociate_error
+        self.current = None
+        self.ssid_sequence.extend(self.after_disassociate)
+
+
+def make_joiner(
+    *,
+    reporter: bool = False,
+    forgetter: bool = False,
+    disassociator: bool = False,
+    **kwargs: Any,
+) -> FakeJoiner:
+    """Build a ``FakeJoiner`` with exactly the capabilities asked for."""
+    bases: list[type] = []
+    if reporter:
+        bases.append(_Reports)
+    if forgetter:
+        bases.append(_Forgets)
+    if disassociator:
+        bases.append(_Disassociates)
+    bases.append(FakeJoiner)
+    return type("ScriptedJoiner", tuple(bases), {})(**kwargs)
+
+
+def make_scanner(
+    *results: Any, reporter: list[str | None] | None = None
+) -> FakeScanner:
+    """Build a ``FakeScanner``.
+
+    With ``reporter`` the scanner also implements ``CurrentNetworkReporter``,
+    answering each poll with the next entry; the last entry repeats.
+    """
+    if reporter is None:
+        return FakeScanner(*results)
+    answers = deque(reporter)
+
+    class ReportingScanner(FakeScanner):
+        async def current_ssid(self) -> str | None:
+            answer = answers.popleft() if len(answers) > 1 else answers[0]
+            self.calls.append({"current_ssid": answer})
+            return answer
+
+    return ReportingScanner(*results)
+
+
+class FakeSoftApClient:
+    """A recording ``SoftApClient`` that never touches a socket."""
+
+    def __init__(
+        self,
+        *,
+        probe_failures: int = 0,
+        probe_takes: float = 0.0,
+        open_takes: float = 0.0,
+        open_error: BaseException | None = None,
+        send_error: BaseException | None = None,
+        address: str = SOFTAP_ADDRESS,
+        port: int = SOFTAP_PORT,
+    ) -> None:
+        self.probe_failures = probe_failures
+        self.probe_takes = probe_takes
+        self.open_takes = open_takes
+        self.open_error = open_error
+        self.send_error = send_error
+        self._address = address
+        self._port = port
+        self.probes: list[float | None] = []
+        self.opened = 0
+        self.sent: list[tuple[Serial, HomeNetwork]] = []
+        self.closed = 0
+
+    @property
+    def address(self) -> str:
+        return self._address
+
+    @property
+    def port(self) -> int:
+        return self._port
+
+    async def probe(self, *, timeout: float | None = None) -> None:
+        self.probes.append(timeout)
+        if self.probe_failures > 0:
+            self.probe_failures -= 1
+            await asyncio.sleep(self.probe_takes)
+            raise SoftApUnreachableError(f"nothing at {self._address}:{self._port}")
+
+    async def open(self) -> None:
+        self.opened += 1
+        await asyncio.sleep(self.open_takes)
+        if self.open_error is not None:
+            raise self.open_error
+
+    async def send_access_point(self, target: Serial, network: HomeNetwork) -> None:
+        if self.send_error is not None:
+            raise self.send_error
+        self.sent.append((target, network))
+
+    async def close(self) -> None:
+        self.closed += 1

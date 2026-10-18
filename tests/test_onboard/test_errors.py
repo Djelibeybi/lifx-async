@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 import lifx.onboard
 from lifx.exceptions import LifxError
 from lifx.onboard import (
+    HostLeftSoftApError,
+    HostRejoinError,
+    InvalidSoftApTargetError,
     LegacyTlsUnavailableError,
     LifxOnboardError,
     MissingCredentialsError,
     OnboardPhase,
+    Result,
     SoftApDialError,
+    SoftApJoinError,
+    SoftApNotFoundError,
     SoftApSendError,
     SoftApUnreachableError,
+    SoftApWaitTimeoutError,
+    VerifyTimeoutError,
     errors,
 )
 
@@ -64,6 +74,13 @@ def test_missing_credentials_is_also_a_value_error() -> None:
         (SoftApDialError, OnboardPhase.DIAL),
         (SoftApSendError, OnboardPhase.CONFIGURE),
         (LegacyTlsUnavailableError, None),
+        (SoftApNotFoundError, OnboardPhase.SCAN),
+        (SoftApJoinError, OnboardPhase.JOIN),
+        (SoftApWaitTimeoutError, OnboardPhase.WAIT),
+        (HostLeftSoftApError, OnboardPhase.WAIT),
+        (HostRejoinError, OnboardPhase.REJOIN),
+        (VerifyTimeoutError, OnboardPhase.VERIFY),
+        (InvalidSoftApTargetError, None),
     ],
 )
 def test_softap_errors_default_their_phase(
@@ -86,6 +103,27 @@ def test_softap_errors_are_exported() -> None:
         "SoftApDialError",
         "SoftApSendError",
         "LegacyTlsUnavailableError",
+        "SoftApNotFoundError",
+        "SoftApJoinError",
+        "SoftApWaitTimeoutError",
+        "HostLeftSoftApError",
+        "HostRejoinError",
+        "VerifyTimeoutError",
+        "InvalidSoftApTargetError",
     ):
         assert name in lifx.onboard.__all__
         assert getattr(lifx.onboard, name) is getattr(errors, name)
+
+
+def test_result_defaults_describe_an_unverified_success() -> None:
+    result = Result(serial=None, verified=False, took=1.5)
+    assert result.phase is None
+    assert result.error is None
+    assert result.host_network is None
+    assert "password" not in repr(result)
+
+
+def test_result_is_frozen() -> None:
+    result = Result(serial=None, verified=False, took=0.0)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        result.verified = True  # type: ignore[misc]
