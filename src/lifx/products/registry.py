@@ -66,6 +66,8 @@ class ProductInfo:
         min_ext_mz_firmware: Minimum firmware version for extended multizone
         temperature_range_upgrades: Wider temperature ranges later firmware
             versions support
+        uplight_coords: Cell ``(x, y)`` of the uplight on a Ceiling product's
+            tile, None for every other product
     """
 
     pid: int
@@ -75,6 +77,7 @@ class ProductInfo:
     temperature_range: TemperatureRange | None
     min_ext_mz_firmware: int | None
     temperature_range_upgrades: tuple[TemperatureRangeUpgrade, ...] = ()
+    uplight_coords: tuple[int, int] | None = None
 
     def has_capability(self, capability: ProductCapability) -> bool:
         """Check if product has a specific capability.
@@ -1499,6 +1502,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(7, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -1513,6 +1517,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(7, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -1669,6 +1674,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(15, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -1683,6 +1689,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(15, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -1999,6 +2006,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(7, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -2013,6 +2021,7 @@ PRODUCTS: dict[int, ProductInfo] = {
         capabilities=ProductCapability.COLOR | ProductCapability.MATRIX,
         temperature_range=TemperatureRange(min=1500, max=9000),
         min_ext_mz_firmware=None,
+        uplight_coords=(7, 7),
         temperature_range_upgrades=(
             TemperatureRangeUpgrade(
                 min_firmware=262292,
@@ -2168,6 +2177,12 @@ class ProductRegistry:
                     )
                 temp_upgrades.sort(key=lambda upgrade: upgrade.min_firmware)
 
+                # Parse uplight position (Ceiling products only)
+                uplight_coords = None
+                coords = features.get("uplight_coords")
+                if coords is not None:
+                    uplight_coords = (int(coords["x"]), int(coords["y"]))
+
                 product_info = ProductInfo(
                     pid=pid,
                     name=name,
@@ -2176,6 +2191,7 @@ class ProductRegistry:
                     temperature_range=temp_range,
                     min_ext_mz_firmware=min_ext_mz_firmware,
                     temperature_range_upgrades=tuple(temp_upgrades),
+                    uplight_coords=uplight_coords,
                 )
 
                 self._products[pid] = product_info

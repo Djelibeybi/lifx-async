@@ -204,6 +204,10 @@ Plus all attributes inherited from `MatrixLightState`: `chain`, `tile_orientatio
 
 ## Zone Layout
 
+The uplight zone comes from the `uplight_coords` LIFX publish for each Ceiling product in
+`products.json`: the zone is `x + y * width`, using the tile width the device reports. The
+downlight is every zone before it, so a new Ceiling model works as soon as LIFX list it.
+
 Access the component zone indices directly:
 
 ```python
