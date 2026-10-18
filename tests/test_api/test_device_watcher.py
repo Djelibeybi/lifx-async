@@ -77,8 +77,8 @@ def _emulator(serials: tuple[str, ...], port: int | None = None) -> Iterator[int
 
 def _watcher(port: int, **kwargs) -> DeviceWatcher:
     kwargs.setdefault("sweep_interval", 3600.0)
-    kwargs.setdefault("discovery_timeout", 1.5)
-    kwargs.setdefault("idle_timeout_multiplier", 1.0)
+    kwargs.setdefault("discovery_timeout", 0.5)
+    kwargs.setdefault("idle_timeout_multiplier", 0.5)
     kwargs.setdefault("device_timeout", 2.0)
     return DeviceWatcher(broadcast_address=LOOPBACK, port=port, **kwargs)
 
