@@ -122,6 +122,21 @@ def vendor_default_features(vendor_data: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in merged.items() if value is not None}
 
 
+def parse_uplight_coords(features: dict[str, Any]) -> tuple[int, int] | None:
+    """Return a product's uplight position as ``(x, y)``, or None.
+
+    Args:
+        features: Product features with vendor defaults merged beneath them
+
+    Returns:
+        The uplight cell coordinates, None when absent or null
+    """
+    coords = features.get("uplight_coords")
+    if coords is None:
+        return None
+    return (int(coords["x"]), int(coords["y"]))
+
+
 def generate_product_definitions(
     products_data: dict[str, Any] | list[dict[str, Any]],
 ) -> str:
@@ -234,6 +249,9 @@ def generate_product_definitions(
             code_lines.append(
                 f"        min_ext_mz_firmware={min_ext_mz_firmware_expr},"
             )
+            uplight_coords = parse_uplight_coords(features)
+            if uplight_coords is not None:
+                code_lines.append(f"        uplight_coords={uplight_coords!r},")
             if temp_upgrade_exprs:
                 code_lines.append("        temperature_range_upgrades=(")
                 for expr in temp_upgrade_exprs:
@@ -330,6 +348,8 @@ class ProductInfo:
         min_ext_mz_firmware: Minimum firmware version for extended multizone
         temperature_range_upgrades: Wider temperature ranges later firmware
             versions support
+        uplight_coords: Cell ``(x, y)`` of the uplight on a Ceiling product's
+            tile, None for every other product
     """
 
     pid: int
@@ -339,6 +359,7 @@ class ProductInfo:
     temperature_range: TemperatureRange | None
     min_ext_mz_firmware: int | None
     temperature_range_upgrades: tuple[TemperatureRangeUpgrade, ...] = ()
+    uplight_coords: tuple[int, int] | None = None
 
     def has_capability(self, capability: ProductCapability) -> bool:
         """Check if product has a specific capability.
@@ -554,6 +575,12 @@ class ProductRegistry:
                     )
                 temp_upgrades.sort(key=lambda upgrade: upgrade.min_firmware)
 
+                # Parse uplight position (Ceiling products only)
+                uplight_coords = None
+                coords = features.get("uplight_coords")
+                if coords is not None:
+                    uplight_coords = (int(coords["x"]), int(coords["y"]))
+
                 product_info = ProductInfo(
                     pid=pid,
                     name=name,
@@ -562,6 +589,7 @@ class ProductRegistry:
                     temperature_range=temp_range,
                     min_ext_mz_firmware=min_ext_mz_firmware,
                     temperature_range_upgrades=tuple(temp_upgrades),
+                    uplight_coords=uplight_coords,
                 )
 
                 self._products[pid] = product_info
