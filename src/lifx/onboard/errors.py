@@ -98,3 +98,46 @@ class LegacyTlsUnavailableError(_PhasedOnboardError):
     The message includes ``ssl.OPENSSL_VERSION`` so the failure is attributed
     to the host rather than the device.
     """
+
+
+class SoftApNotFoundError(_PhasedOnboardError):
+    """Raised when no matching LIFX SoftAP appears within the find timeout."""
+
+    default_phase = OnboardPhase.SCAN
+
+
+class SoftApJoinError(_PhasedOnboardError):
+    """Raised when the host cannot join the SoftAP within the find timeout."""
+
+    default_phase = OnboardPhase.JOIN
+
+
+class SoftApWaitTimeoutError(_PhasedOnboardError):
+    """Raised when the SoftAP never accepts a TCP probe within the wait timeout."""
+
+    default_phase = OnboardPhase.WAIT
+
+
+class HostLeftSoftApError(_PhasedOnboardError):
+    """Raised when the host is found on another network while waiting."""
+
+    default_phase = OnboardPhase.WAIT
+
+
+class HostRejoinError(_PhasedOnboardError):
+    """Raised when the host could not be returned to any rejoin target."""
+
+    default_phase = OnboardPhase.REJOIN
+
+
+class VerifyTimeoutError(_PhasedOnboardError):
+    """Raised when the device is not seen on the LAN within the verify timeout."""
+
+    default_phase = OnboardPhase.VERIFY
+
+
+class InvalidSoftApTargetError(_PhasedOnboardError):
+    """Raised when a target is neither a SoftAP name, a serial nor a suffix.
+
+    It has no phase: the target is rejected before onboarding starts.
+    """
