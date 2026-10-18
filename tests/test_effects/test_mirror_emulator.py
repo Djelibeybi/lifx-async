@@ -80,6 +80,15 @@ async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
     raise AssertionError("condition never held")
 
 
+async def _powered_on(light: MirrorLight) -> None:
+    """Wait for the power-on fade an effect starts on a light that was off."""
+
+    async def on() -> bool:
+        return await light.get_power() == 65535
+
+    await _eventually(on)
+
+
 async def _tile(mirror: MirrorLight) -> list[HSBK]:
     return (await mirror.get_all_tile_colors())[0]
 
@@ -318,7 +327,7 @@ class TestMirrorRingEffects:
 
             await mirror.front.start_effect(_Solid(RED))
 
-            assert await mirror.get_power() == 65535
+            await _powered_on(mirror)
             assert mirror.front_is_on
             assert not mirror.back_is_on
 

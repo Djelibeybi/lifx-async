@@ -195,6 +195,22 @@ class Light(Device[LightState]):
         """Put back a paint record captured before an effect, after its restore."""
         self._paint_record = record
 
+    async def _await_paint_settled(self) -> None:
+        """Wait out the fade of the paint this light remembers, if one is running.
+
+        A paint written with a duration is still fading when its write returns,
+        and the light reports the in-flight colors until the fade ends, as
+        firmware does. A read taken sooner says nothing about whether the paint
+        still shows, so verification and state capture wait for the record's
+        ``settles_at`` first. Nothing to wait for costs nothing.
+        """
+        record = self._paint_record
+        if record is None:
+            return
+        remaining = record.settles_at - time.monotonic()
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
     async def start_effect(
         self, effect: LIFXEffect, *, enable_thread: bool = False
     ) -> None:
@@ -1377,13 +1393,19 @@ class Light(Device[LightState]):
 
     async def _write_mood(
         self, write: Callable[[float], Awaitable[None]], power_on: bool
-    ) -> None:
-        """Write a mood with the app's fade, fading power up if it was off."""
+    ) -> float:
+        """Write a mood with the app's fade, fading power up if it was off.
+
+        Returns:
+            The fade the colors were written with, in seconds: a light that
+            was off gets them at once and fades its power up instead
+        """
         if power_on:
             await write(0.0)
             await self.set_power(True, duration=MOOD_FADE_SECONDS)
-        else:
-            await write(MOOD_FADE_SECONDS)
+            return 0.0
+        await write(MOOD_FADE_SECONDS)
+        return MOOD_FADE_SECONDS
 
     def __repr__(self) -> str:
         """String representation of light."""

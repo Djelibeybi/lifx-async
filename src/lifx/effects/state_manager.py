@@ -127,6 +127,9 @@ class DeviceStateManager:
                 return restored_prestate
             del self._restored[light.serial]
 
+        # A paint still fading would be captured mid-fade, and restoring that
+        # would put back colors the light never settled on.
+        await light._await_paint_settled()
         # Taken first, to compare once the reads finish: a write while the
         # state is read replaces or ends the record.
         paint_record = light._paint_record
