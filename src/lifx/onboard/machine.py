@@ -18,7 +18,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from lifx.onboard.errors import (
@@ -106,8 +106,18 @@ class _RejoinTarget:
     """One network the host may be returned to."""
 
     ssid: str
-    password: str
-    auto_join: bool
+    password: str = field(repr=False)
+    auto_join: bool = False
+
+
+def _name(error: BaseException) -> str:
+    """The only part of a caller-supplied exception the library repeats.
+
+    A Scanner or Joiner backend may put the password into an error message
+    or traceback (a subprocess echoing its argv, for example), so neither is
+    ever logged or chained; the type name is.
+    """
+    return type(error).__name__
 
 
 def _is_softap_name(ssid: str) -> bool:
@@ -221,9 +231,11 @@ class _Run:
         if self._on_event is not None:
             try:
                 self._on_event(event)
-            except Exception:
-                _LOGGER.exception(
-                    "onboarding event callback failed for %s", event_type.value
+            except Exception as error:
+                _LOGGER.error(
+                    "onboarding event callback failed for %s: %s",
+                    event_type.value,
+                    _name(error),
                 )
 
     def _elapsed(self) -> float:
@@ -331,15 +343,17 @@ class _Run:
         deadline = time.monotonic() + self._find_timeout
         completed = 0
         saw_networks = False
-        last_error: Exception | None = None
+        last_error: str | None = None
         while True:
             try:
                 networks = await self._scanner.scan(
                     min_rssi=self._min_rssi, include_non_lifx=self._include_non_lifx
                 )
             except Exception as error:
-                last_error = error
-                _LOGGER.warning("scan on %s failed: %r", self._scanner.interface, error)
+                last_error = _name(error)
+                _LOGGER.warning(
+                    "scan on %s failed: %s", self._scanner.interface, last_error
+                )
             else:
                 completed += 1
                 saw_networks = saw_networks or bool(networks)
@@ -360,7 +374,9 @@ class _Run:
         message = f"No LIFX SoftAP {wanted} found within {self._find_timeout}s"
         if completed and not saw_networks:
             message = f"{message}. {_MACOS_HINT}"
-        raise SoftApNotFoundError(message) from last_error
+        if last_error is not None:
+            message = f"{message} (the last scan raised {last_error})"
+        raise SoftApNotFoundError(message) from None
 
     async def _join_phase(self) -> None:
         network = self._softap_network
@@ -378,11 +394,12 @@ class _Run:
             try:
                 await self._joiner.join(network)
             except Exception as error:
-                _LOGGER.warning("joining %r failed: %r", network.ssid, error)
+                _LOGGER.warning("joining %r failed: %s", network.ssid, _name(error))
                 if time.monotonic() >= deadline:
                     raise SoftApJoinError(
-                        f"Could not join {network.ssid!r} within {self._find_timeout}s"
-                    ) from error
+                        f"Could not join {network.ssid!r} within "
+                        f"{self._find_timeout}s: {_name(error)}"
+                    ) from None
                 await asyncio.sleep(self._find_poll)
             else:
                 break
@@ -497,15 +514,15 @@ class _Run:
         if self._forgetter is not None:
             try:
                 await self._forgetter.forget(ssid)
-            except Exception:
-                _LOGGER.warning("forgetting %r failed", ssid, exc_info=True)
+            except Exception as error:
+                _LOGGER.warning("forgetting %r failed: %s", ssid, _name(error))
         if self._disassociator is not None:
             try:
                 current = await self._current_ssid()
                 if current is None or current == ssid:
                     await self._disassociator.disassociate()
-            except Exception:
-                _LOGGER.warning("leaving %r failed", ssid, exc_info=True)
+            except Exception as error:
+                _LOGGER.warning("leaving %r failed: %s", ssid, _name(error))
 
     async def _rejoin_phase(self) -> str:
         targets = self._rejoin_targets()
@@ -521,8 +538,8 @@ class _Run:
             )
             try:
                 landed = await self._rejoin_target(target)
-            except Exception:
-                _LOGGER.warning("could not rejoin %r", target.ssid, exc_info=True)
+            except Exception as error:
+                _LOGGER.warning("could not rejoin %r: %s", target.ssid, _name(error))
                 continue
             self._emit(
                 OnboardEventType.REJOINED,
@@ -552,15 +569,17 @@ class _Run:
             try:
                 await self._joiner.rejoin(target.ssid, target.password)
             except Exception as error:
+                # The Joiner was handed the password, so its message and
+                # traceback are never logged or chained: only its type is.
                 if await self._current_ssid() == target.ssid:
-                    _LOGGER.debug("already on %r despite %r", target.ssid, error)
+                    _LOGGER.debug("already on %r despite %s", target.ssid, _name(error))
                     return target.ssid
-                _LOGGER.warning("rejoining %r failed: %r", target.ssid, error)
+                _LOGGER.warning("rejoining %r failed: %s", target.ssid, _name(error))
                 if time.monotonic() >= deadline:
                     raise HostRejoinError(
                         f"Could not rejoin {target.ssid!r} within "
-                        f"{self._rejoin_timeout}s"
-                    ) from error
+                        f"{self._rejoin_timeout}s: {_name(error)}"
+                    ) from None
                 await asyncio.sleep(self._rejoin_poll)
             else:
                 return target.ssid
@@ -605,9 +624,9 @@ class _Run:
         for target in targets:
             try:
                 self._host_network = await self._rejoin_target(target)
-            except Exception:
+            except Exception as error:
                 _LOGGER.warning(
-                    "recovery could not rejoin %r", target.ssid, exc_info=True
+                    "recovery could not rejoin %r: %s", target.ssid, _name(error)
                 )
                 continue
             _LOGGER.info("host recovered to %r", self._host_network)

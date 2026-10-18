@@ -192,7 +192,9 @@ class FakeJoiner:
         rejoin_hangs: bool = False,
         forget_error: BaseException | None = None,
         disassociate_error: BaseException | None = None,
+        rejoin_error_echoes_password: bool = False,
     ) -> None:
+        self.rejoin_error_echoes_password = rejoin_error_echoes_password
         self.forget_error = forget_error
         self.disassociate_error = disassociate_error
         self.current = current
@@ -229,6 +231,9 @@ class FakeJoiner:
             if self.rejoin_error_lands_anyway:
                 self.current = ssid
                 self.ssid_sequence.clear()
+            if self.rejoin_error_echoes_password:
+                # A subprocess backend echoing its argv would do this.
+                raise RuntimeError(f"nmcli dev wifi connect {ssid} password {password}")
             raise OSError("join failed")
         self.current = ssid
 

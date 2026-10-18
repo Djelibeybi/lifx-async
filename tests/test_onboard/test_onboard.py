@@ -251,7 +251,10 @@ class TestScan:
         scanner = make_scanner([], glitch)
         with pytest.raises(SoftApNotFoundError) as info:
             await _run(home_network, scanner=scanner, target=SOFTAP_SERIAL)
-        assert info.value.__cause__ is glitch
+        # The scanner's error is named by type only, never chained or quoted.
+        assert info.value.__cause__ is None
+        assert "RuntimeError" in str(info.value)
+        assert "airport busy" not in str(info.value)
         assert "macOS" in str(info.value)
         assert len(scanner.calls) >= 2
 
@@ -261,7 +264,8 @@ class TestScan:
         glitch = RuntimeError("airport busy")
         with pytest.raises(SoftApNotFoundError) as info:
             await _run(home_network, scanner=make_scanner(glitch))
-        assert info.value.__cause__ is glitch
+        assert info.value.__cause__ is None
+        assert "RuntimeError" in str(info.value)
         assert "macOS" not in str(info.value)
         assert "at all" in str(info.value)
 
@@ -316,6 +320,8 @@ class TestJoin:
             await _run(home_network, joiner=joiner)
         assert info.value.phase is OnboardPhase.JOIN
         assert SOFTAP_SSID in str(info.value)
+        assert info.value.__cause__ is None
+        assert "OSError" in str(info.value)
         assert joiner.calls.count("join") >= 2
         assert "forget" not in joiner.calls
         assert "disassociate" not in joiner.calls

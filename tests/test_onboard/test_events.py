@@ -196,3 +196,36 @@ class TestDeliveryDuringOnboarding:
         assert HOME_PASSWORD not in repr(error)
         assert HOME_PASSWORD not in repr(error.result)
         assert HOME_SSID in caplog.text, "SSIDs may be logged"
+
+    async def test_a_joiner_error_echoing_the_password_is_never_repeated(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        seen: list[OnboardEvent] = []
+        joiner = make_joiner(
+            current=ORIGINAL_SSID,
+            reporter=True,
+            forgetter=True,
+            disassociator=True,
+            rejoin_failures=10_000,
+            rejoin_error_echoes_password=True,
+        )
+        joiner.after_disassociate = [None] * 100_000
+        with caplog.at_level(logging.DEBUG):
+            with pytest.raises(HostRejoinError) as info:
+                await onboard(
+                    home_network,
+                    scanner=make_scanner([softap_network()]),
+                    joiner=joiner,
+                    softap=FakeSoftApClient(),
+                    verify=False,
+                    on_event=seen.append,
+                    **{**FAST, "rejoin_timeout": 0.02},
+                )
+        error = info.value
+        assert HOME_PASSWORD not in caplog.text
+        assert "nmcli" not in caplog.text
+        assert HOME_PASSWORD not in str(error)
+        assert HOME_PASSWORD not in repr(error.__cause__ or error)
+        assert error.__cause__ is None
+        for event in seen:
+            assert HOME_PASSWORD not in repr(event)
