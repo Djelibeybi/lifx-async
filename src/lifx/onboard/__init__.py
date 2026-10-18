@@ -4,6 +4,7 @@ Import explicitly: ``import lifx.onboard``. Nothing here is exported from the
 top-level ``lifx`` namespace. Standard library only.
 """
 
+from lifx.onboard.bulk import SCAN_INTERVAL, bulk_onboard
 from lifx.onboard.errors import (
     HostLeftSoftApError,
     HostRejoinError,
@@ -61,6 +62,7 @@ __all__ = [
     "LIFX_OUI",
     "REJOIN_POLL",
     "REJOIN_TIMEOUT",
+    "SCAN_INTERVAL",
     "SOFTAP_ADDRESS",
     "SOFTAP_PORT",
     "VERIFY_POLL",
@@ -97,6 +99,7 @@ __all__ = [
     "WifiInterface",
     "WifiSecurity",
     "build_access_point_message",
+    "bulk_onboard",
     "onboard",
     "parse_serial",
     "serial_from_softap_ssid",

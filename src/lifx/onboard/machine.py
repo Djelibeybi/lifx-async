@@ -175,6 +175,7 @@ class _Run:
         auto_join_wait: float,
         verify_timeout: float,
         verify_poll: float,
+        on_configured: Callable[[], None] | None = None,
     ) -> None:
         self._network = network
         self._scanner = scanner
@@ -197,6 +198,7 @@ class _Run:
         self._auto_join_wait = auto_join_wait
         self._verify_timeout = verify_timeout
         self._verify_poll = verify_poll
+        self._on_configured = on_configured
 
         self._reporter = self._capability(CurrentNetworkReporter)
         self._forgetter = self._capability(NetworkForgetter)
@@ -274,13 +276,39 @@ class _Run:
         if self._softap_network is None and self._scanner is None:
             raise ValueError("A scanner is required unless target is a SoftAP name")
 
-    async def run(self, target: str | Serial | None) -> Result:
-        self._resolve_target(target)
+    async def _record_original_network(self) -> None:
+        """Remember the host's own network, if a reporter can name it."""
         original = await self._current_ssid()
         if original is not None and not _is_softap_name(original):
             self._original_ssid = original
         _LOGGER.debug("onboarding starts on host network %r", self._original_ssid)
 
+    async def run(self, target: str | Serial | None) -> Result:
+        self._resolve_target(target)
+        await self._record_original_network()
+        return await self._execute()
+
+    async def run_network(self, network: SoftApNetwork) -> Result:
+        """Join, wait, dial, configure and rejoin for an already-scanned SoftAP.
+
+        Bulk mode's entry point: the scan and verification phases belong to
+        the bulk loop, so this skips the first and the run must have been
+        built with ``verify=False`` to skip the second. Unlike :meth:`run` it
+        returns the failing ``Result`` instead of raising the onboarding
+        error, after host recovery has run; cancellation still propagates.
+        """
+        assert network.serial is not None
+        self._softap_network = network
+        self._serial = network.serial
+        await self._record_original_network()
+        try:
+            return await self._execute()
+        except LifxOnboardError as error:
+            result = error.result
+            assert isinstance(result, Result)
+            return result
+
+    async def _execute(self) -> Result:
         joined = False
         rejoined = False
         verified = False
@@ -490,6 +518,8 @@ class _Run:
             await self._softap.send_access_point(self._serial, self._network)
         finally:
             await self._softap.close()
+        if self._on_configured is not None:
+            self._on_configured()
         self._emit(
             OnboardEventType.CONFIGURED,
             OnboardPhase.CONFIGURE,
