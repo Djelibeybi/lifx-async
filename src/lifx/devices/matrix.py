@@ -243,6 +243,9 @@ class MatrixEffect:
             ``UNKNOWN_<n>`` member rather than raising
         cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS sky type)
         cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS sky type)
+        soft_off: Turn the light off when the effect ends (SKY with SUNSET only).
+            On the wire this is the byte at offset 4 of the effect parameter,
+            which CLOUDS reads as ``cloud_saturation_min``
         from_device: Set when building this object from a device response. The
             validation and default-filling below are rules for values the
             caller is about to send: applying them to values the firmware
@@ -257,6 +260,7 @@ class MatrixEffect:
     sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE
     cloud_saturation_min: int = 0
     cloud_saturation_max: int = 0
+    soft_off: bool = False
     from_device: InitVar[bool] = False
 
     def __post_init__(self, from_device: bool) -> None:
@@ -279,6 +283,12 @@ class MatrixEffect:
         # Only validate palette if provided
         if self.palette is not None:
             self._validate_palette(self.palette)
+
+        if self.soft_off and not (
+            self.effect_type == FirmwareEffect.SKY
+            and self.sky_type == TileEffectSkyType.SUNSET
+        ):
+            raise ValueError("soft_off applies to the SKY effect with SUNSET only")
 
         self._validate_saturation(self.cloud_saturation_min, "cloud_saturation_min")
         self._validate_saturation(self.cloud_saturation_max, "cloud_saturation_max")
@@ -1239,14 +1249,22 @@ class MatrixLight(PaintTracking, Light):
             ]
         ]
 
+        parameter = response.settings.parameter
+        # The byte at offset 4 means the soft-off flag for a Sunset and the
+        # cloud saturation minimum otherwise.
+        is_sunset = (
+            response.settings.effect_type == FirmwareEffect.SKY
+            and parameter.sky_type == TileEffectSkyType.SUNSET
+        )
         effect = MatrixEffect(
             effect_type=response.settings.effect_type,
             speed=response.settings.speed,
             duration=response.settings.duration,
             palette=palette if palette else None,
-            sky_type=response.settings.parameter.sky_type,
-            cloud_saturation_min=response.settings.parameter.cloud_saturation_min,
-            cloud_saturation_max=response.settings.parameter.cloud_saturation_max,
+            sky_type=parameter.sky_type,
+            cloud_saturation_min=0 if is_sunset else parameter.cloud_saturation_min,
+            cloud_saturation_max=parameter.cloud_saturation_max,
+            soft_off=is_sunset and parameter.cloud_saturation_min == 1,
             from_device=True,
         )
 
@@ -1402,6 +1420,7 @@ class MatrixLight(PaintTracking, Light):
         sky_type: TileEffectSkyType = TileEffectSkyType.SUNRISE,
         cloud_saturation_min: int = 0,
         cloud_saturation_max: int = 0,
+        soft_off: bool = False,
     ) -> None:
         """Set matrix effect with configuration.
 
@@ -1437,6 +1456,8 @@ class MatrixLight(PaintTracking, Light):
             sky_type: Sky effect type (SUNRISE, SUNSET, CLOUDS)
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
+            soft_off: Turn the light off when a SUNSET ends. Valid for
+                SKY with SUNSET only
 
         Raises:
             LifxUnsupportedCommandError: If SKY is requested on a device that
@@ -1447,7 +1468,9 @@ class MatrixLight(PaintTracking, Light):
             LifxProtocolError: If MORPH is requested with no palette and the
                 colour read gets a malformed reply, or the device reports no
                 colours
-            ValueError: If speed is negative (checked before rounding), or a
+            ValueError: If ``soft_off`` is set for anything but the SKY
+                effect with SUNSET (checked before anything is sent), if
+                speed is negative (checked before rounding), or a
                 non-zero speed rounds to 0 ms for an active effect that does
                 not play once at speed 0, or another field fails
                 ``MatrixEffect`` validation
@@ -1472,6 +1495,11 @@ class MatrixLight(PaintTracking, Light):
             ...     speed=3.0,
             ... )
         """
+        if soft_off and not (
+            effect_type == FirmwareEffect.SKY and sky_type == TileEffectSkyType.SUNSET
+        ):
+            raise ValueError("soft_off applies to the SKY effect with SUNSET only")
+
         if effect_type == FirmwareEffect.SKY:
             try:
                 supported, reason = await self._resolve_sky_support()
@@ -1528,6 +1556,7 @@ class MatrixLight(PaintTracking, Light):
             sky_type=sky_type,
             cloud_saturation_min=cloud_saturation_min,
             cloud_saturation_max=cloud_saturation_max,
+            soft_off=soft_off,
         )
 
         if effect_type == FirmwareEffect.MORPH and palette is None:
@@ -1555,7 +1584,12 @@ class MatrixLight(PaintTracking, Light):
             duration=effect.duration,
             parameter=TileEffectParameter(
                 sky_type=effect.sky_type,
-                cloud_saturation_min=effect.cloud_saturation_min,
+                # Sunset reads this byte as the soft-off flag
+                cloud_saturation_min=(
+                    int(effect.soft_off)
+                    if effect.soft_off
+                    else effect.cloud_saturation_min
+                ),
                 cloud_saturation_max=effect.cloud_saturation_max,
             ),
             palette_count=palette_count,

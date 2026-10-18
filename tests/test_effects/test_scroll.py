@@ -92,6 +92,37 @@ class TestEffectScroll:
         assert [c.hue for c in frames[0]] == [10, 0]
         assert duration == 1.25
 
+    async def test_step_fades_never_outlive_the_step_gap(
+        self,
+        mock_device_factory,  # noqa: F811
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("lifx.effects.scroll.MOOD_SCROLL_STEP_SECONDS", 0.03)
+        monkeypatch.setattr("lifx.effects.scroll.MOOD_SCROLL_MAX_FADE_SECONDS", 2.0)
+        light = mock_device_factory(MatrixLight)
+        light.get_device_chain = AsyncMock(
+            return_value=[make_tile(0, width=2, height=1)]
+        )
+        light._write_mood_frames = AsyncMock()
+        effect = EffectScroll(frame=[hues(0, 10)])
+        effect.participants = [light]
+
+        # Wait for writes rather than a fixed interval: a slow runner (Windows
+        # CI) can take longer than one step to schedule the second write.
+        async def three_writes() -> None:
+            while light._write_mood_frames.await_count < 3:
+                await asyncio.sleep(0.01)
+
+        task = asyncio.create_task(effect.async_play())
+        try:
+            await asyncio.wait_for(three_writes(), timeout=5.0)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        durations = [c.args[2] for c in light._write_mood_frames.await_args_list]
+        assert len(durations) > 1
+        assert all(d <= 0.03 for d in durations)
+
     async def test_reads_the_tiles_without_a_frame(self, mock_device_factory) -> None:  # noqa: F811
         light = mock_device_factory(MatrixLight)
         light.get_device_chain = AsyncMock(

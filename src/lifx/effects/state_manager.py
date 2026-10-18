@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from lifx.devices.component.effect_support import (
@@ -33,6 +35,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Seconds after a restore during which a capture returns the restored prestate.
+DEFAULT_SETTLE_WINDOW = 5.0
+
 
 class DeviceStateManager:
     """Manages device state capture and restoration for effects.
@@ -54,8 +59,42 @@ class DeviceStateManager:
         ```
     """
 
+    def __init__(
+        self,
+        settle_window: float = DEFAULT_SETTLE_WINDOW,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        """Initialize the state manager.
+
+        Args:
+            settle_window: Seconds after a restore during which a capture
+                returns the prestate that was restored instead of reading the
+                device, which is still mid-fade and would report colors the
+                effect painted. 0 disables the window.
+            clock: Monotonic clock in seconds, replaceable for tests
+
+        Raises:
+            ValueError: If settle_window is negative
+        """
+        if settle_window < 0:
+            raise ValueError("settle_window must not be negative")
+        self._settle_window = settle_window
+        self._clock = clock
+        # Per serial: when the last restore began, and what it restored.
+        # A caller write since then ends the window, as the device no longer
+        # shows what was restored; the write count at the restore's end tells.
+        self._restored: dict[str, tuple[float, int, PreState]] = {}
+
+    @property
+    def settle_window(self) -> float:
+        """Seconds after a restore during which captures reuse its prestate."""
+        return self._settle_window
+
     async def capture_state(self, light: Light) -> PreState:
         """Capture current device state.
+
+        A capture within the settle window of the light's last restore returns
+        the prestate that restore wrote, without reading the device.
 
         Captures power state, colour, zone colours (for multizone devices) and
         the colours of every tile (for matrix lights) to enable restoration
@@ -76,6 +115,16 @@ class DeviceStateManager:
             print(f"Captured: {prestate}")
             ```
         """
+        restored = self._restored.get(light.serial)
+        if restored is not None:
+            restored_at, writes, restored_prestate = restored
+            if (
+                self._clock() - restored_at < self._settle_window
+                and light._state_writes == writes
+            ):
+                return restored_prestate
+            del self._restored[light.serial]
+
         # Taken first, to compare once the reads finish: a write while the
         # state is read replaces or ends the record.
         paint_record = light._paint_record
@@ -202,6 +251,15 @@ class DeviceStateManager:
         # stored colours, whatever the restore writes above remembered.
         if isinstance(light, ComponentMatrixLight) and prestate.stored_colors:
             await reinstate_stored_colors(light, prestate.stored_colors)
+
+        # Stamped once the writes are done, so the count includes them and only
+        # a later caller write ends the window.
+        if self._settle_window > 0:
+            self._restored[light.serial] = (
+                self._clock(),
+                light._state_writes,
+                prestate,
+            )
 
     async def restore_component(
         self, light: ComponentMatrixLight, component: ComponentName, prestate: PreState
