@@ -95,6 +95,57 @@ provide the other two targeted lookups — by serial number and by device
 label/name respectively. See the [High-Level API reference](../api/high-level.md)
 for their full signatures.
 
+## When a device moves
+
+A device can come back on a different IP address or port after a router
+restart, a DHCP change or a move between access points. Its serial does not
+change, so the library follows the serial: the device object you already hold
+keeps working and nothing you cached on it is thrown away.
+
+Pass the objects you hold to discovery with `known_devices` (or `device` for
+`find_by_serial()`). When a result reports one of those serials at a different
+address, that object is moved to the new address and yielded in place of a new
+object:
+
+```python
+from lifx import Light, discover_udp
+
+lights: list[Light] = [...]  # objects you created or discovered earlier
+
+async for device in discover_udp(known_devices=lights):
+    print(device.serial, device.ip, device.port)  # same objects, current address
+```
+
+`discover()`, `discover_udp()`, `discover_mdns()` and `find_by_serial()` all
+accept it. If you learn the new address some other way, apply it yourself:
+
+```python
+light.update_address("192.0.2.40", 56700)
+```
+
+What a move does:
+
+- `device.ip` and `device.port` report the new address.
+- A request that was in flight is not failed. Its next retransmission goes to
+  the new address, so it completes there.
+- A late reply from the old address is ignored (logged at debug level), so it
+  cannot be mistaken for an answer from the device.
+- The cached label, firmware, group, location, product capabilities and the
+  device's own `connectivity` report are kept. Nothing is re-read.
+- No color, power or restore write is ever sent. A move only changes where
+  packets go.
+- Announcing the address a device already has changes nothing. A change of IPv6
+  zone counts as a move.
+
+`Device.update_address()` returns `True` when the address changed and `False`
+when it was already current. It raises `ValueError` for an address or port the
+library cannot use, and leaves the device unchanged.
+
+Discovery is unauthenticated UDP, so the library does not arbitrate between
+conflicting announcements: a second host that claims a serial can move the
+object. Use `device.connection.address_epoch`, which counts moves, if you need
+to tell that one happened.
+
 ## Choosing a discovery method
 
 | Scenario | Recommended method |

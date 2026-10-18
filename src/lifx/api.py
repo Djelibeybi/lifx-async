@@ -13,7 +13,14 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Callable, Iterator, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from contextlib import aclosing
 from dataclasses import dataclass
 from types import TracebackType
@@ -1100,6 +1107,33 @@ class DeviceGroup:
         self._group_metadata = None
 
 
+def _index_known_devices(known_devices: Iterable[Device] | None) -> dict[str, Device]:
+    """Index caller-held device objects by normalized serial."""
+    return {
+        Serial.from_string(device.serial).to_string(): device
+        for device in known_devices or ()
+    }
+
+
+async def _follow_known_device(device: Device, known: Mapping[str, Device]) -> Device:
+    """Return the caller's object for a rediscovered serial, moved if needed.
+
+    A discovery result is a fresh object. When its serial is one the caller
+    already holds, the caller's object is the one that must keep working, so
+    the result's endpoint is applied to it (a same-address result is a no-op)
+    and it is returned in place of the fresh object. The fresh object never
+    reached the caller and is closed. Nothing is written to the device and no
+    cached value is refreshed. Discovery is unauthenticated, so a conflicting
+    announcement can still move a device.
+    """
+    existing = known.get(Serial.from_string(device.serial).to_string())
+    if existing is None:
+        return device
+    existing.update_address(device.ip, device.port)
+    await device.connection.close()
+    return existing
+
+
 async def _create_discovered_device(
     discovered: DiscoveredDevice,
     *,
@@ -1157,6 +1191,7 @@ async def discover(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int | None = DEFAULT_MAX_RETRIES,
+    known_devices: Iterable[Device] | None = None,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices and yield them as they are found.
 
@@ -1168,6 +1203,13 @@ async def discover(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: request timeout set on discovered devices
         max_retries: max retries per request set on discovered devices
+        known_devices: device objects you already hold. A discovery result
+            whose serial matches one of them moves that object to the
+            reported address (see ``Device.update_address``) and yields it
+            instead of a new object. A result at the same address changes
+            nothing. Nothing is written to the device and no cached value is
+            refreshed.
+
     Yields:
         Device instances as they are discovered
 
@@ -1198,6 +1240,7 @@ async def discover(
     """
     validate_address(broadcast_address)
     validate_port(port)
+    known = _index_known_devices(known_devices)
     deadline = time.monotonic() + max(0.0, timeout)
     observer: _DiscoveryObserver | None = _current_discovery_observer()
     queue: asyncio.Queue[_DiscoveryEvent] = asyncio.Queue()
@@ -1294,7 +1337,7 @@ async def discover(
                 raw_identity=serial,
             )
             if disposition == "winner" and time.monotonic() < deadline:
-                yield device
+                yield await _follow_known_device(device, known)
     finally:
         await _cancel_and_reap(tasks)
 
@@ -1307,6 +1350,7 @@ async def discover_udp(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int | None = DEFAULT_MAX_RETRIES,
+    known_devices: Iterable[Device] | None = None,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via UDP and yield them as they are found.
 
@@ -1329,12 +1373,19 @@ async def discover_udp(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: request timeout set on discovered devices
         max_retries: max retries per request set on discovered devices
+        known_devices: device objects you already hold. A discovery result
+            whose serial matches one of them moves that object to the
+            reported address (see ``Device.update_address``) and yields it
+            instead of a new object. A result at the same address changes
+            nothing. Nothing is written to the device and no cached value is
+            refreshed.
 
     Yields:
         Device instances as they are discovered via UDP
     """
     validate_address(broadcast_address)
     validate_port(port)
+    known = _index_known_devices(known_devices)
     deadline = time.monotonic() + max(0.0, timeout)
     devices = discover_devices_shared(
         timeout=timeout,
@@ -1354,7 +1405,7 @@ async def discover_udp(
                 deadline=deadline,
             )
             if device is not None:
-                yield device
+                yield await _follow_known_device(device, known)
 
 
 async def discover_mdns(
@@ -1363,6 +1414,7 @@ async def discover_mdns(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int | None = DEFAULT_MAX_RETRIES,
+    known_devices: Iterable[Device] | None = None,
 ) -> AsyncGenerator[Device, None]:
     """Discover LIFX devices via mDNS and yield them as they are found.
 
@@ -1395,6 +1447,12 @@ async def discover_mdns(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: request timeout set on discovered devices
         max_retries: max retries per request set on discovered devices
+        known_devices: device objects you already hold. A discovery result
+            whose serial matches one of them moves that object to the
+            reported address (see ``Device.update_address``) and yields it
+            instead of a new object. A result at the same address changes
+            nothing. Nothing is written to the device and no cached value is
+            refreshed.
 
     Yields:
         Device instances (Light, MatrixLight, MultiZoneLight, etc.)
@@ -1416,6 +1474,7 @@ async def discover_mdns(
     """
     from lifx.network.discovery.mdns.discovery import discover_devices_mdns
 
+    known = _index_known_devices(known_devices)
     devices = discover_devices_mdns(
         timeout=timeout,
         max_response_time=max_response_time,
@@ -1425,7 +1484,7 @@ async def discover_mdns(
     )
     async with aclosing(devices):
         async for device in devices:
-            yield device
+            yield await _follow_known_device(device, known)
 
 
 async def _race_serial_sources(
@@ -1556,6 +1615,7 @@ async def find_by_serial(
     idle_timeout_multiplier: float = IDLE_TIMEOUT_MULTIPLIER,
     device_timeout: float = DEFAULT_REQUEST_TIMEOUT,
     max_retries: int | None = DEFAULT_MAX_RETRIES,
+    device: Device | None = None,
 ) -> Device | None:
     """Find a specific device by serial number.
 
@@ -1568,6 +1628,11 @@ async def find_by_serial(
         idle_timeout_multiplier: Idle timeout multiplier
         device_timeout: request timeout set on discovered device
         max_retries: max retries per request set on discovered device
+        device: an existing device object for this serial. If the serial is
+            found at a different address, that object is moved there (see
+            ``Device.update_address``) and returned instead of a new object;
+            at the same address nothing changes. An object with a different
+            serial is ignored.
 
     Returns:
         Device instance if found, None otherwise
@@ -1600,7 +1665,7 @@ async def find_by_serial(
     except ValueError:
         return None
 
-    return await _race_serial_sources(
+    found = await _race_serial_sources(
         serial_str,
         timeout=timeout,
         broadcast_address=broadcast_address,
@@ -1609,6 +1674,11 @@ async def find_by_serial(
         idle_timeout_multiplier=idle_timeout_multiplier,
         device_timeout=device_timeout,
         max_retries=max_retries,
+    )
+    if found is None:
+        return None
+    return await _follow_known_device(
+        found, _index_known_devices(() if device is None else (device,))
     )
 
 
