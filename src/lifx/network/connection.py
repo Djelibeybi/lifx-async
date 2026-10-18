@@ -7,6 +7,7 @@ import logging
 import socket
 import time
 from collections.abc import AsyncGenerator, Callable
+from contextlib import aclosing
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
@@ -1639,3 +1640,30 @@ class DeviceConnection:
         async for response in self.request_stream(packet, timeout):
             return response
         raise LifxTimeoutError(f"No response from {self.ip}")
+
+    async def echo(self, payload: bytes) -> bytes:
+        """Send an echo request and wait for the response carrying ``payload``.
+
+        Uses the connection's normal retransmission. A response whose payload
+        differs from the one sent is ignored rather than accepted.
+
+        Args:
+            payload: The 64-byte payload to echo
+
+        Returns:
+            The echoed payload
+
+        Raises:
+            LifxTimeoutError: If no matching response arrives before the deadline
+            LifxConnectionError: If connection fails
+        """
+        await self._ensure_open()
+
+        stream = self._request_stream_impl(
+            Device.EchoRequest(payload=payload), timeout=self.timeout
+        )
+        async with aclosing(stream):
+            async for _header, body in stream:
+                if body == payload:
+                    return body
+        raise LifxTimeoutError(f"No matching echo response from {self.ip}")

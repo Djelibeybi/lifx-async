@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import logging
+import secrets
 import time
 import uuid
 from collections.abc import Coroutine
@@ -676,6 +678,7 @@ class Device(Generic[StateT]):
         )
 
         # State storage: Cached values from device
+        self._ping_counter = itertools.count()
         self._label: str | None = None
         self._version: DeviceVersion | None = None
         self._host_firmware: FirmwareInfo | None = None
@@ -1377,6 +1380,32 @@ class Device(Generic[StateT]):
 
         if result and self._state is not None:
             await self._schedule_refresh()
+
+    async def ping(self) -> float:
+        """Measure the round-trip time to the device without changing its state.
+
+        Sends an echo request whose 64-byte payload is an 8-byte counter
+        followed by random bytes, and waits for the echo response carrying
+        the same payload. Responses with a different payload are ignored.
+        The connection's normal retransmission applies.
+
+        Returns:
+            Round-trip time in seconds
+
+        Raises:
+            LifxTimeoutError: If no matching response arrives before the deadline
+            LifxConnectionError: If the connection fails
+
+        Example:
+            ```python
+            rtt = await device.ping()
+            print(f"{rtt * 1000:.1f} ms")
+            ```
+        """
+        payload = next(self._ping_counter).to_bytes(8, "big") + secrets.token_bytes(56)
+        started = time.monotonic()
+        await self.connection.echo(payload)
+        return time.monotonic() - started
 
     async def get_version(self) -> DeviceVersion:
         """Get device version information.
