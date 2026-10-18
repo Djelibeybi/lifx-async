@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 import time
 from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
@@ -26,7 +27,13 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.network.address import SocketAddress, sockaddr_for, wildcard_for
+from lifx.network.address import (
+    SocketAddress,
+    family_for_sockaddr,
+    sockaddr_for,
+    validate_address,
+    wildcard_for,
+)
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
@@ -35,6 +42,25 @@ from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device, get_packet_class
 
 _LOGGER = logging.getLogger(__name__)
+
+#: Canonical identity of a UDP endpoint: unscoped host, port, IPv6 scope id.
+_EndpointKey = tuple[str, int, int]
+
+#: How many previous endpoints a connection remembers for stale-reply
+#: rejection. Bounded so a device that flaps between addresses cannot grow it.
+_MAX_RETIRED_ENDPOINTS = 16
+
+
+def _endpoint_key(address: SocketAddress) -> _EndpointKey:
+    """Return the canonical, comparable identity of a socket address.
+
+    Accepts both a validated sockaddr and the raw ``recvfrom`` address, whose
+    IPv6 host may still carry a ``%zone`` suffix.
+    """
+    host = address[0].partition("%")[0].lower()
+    scope_id = address[3] if len(address) == 4 else 0
+    return host, address[1], scope_id
+
 
 # Type variable for packet types
 T = TypeVar("T")
@@ -170,6 +196,17 @@ class DeviceConnection:
         self.ip = ip
         self.port = port
         self._send_address: SocketAddress | None = None
+        # Socket family the open transport is bound to. A move across address
+        # families rebinds it on the next send (see _rebind_transport).
+        self._transport_family: socket.AddressFamily | None = None
+        # Incremented by every update_address() that changes the endpoint.
+        self._address_epoch = 0
+        # Endpoints this device has moved away from, oldest first, bounded so
+        # a flapping device cannot grow it. Responses from them are dropped.
+        self._retired_endpoints: dict[_EndpointKey, None] = {}
+        # Source of the datagram receive_packet() returned last, read by the
+        # background receiver straight after that call (no await between).
+        self._last_source: SocketAddress | None = None
         self.max_retries = max_retries
         self.timeout = timeout
 
@@ -252,6 +289,126 @@ class DeviceConnection:
         """
         if value is not None:
             self._thread_connection = value
+
+    @property
+    def address_epoch(self) -> int:
+        """How many times this connection's endpoint has changed.
+
+        Starts at 0 and increases by one for each :meth:`update_address` that
+        moved the device. It is a counter for observers (a watcher can tell a
+        move happened); it is not a correlation key.
+        """
+        return self._address_epoch
+
+    def update_address(self, ip: str, port: int) -> bool:
+        """Point this connection at a new endpoint without failing anything.
+
+        This is the connection-level half of endpoint migration. It only
+        rebinds *where packets go and who is believed*; it re-reads nothing
+        and sends nothing. Callers that hold a device object should use
+        :meth:`lifx.devices.base.Device.update_address`, which applies the
+        same endpoint to the device's own ``ip`` and ``port`` too.
+
+        On a change the address epoch increments, ``ip``/``port`` and the send
+        address are replaced, and the endpoint just left is remembered so a
+        late datagram from it is dropped (debug-logged as
+        ``stale_epoch_response``) instead of being correlated. Requests in
+        flight are not failed: each keeps listening and its next
+        retransmission goes to the new endpoint. A move across address
+        families (IPv4 to IPv6 or back) rebinds the socket on the next send.
+        The observed transport report survives.
+
+        Replies are filtered only against endpoints this connection has left.
+        A connection that never moved keeps correlating on source, sequence
+        and serial alone, as before.
+
+        An IPv6 zone change counts as a move, because the zone selects the
+        interface the packet leaves on.
+
+        Args:
+            ip: New device IP address (IPv4 or IPv6 literal, optionally zoned).
+            port: New device UDP port.
+
+        Returns:
+            ``True`` if the endpoint changed, ``False`` if it was already
+            current (a no-op that logs nothing).
+
+        Raises:
+            ValueError: If the address or port is not a usable device
+                endpoint. The connection is left unchanged.
+        """
+        validate_address(ip)
+        new_address = sockaddr_for((ip, port))
+        try:
+            old_address: SocketAddress | None = sockaddr_for((self.ip, self.port))
+        except ValueError:
+            # The connection was built around an endpoint that never resolved.
+            old_address = None
+
+        if new_address == old_address:
+            return False
+
+        if old_address is not None:
+            old_key = _endpoint_key(old_address)
+            self._retired_endpoints.pop(old_key, None)
+            self._retired_endpoints[old_key] = None
+        self._retired_endpoints.pop(_endpoint_key(new_address), None)
+        while len(self._retired_endpoints) > _MAX_RETIRED_ENDPOINTS:
+            del self._retired_endpoints[next(iter(self._retired_endpoints))]
+
+        previous_ip, previous_port = self.ip, self.port
+        self._address_epoch += 1
+        self.ip = ip
+        self.port = port
+        self._peer.ip = ip
+        self._peer.port = port
+        if self._is_open:
+            self._send_address = new_address
+
+        _LOGGER.debug(
+            {
+                "class": "DeviceConnection",
+                "method": "update_address",
+                "action": "address_updated",
+                "serial": self.serial,
+                "epoch": self._address_epoch,
+                "old_ip": previous_ip,
+                "old_port": previous_port,
+                "ip": ip,
+                "port": port,
+            }
+        )
+        return True
+
+    def _is_retired_source(self, source: SocketAddress) -> bool:
+        """Whether a datagram came from an endpoint this device has left."""
+        return _endpoint_key(source) in self._retired_endpoints
+
+    async def _rebind_transport(self, send_address: SocketAddress) -> None:
+        """Replace the socket with one of the family ``send_address`` needs.
+
+        A socket bound to the IPv4 wildcard cannot reach an IPv6 device and
+        vice versa. The new socket is published before the old one closes, and
+        the receiver re-reads ``self._transport`` on every poll, so in-flight
+        requests simply keep listening and retransmit over the new socket.
+        """
+        family = family_for_sockaddr(send_address)
+        replacement = UdpTransport(
+            ip_address=wildcard_for(send_address[0]),
+            port=0,
+            broadcast=False,
+            peer=self._peer,
+        )
+        await replacement.open()
+        if not self._is_open or self._transport_family == family:
+            # Closed meanwhile, or a concurrent sender already rebound.
+            await replacement.close()
+            return
+        previous = self._transport
+        assert previous is not None  # _is_open implies a published transport
+        self._transport = replacement
+        self._transport_family = family
+        await previous.close()
 
     @property
     def serial(self) -> str:
@@ -340,7 +497,11 @@ class DeviceConnection:
 
             self._opening_transport = None
             self._transport = transport
-            self._send_address = send_address
+            self._transport_family = family_for_sockaddr(send_address)
+            # Re-read the endpoint: update_address() may have moved the device
+            # while the socket was opening. A family mismatch is repaired on
+            # the first send.
+            self._send_address = sockaddr_for((self.ip, self.port))
             self._receiver_shutdown = asyncio.Event()
             self._is_open = True
 
@@ -565,6 +726,16 @@ class DeviceConnection:
         if not self._is_open or self._transport is None or self._send_address is None:
             raise LifxConnectionError("Connection not open")
 
+        if family_for_sockaddr(self._send_address) != self._transport_family:
+            await self._rebind_transport(self._send_address)
+            # The rebind awaited: a close may have landed in the gap.
+            if (
+                not self._is_open
+                or self._transport is None
+                or self._send_address is None
+            ):
+                raise LifxConnectionError("Connection not open")
+
         # Allocate source if not provided
         if source is None:
             source = allocate_source()
@@ -607,7 +778,8 @@ class DeviceConnection:
 
         # Receive message - source address not validated here
         # Validation occurs via target field and sequence number matching
-        data, _addr = await self._transport.receive(timeout=timeout)
+        data, addr = await self._transport.receive(timeout=timeout)
+        self._last_source = addr
 
         # Parse and return message
         return parse_message(data)
@@ -629,9 +801,24 @@ class DeviceConnection:
                 # Poll with timeout to allow periodic shutdown checks
                 # Note: This timeout does NOT delay packet handling!
                 # Packets are queued immediately when they arrive.
+                self._last_source = None
                 header, payload = await self.receive_packet(
                     timeout=_RECEIVER_POLL_TIMEOUT
                 )
+                source = self._last_source
+                if source is not None and self._is_retired_source(source):
+                    _LOGGER.debug(
+                        {
+                            "class": "DeviceConnection",
+                            "method": "_background_receiver",
+                            "action": "stale_epoch_response",
+                            "serial": self.serial,
+                            "epoch": self._address_epoch,
+                            "source_ip": source[0],
+                            "source_port": source[1],
+                        }
+                    )
+                    continue
 
                 # Compute correlation key (includes serial for defense-in-depth)
                 # For discovery connections, always use "000000000000" for correlation

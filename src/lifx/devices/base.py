@@ -742,6 +742,44 @@ class Device(Generic[StateT]):
         # An unobserved donor never erases an observation already made here.
         self.connection._adopt_thread_connection(source.connection.thread_connection)
 
+    def update_address(self, ip: str, port: int = LIFX_UDP_PORT) -> bool:
+        """Follow this device to a new IP address or port.
+
+        Call this when you learn from outside the library (a DHCP lease list,
+        a router, your own discovery) that the device with this serial now
+        lives somewhere else. The same object keeps working: ``ip`` and
+        ``port`` change, requests already in flight retransmit to the new
+        address, and replies from the old address are ignored from now on.
+
+        Nothing else changes. Cached label, firmware, group, location,
+        capabilities, discovery metadata and the device's own transport report
+        are kept and nothing is re-read, and no color, power or restore write
+        is sent. Discovery calls this for you when it is given this device
+        through ``known_devices`` and finds its serial elsewhere; see the
+        discovery guide.
+
+        An IPv6 zone change counts as a move. Passing the current address is a
+        no-op.
+
+        Args:
+            ip: New IPv4 or IPv6 address (IPv6 link-local needs a zone).
+            port: New UDP port (default 56700).
+
+        Returns:
+            ``True`` if the address changed, ``False`` if it was already
+            current.
+
+        Raises:
+            ValueError: If the address or port is not a usable device
+                endpoint. The device is left unchanged.
+        """
+        _validate_device_endpoint(ip, port, class_name=type(self).__name__)
+        if not self.connection.update_address(ip, port):
+            return False
+        self.ip = ip
+        self.port = port
+        return True
+
     @classmethod
     async def from_ip(
         cls,
