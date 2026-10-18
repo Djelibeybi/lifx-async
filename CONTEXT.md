@@ -109,3 +109,8 @@ be checked.
 Choosing turn-on brightness when no color is supplied: use suitable stored
 brightness first, otherwise the other light component's brightness, then the
 default brightness.
+
+**Device watcher** (working name, to settle in domain modelling):
+The long-lived object that runs discovery on a schedule, holds one device
+object per serial, and reports added, updated and removed events. Its terms
+(silent, silence threshold, sweep) have no glossary entries yet.

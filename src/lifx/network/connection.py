@@ -43,6 +43,16 @@ from lifx.protocol.packets import Device, get_packet_class
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def monotonic_now() -> float:
+    """Return the clock that stamps ``DeviceConnection.last_response_at``.
+
+    A module-level function so a test, or a watcher with an injected clock,
+    can substitute one source of time for every connection.
+    """
+    return time.monotonic()
+
+
 #: Canonical identity of a UDP endpoint: unscoped host, port, IPv6 scope id.
 _EndpointKey = tuple[str, int, int]
 
@@ -201,6 +211,8 @@ class DeviceConnection:
         self._transport_family: socket.AddressFamily | None = None
         # Incremented by every update_address() that changes the endpoint.
         self._address_epoch = 0
+        # monotonic_now() at the last response that matched a pending request.
+        self._last_response_at: float | None = None
         # Endpoints this device has moved away from, oldest first, bounded so
         # a flapping device cannot grow it. Responses from them are dropped.
         self._retired_endpoints: dict[_EndpointKey, None] = {}
@@ -289,6 +301,16 @@ class DeviceConnection:
         """
         if value is not None:
             self._thread_connection = value
+
+    @property
+    def last_response_at(self) -> float | None:
+        """When this connection last received a correlated response.
+
+        ``None`` until one arrives. The value comes from
+        :func:`monotonic_now`. Only a response that matched a pending request
+        counts: a stray, stale-epoch or unmatched datagram does not.
+        """
+        return self._last_response_at
 
     @property
     def address_epoch(self) -> int:
@@ -838,6 +860,7 @@ class DeviceConnection:
 
                 # Route to waiting request
                 if key in self._pending_requests:
+                    self._last_response_at = monotonic_now()
                     queue = self._pending_requests[key]
                     try:
                         # Put in queue for request coroutine to consume
