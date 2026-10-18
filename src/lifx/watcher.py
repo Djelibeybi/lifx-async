@@ -472,27 +472,38 @@ class DeviceWatcher:
         stream = _discover_verified_devices_mdns(**kwargs)
         async with aclosing(stream):
             async for device in stream:
-                self._ingest(await _follow_known_device(device, known))
+                await self._ingest(await _follow_known_device(device, known))
 
     async def _consume(self, stream: AsyncGenerator[Device[Any], None]) -> None:
         async with aclosing(stream):
             async for device in stream:
-                self._ingest(device)
+                await self._ingest(device)
 
-    def _ingest(self, device: Device[Any]) -> None:
-        """Record a discovery result. Known serials arrive as the held object.
+    async def _ingest(self, device: Device[Any]) -> None:
+        """Record a discovery result.
 
         Every stream fed here is correlated: a UDP sighting is a StateService
         reply to this sweep's request and an mDNS sighting has answered the
         verification probe, so the sighting itself counts as the device being
         heard.
+
+        A serial the watcher already holds normally arrives as the held
+        object, moved by discovery. The exception is a serial new to this
+        sweep that both legs find: each leg took its ``known_devices``
+        snapshot before either yielded, so the second leg hands over a fresh
+        object. The held object is the one callers have, so the later
+        endpoint is applied to it and the unused object is closed.
         """
         serial = _normalize(device.serial)
         self._heard[serial] = self._now()
-        if serial not in self._devices:
+        held = self._devices.get(serial)
+        if held is None:
             self._devices[serial] = device
             self._snapshots[serial] = _snapshot(device, self._polled.get(serial))
             self._emit(DeviceEventType.ADDED, serial)
+        elif held is not device:
+            held.update_address(device.ip, device.port)
+            await device.connection.close()
 
     async def _poll_devices(self) -> None:
         """Read the state the caller asked to keep fresh, for devices that are due.

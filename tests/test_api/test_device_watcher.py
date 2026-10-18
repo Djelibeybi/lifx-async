@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from lifx_emulator import EmulatedLifxServer
@@ -330,6 +330,51 @@ class TestConsumption:
                     await watcher.sweep()
                 event = await asyncio.wait_for(waiter, timeout=2.0)
                 assert event.type is DeviceEventType.UPDATED
+
+
+class TestFirstSweepRace:
+    async def test_second_leg_moves_the_retained_object_and_closes_its_own(
+        self,
+    ) -> None:
+        """Both legs start without the serial; the later endpoint wins."""
+        udp_port = get_free_port()
+        mdns_port = get_free_port()
+        from_udp = Light(serial=SERIAL_A, ip=LOOPBACK, port=udp_port)
+        from_mdns = Light(serial=SERIAL_A, ip=LOOPBACK, port=mdns_port)
+        from_mdns.connection.close = AsyncMock()  # type: ignore[method-assign]
+        mdns_started = asyncio.Event()
+        udp_added = asyncio.Event()
+
+        async def udp(**kwargs):
+            # Both legs have taken their known_devices snapshot by now.
+            await mdns_started.wait()
+            yield from_udp
+
+        async def mdns(**kwargs):
+            mdns_started.set()
+            await udp_added.wait()
+            yield from_mdns
+
+        with (
+            patch("lifx.watcher.discover_udp", udp),
+            patch("lifx.watcher._discover_verified_devices_mdns", mdns),
+        ):
+            watcher = _watcher(udp_port, mdns=True)
+            watcher.add_listener(lambda event: udp_added.set())
+            async with watcher:
+                events = _drain(watcher)
+                assert [e.type for e in events] == [
+                    DeviceEventType.ADDED,
+                    DeviceEventType.UPDATED,
+                ]
+                assert all(e.device is from_udp for e in events)
+                assert events[1].changes["address"] == (
+                    (LOOPBACK, udp_port),
+                    (LOOPBACK, mdns_port),
+                )
+                assert watcher.get(SERIAL_A) is from_udp
+                assert from_udp.port == mdns_port
+                from_mdns.connection.close.assert_awaited_once()
 
 
 class TestMdns:
