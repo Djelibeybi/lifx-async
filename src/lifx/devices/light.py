@@ -203,12 +203,18 @@ class Light(Device[LightState]):
         firmware does. A read taken sooner says nothing about whether the paint
         still shows, so verification and state capture wait for the record's
         ``settles_at`` first. Nothing to wait for costs nothing.
+
+        Another paint may replace the record while this sleeps, so the record
+        is read again after every wait and the wait ends only once the record
+        then current has landed: the caller reads the light for that record.
         """
-        record = self._paint_record
-        if record is None:
-            return
-        remaining = record.settles_at - time.monotonic()
-        if remaining > 0:
+        while True:
+            record = self._paint_record
+            if record is None:
+                return
+            remaining = record.settles_at - time.monotonic()
+            if remaining <= 0:
+                return
             await asyncio.sleep(remaining)
 
     async def start_effect(

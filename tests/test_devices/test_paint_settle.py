@@ -74,9 +74,44 @@ class TestAwaitPaintSettled:
         sleep.assert_not_awaited()
 
     async def test_a_fading_paint_waits_out_the_rest_of_its_fade(
-        self, multizone_light: MultiZoneLight, clock: None, sleep: AsyncMock
+        self,
+        multizone_light: MultiZoneLight,
+        monkeypatch: pytest.MonkeyPatch,
+        sleep: AsyncMock,
     ) -> None:
+        # Read before the wait and again after it; the event loop shares the
+        # clock, so it keeps answering once the ticks run out.
+        ticks = iter([100.0, 100.25])
+        monkeypatch.setattr(
+            "lifx.devices.light.time.monotonic", lambda: next(ticks, 100.25)
+        )
         multizone_light._paint_record = PaintRecord("mood", "x", settles_at=100.25)
         await multizone_light._await_paint_settled()
         sleep.assert_awaited_once()
         assert sleep.await_args.args[0] == pytest.approx(0.25)
+
+    async def test_a_paint_made_during_the_wait_is_waited_for_too(
+        self,
+        multizone_light: MultiZoneLight,
+        monkeypatch: pytest.MonkeyPatch,
+        sleep: AsyncMock,
+    ) -> None:
+        """The record is re-read after every sleep, so a newer fade is honoured."""
+        ticks = iter([100.0, 100.0, 100.5])
+        monkeypatch.setattr(
+            "lifx.devices.light.time.monotonic", lambda: next(ticks, 100.5)
+        )
+        multizone_light._paint_record = PaintRecord("mood", "a", settles_at=100.25)
+        newer = PaintRecord("mood", "b", settles_at=100.5)
+
+        async def repaint(_remaining: float) -> None:
+            multizone_light._paint_record = newer
+
+        sleep.side_effect = repaint
+        await multizone_light._await_paint_settled()
+
+        assert [call.args[0] for call in sleep.await_args_list] == [
+            pytest.approx(0.25),
+            pytest.approx(0.5),
+        ]
+        assert multizone_light._paint_record is newer
