@@ -3,28 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum
 
 from lifx.onboard.errors import MissingCredentialsError
 from lifx.protocol.models import LIFX_OUI, Serial
+from lifx.protocol.protocol_types import WifiSecurity
 
 _MAX_SSID_BYTES = 32
 _MAX_PASSWORD_BYTES = 64
-
-
-# TODO(#329): replace with lifx.protocol.protocol_types.WifiSecurity once
-# ticket 327 is merged.
-class WifiSecurity(IntEnum):
-    """Wi-Fi security modes understood by packet 305."""
-
-    UNKNOWN = 0
-    OPEN = 1
-    WEP_PSK = 2
-    WPA_TKIP_PSK = 3
-    WPA_AES_PSK = 4
-    WPA2_AES_PSK = 5
-    WPA2_TKIP_PSK = 6
-    WPA2_MIXED_PSK = 7
 
 
 @dataclass(frozen=True)

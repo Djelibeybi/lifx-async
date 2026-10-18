@@ -21,6 +21,8 @@ repos:
   - id: check-case-conflict
   - id: check-merge-conflict
   - id: detect-private-key
+    # The fake SoftAP's synthetic, untrusted test key lives here on purpose.
+    exclude: ^tests/test_onboard/fixtures/
   - id: mixed-line-ending
     args: [--fix=lf]
   - id: check-docstring-first
