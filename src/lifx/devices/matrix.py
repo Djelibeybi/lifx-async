@@ -1465,7 +1465,9 @@ class MatrixLight(PaintTracking, Light):
             cloud_saturation_min: Minimum cloud saturation (0-255, for CLOUDS)
             cloud_saturation_max: Maximum cloud saturation (0-255, for CLOUDS)
             soft_off: Turn the light off when a SUNSET ends. Valid for
-                SKY with SUNSET only
+                SKY with SUNSET only. Verified on hardware (2026-10-18): a
+                Path with host firmware 4.200 reported power off at the end
+                of a 15 s Sunset
 
         Raises:
             LifxUnsupportedCommandError: If SKY is requested on a device that
@@ -1734,6 +1736,9 @@ class MatrixLight(PaintTracking, Light):
         Rendering keeps the full rectangle; the cells with no LED are turned off
         here, once, at paint time. Caller writes and state restore go through
         :meth:`set_matrix_colors` and are never masked.
+
+        ``Animator._mask_hidden_cells`` applies the same mask to protocol
+        tuples on the animation hot path; keep the two in step.
         """
         physical = self._to_physical(tile, colors)
         masked = self.capabilities.masked_zones if self.capabilities else frozenset()

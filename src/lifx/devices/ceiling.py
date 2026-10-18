@@ -498,9 +498,13 @@ class CeilingLight(ComponentMatrixLight):
         Returns:
             Zone index (63 for standard Ceiling, 127 for Ceiling 13x26)
 
+        The tile chain must be loaded first, which the async context manager
+        does on entry.
+
         Raises:
-            LifxError: If the device version or tile chain is not available, or
-                the device is not a Ceiling product
+            LifxError: If the device version or the tile chain has not been
+                loaded (use the async context manager), or the device is not a
+                Ceiling product
         """
         if not self.version:
             raise LifxError("Device version not available. Use async context manager.")

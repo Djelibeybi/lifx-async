@@ -1018,6 +1018,10 @@ class Animator:
         A Ceiling's uplight is never masked, so it stays addressable. A light
         component's frame darkens only the cells it draws (``only``), so the
         other component's held colors pass through untouched.
+
+        :meth:`lifx.devices.matrix.MatrixLight._to_painted` applies the same
+        mask to HSBK colors at paint time; keep the two in step. This one stays
+        on protocol tuples so the frame hot path does no conversion.
         """
         capabilities = self._device.capabilities if self._device else None
         masked = capabilities.masked_zones if capabilities else frozenset()

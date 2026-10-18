@@ -128,8 +128,11 @@ What a move does:
 - `device.ip` and `device.port` report the new address.
 - A request that was in flight is not failed. Its next retransmission goes to
   the new address, so it completes there.
-- A late reply from the old address is ignored (logged at debug level), so it
-  cannot be mistaken for an answer from the device.
+- A late reply from an address the connection has left is ignored (logged at
+  debug level), so it cannot be mistaken for an answer from the device. Only
+  endpoints the connection has moved away from are filtered: a connection that
+  never moved still accepts a reply by source, sequence and serial alone, as
+  before.
 - The cached label, firmware, group, location, product capabilities and the
   device's own `connectivity` report are kept. Nothing is re-read.
 - No color, power or restore write is ever sent. A move only changes where

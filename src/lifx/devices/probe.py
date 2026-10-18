@@ -7,6 +7,10 @@ answered makes it a multizone light, and neither makes it a plain light.
 
 Ceiling and Mirror are never inferred here, because telling them apart needs a
 product id the registry has never seen.
+
+Verified on hardware (2026-10-18): with their product ids removed from the
+registry, a Path was probed as a matrix light, a Beam as a multizone light and
+a Mini as a plain light.
 """
 
 from __future__ import annotations

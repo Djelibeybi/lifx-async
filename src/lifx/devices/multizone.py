@@ -843,10 +843,8 @@ class MultiZoneLight(PaintTracking, Light):
 
         Note:
             A multi-chunk write is normally sent as NO_APPLY chunks with
-            APPLY on the last one. The reference library lifxlan-go instead
-            sends every chunk with NO_APPLY and then an empty APPLY_ONLY
-            packet. That alternative is a fallback if a device mis-applies
-            the last chunk. This method's behavior is unchanged.
+            APPLY on the last one. The lifxlan-go library instead sends
+            every chunk with NO_APPLY and then an empty APPLY_ONLY packet.
 
         Args:
             zone_index: Starting zone index

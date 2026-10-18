@@ -66,7 +66,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=5,
         height=6,
         zones=frozenset({2, 3, 4}),
-        verified="pending",  # TODO: ISO date of the fleet check
+        verified="pending",  # filled by the single-bright-color check
     ),
     HiddenCellFamily(
         name="Ceiling 8x8",
@@ -74,7 +74,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=8,
         height=8,
         zones=frozenset({0, 1, 6, 7, 56, 57, 62, 63}),
-        verified="pending",  # TODO: ISO date of the fleet check
+        verified="pending",  # filled by the single-bright-color check
         uplight_zone=63,
     ),
     HiddenCellFamily(
@@ -83,7 +83,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=16,
         height=8,
         zones=frozenset({0, 1, 14, 15, 112, 113, 126, 127}),
-        verified="pending",  # TODO: ISO date of the fleet check
+        verified="pending",  # filled by the single-bright-color check
         uplight_zone=127,
     ),
     HiddenCellFamily(
@@ -92,7 +92,7 @@ HIDDEN_CELL_FAMILIES: tuple[HiddenCellFamily, ...] = (
         width=7,
         height=5,
         zones=frozenset({0, 6, 28, 34}),
-        verified="pending",  # TODO: ISO date of the fleet check
+        verified="pending",  # filled by the single-bright-color check
     ),
 )
 

@@ -340,9 +340,11 @@ class DeviceConnection:
         families (IPv4 to IPv6 or back) rebinds the socket on the next send.
         The observed transport report survives.
 
-        Replies are filtered only against endpoints this connection has left.
-        A connection that never moved keeps correlating on source, sequence
-        and serial alone, as before.
+        Replies are dropped only when they come from an endpoint this
+        connection has left; a reply from any other source is not rejected for
+        its address. This is not a "current address only" rule: a connection
+        that never moved keeps correlating on source, sequence and serial
+        alone, as before.
 
         An IPv6 zone change counts as a move, because the zone selects the
         interface the packet leaves on.

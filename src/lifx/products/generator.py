@@ -440,8 +440,10 @@ class ProductInfo:
     def visible_zone_count(self) -> int | None:
         """Cells that have an LED, or None when the registry knows no size.
 
-        Only the products with hidden cells have a registry size; for every
-        other product the count is whatever the device reports.
+        The registry only knows the cell count for products with a
+        hidden-cell entry (Candle, Ceiling and Luna families); for every other
+        product this is None. Callers should then fall back to the tile size
+        the device reports.
         """
         family = hidden_cell_family(self.pid)
         return family.visible_zone_count if family else None
