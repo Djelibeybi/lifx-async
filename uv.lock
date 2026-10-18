@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.10"
 
 [[package]]
@@ -180,7 +180,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -286,7 +286,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "hatchling", specifier = ">=1.27.0" },
-    { name = "lifx-emulator-core", specifier = ">=3.12.4" },
+    { name = "lifx-emulator-core", specifier = ">=3.15.0" },
     { name = "llmstxt-standalone", specifier = ">=0.2.0" },
     { name = "mkdocstrings-python", specifier = ">=2.0.3" },
     { name = "prek", specifier = ">=0.3.6" },
@@ -307,16 +307,17 @@ dev = [
 
 [[package]]
 name = "lifx-emulator-core"
-version = "3.12.4"
+version = "3.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "ifaddr" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "zeroconf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/a5/73d424b4a3c34919b1b92a80c2331985b8ac24f3b13f985117f04f898373/lifx_emulator_core-3.12.4.tar.gz", hash = "sha256:4295da4da2093e3c8d5dff9b7120d503669e66f5d2eb02e1c2d43b5b7d3751dd", size = 240831, upload-time = "2026-10-05T03:53:21.706Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/36/66203b0c5f553aa76337d36d3d0dbafd673222b50ab50360a68bc5e46435/lifx_emulator_core-3.15.0.tar.gz", hash = "sha256:de5c990b4a1996ca24fbcdbd189babc57edcdf089cf45b529a1a6c449899e380", size = 274063, upload-time = "2026-10-18T11:54:08.794Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/11/dac5ea10f2ec407685439f38af24f8e41935fc95718bfe84304882ff87d2/lifx_emulator_core-3.12.4-py3-none-any.whl", hash = "sha256:06d708082623a9ae0e4c81ed2645366f7e01d9b3b1f5b8cf19e6c7ce0e64a297", size = 141050, upload-time = "2026-10-05T03:53:20.206Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/a0/afd5444dd76da76c6a3b8f6a64a75bf588963a492280fe1e9a39e0e0050e/lifx_emulator_core-3.15.0-py3-none-any.whl", hash = "sha256:e4161fd9add70beacd9e8b428e82eb609faccf7b44d81177cb2d193fb7102bbb", size = 156517, upload-time = "2026-10-18T11:54:07.161Z" },
 ]
 
 [[package]]

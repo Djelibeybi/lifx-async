@@ -1537,10 +1537,12 @@ class MultiZoneLight(PaintTracking, Light):
         if power_on and not is_on:
             await self.set_all_color_zones(colors, duration=0)
             await self.set_power(True, duration=duration)
+            fade = 0.0
         else:
             # Light is already on, or we're not turning it on - apply with duration
             await self.set_all_color_zones(colors, duration=duration)
-        self._record_paint("theme", theme, colors)
+            fade = duration
+        self._record_paint("theme", theme, colors, fade)
 
     async def _paint_mood(
         self,
@@ -1555,11 +1557,11 @@ class MultiZoneLight(PaintTracking, Light):
         colors = self._clamp_colors(
             MoodGenerator(theme).get_multizone_colors(zone_count, brightness)
         )
-        await self._write_mood(
+        fade = await self._write_mood(
             lambda duration: self.set_all_color_zones(colors, duration=duration),
             power_on,
         )
-        self._record_paint("mood", theme, colors)
+        self._record_paint("mood", theme, colors, fade)
         return []
 
     async def animate_mood(self, theme: Theme) -> None:
@@ -1606,6 +1608,7 @@ class MultiZoneLight(PaintTracking, Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        await self._await_paint_settled()
         record = self._paint_record
         await super().refresh_state()
 
@@ -1619,7 +1622,11 @@ class MultiZoneLight(PaintTracking, Light):
         self._check_paint(record, lambda r: r.matches_zones(zones))
 
     async def _verify_paint(self) -> None:
-        """Read every zone and clear the record unless each still matches."""
+        """Read every zone and clear the record unless each still matches.
+
+        A paint still fading is read once its fade has ended.
+        """
+        await self._await_paint_settled()
         record = self._paint_record
         if record is not None:
             zones = await self.get_all_color_zones()

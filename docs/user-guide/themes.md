@@ -361,7 +361,9 @@ The property does not know whether the light still shows the paint. To check, re
 `await light.get_current_theme()` or `await light.get_current_mood()`. Each reads the zones or
 tiles (or, for firmware Morph, the effect) and returns the slug only if the light still shows
 exactly what was painted, allowing for the rounding of colors to uint16. If it does not, the
-record is cleared and the call returns `None`. A light is never identified from its colors: a
+record is cleared and the call returns `None`. A paint written with a fade, as a mood is, is read
+once the fade has ended: the light reports the colors it is passing through until then, and the
+check waits for the remainder of the fade rather than mistaking them for a change. A light is never identified from its colors: a
 paint this object did not make reads as `None`. `refresh_state()` runs the same check on the state
 it already fetches, with no extra request.
 

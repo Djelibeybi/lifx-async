@@ -117,8 +117,8 @@ were last painted with, for a theme that has a slug.
 |---|---|---|
 | `current_theme` | The in-memory record, with no request | The slug of the theme last painted as a theme, or `None` |
 | `current_mood` | The in-memory record, with no request | The slug of the theme last painted as a mood, or `None` |
-| `await get_current_theme()` | The light, then the record | The slug if the light still shows the paint, or `None` |
-| `await get_current_mood()` | The light, then the record | The slug if the light still shows the paint, or `None` |
+| `await get_current_theme()` | The light, once any fade it was painted with has ended, then the record | The slug if the light still shows the paint, or `None` |
+| `await get_current_mood()` | The light, once any fade it was painted with has ended, then the record | The slug if the light still shows the paint, or `None` |
 | `await refresh_state()` | The state it already fetches | Nothing; clears the record if the light no longer shows it |
 
 A light has at most one of the two. Verification compares every zone or tile with what was
