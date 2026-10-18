@@ -239,10 +239,17 @@ class TestAutoJoin:
         # Twenty polls still on the SoftAP outlast auto_join_wait many times
         # over; a budget counted from disassociate would already have expired
         # and forced a join before the OS lands the host on the original.
+        # Windows sleeps in roughly 15 ms steps, so those polls can take
+        # 0.3 s; the rejoin budget is widened so only the auto-join budget
+        # can decide the outcome.
         joiner = _full_joiner()
         joiner.after_disassociate = [SOFTAP_SSID] * 20 + [None, ORIGINAL_SSID]
         result, _ = await _run(
-            home_network, joiner, auto_join_wait=0.015, rejoin_poll=0.005
+            home_network,
+            joiner,
+            auto_join_wait=0.05,
+            rejoin_poll=0.005,
+            rejoin_timeout=2.0,
         )
         assert joiner.rejoins == []
         assert result.host_network == ORIGINAL_SSID
@@ -475,9 +482,11 @@ class TestCancellation:
         with pytest.raises(asyncio.CancelledError) as info:
             await asyncio.wait_for(task, HANG_GUARD_TIMEOUT)
         # The failure is logged, not chained: a chained error could carry a
-        # backend's message into the cancellation's traceback.
+        # backend's message into the cancellation's traceback. asyncio may
+        # attach another CancelledError as the implicit context, which is
+        # harmless; a backend's Exception never may be.
         assert info.value.__cause__ is None
-        assert info.value.__context__ is None
+        assert not isinstance(info.value.__context__, Exception)
         assert joiner.rejoins == [(ORIGINAL_SSID, "")]
 
 
