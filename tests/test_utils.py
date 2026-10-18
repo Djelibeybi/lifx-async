@@ -194,3 +194,59 @@ class TestSerialImmutability:
         serial = Serial.from_string("d073d5123456")
         with pytest.raises(Exception):  # FrozenInstanceError in Python 3.10+
             serial.value = b"\x00" * 6  # type: ignore
+
+
+class TestSerialFromSuffix:
+    """Test Serial.from_suffix() method."""
+
+    def test_prepends_oui(self) -> None:
+        assert Serial.from_suffix("8274eb") == Serial.from_string("d073d58274eb")
+
+    def test_uppercase_is_accepted(self) -> None:
+        assert Serial.from_suffix("8274EB").to_string() == "d073d58274eb"
+
+    @pytest.mark.parametrize(
+        "text", ["", "8274e", "8274ebc", "82zz4e", "82 74e", "8274e\n", "d073d58274eb"]
+    )
+    def test_rejects_bad_suffix(self, text: str) -> None:
+        with pytest.raises(ValueError):
+            Serial.from_suffix(text)
+
+    def test_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError):
+            Serial.from_suffix(b"8274eb")  # type: ignore[arg-type]
+
+
+class TestSerialFromSoftApSsid:
+    """Test Serial.from_softap_ssid() method."""
+
+    def test_candle_name(self) -> None:
+        serial = Serial.from_softap_ssid("LIFX Candle Color 8274eb")
+        assert serial == Serial.from_string("d073d58274eb")
+
+    def test_minimal_name(self) -> None:
+        assert Serial.from_softap_ssid("LIFX 8274eb").to_string() == "d073d58274eb"
+
+    def test_uppercase_tail_is_lowercased(self) -> None:
+        assert Serial.from_softap_ssid("LIFX A 8274EB").to_string() == "d073d58274eb"
+
+    @pytest.mark.parametrize(
+        "ssid",
+        [
+            "Neighbour4C0A17",
+            "LIFX 12",
+            "LIFX",
+            "LIFX Candle zzzzzz",
+            "lifx Candle 8274eb",
+            "LIFX 8274e",
+            "LIFX Candle 8274eb\n",
+            "",
+        ],
+    )
+    def test_rejects_bad_name(self, ssid: str) -> None:
+        with pytest.raises(ValueError):
+            Serial.from_softap_ssid(ssid)
+
+    def test_rejects_non_string(self) -> None:
+        with pytest.raises(TypeError):
+            Serial.from_softap_ssid(None)  # type: ignore[arg-type]
