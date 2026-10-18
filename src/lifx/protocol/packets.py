@@ -28,6 +28,8 @@ from lifx.protocol.protocol_types import (
     TileBufferRect,
     TileEffectSettings,
     TileStateDevice,
+    WifiInterface,
+    WifiSecurity,
 )
 
 
@@ -1368,6 +1370,32 @@ class Tile(Packet):
         settings: TileEffectSettings
 
 
+class Wifi(Packet):
+    """Wifi category packets."""
+
+    @dataclass
+    class SetAccessPoint(Packet):
+        """Packet type 305."""
+
+        PKT_TYPE: ClassVar[int] = 305
+        _fields: ClassVar[list[dict[str, Any]]] = [
+            {"name": "Interface", "type": "<WifiInterface>", "size_bytes": 1},
+            {"name": "Ssid", "type": "[32]byte", "size_bytes": 32},
+            {"name": "Password", "type": "[64]byte", "size_bytes": 64},
+            {"name": "Security", "type": "<WifiSecurity>", "size_bytes": 1},
+        ]
+
+        # Packet metadata for automatic handling
+        _packet_kind: ClassVar[str] = "SET"
+        _requires_ack: ClassVar[bool] = True
+        _requires_response: ClassVar[bool] = False
+
+        interface: WifiInterface
+        ssid: bytes
+        password: bytes
+        security: WifiSecurity
+
+
 # Packet Registry - maps packet type to nested packet class
 PACKET_REGISTRY: dict[int, type[Packet]] = {
     2: Device.GetService,
@@ -1418,6 +1446,7 @@ PACKET_REGISTRY: dict[int, type[Packet]] = {
     148: Light.GetLastHevCycleResult,
     149: Light.StateLastHevCycleResult,
     223: Device.StateUnhandled,
+    305: Wifi.SetAccessPoint,
     401: Sensor.GetAmbientLight,
     402: Sensor.StateAmbientLight,
     501: MultiZone.SetColorZones,
