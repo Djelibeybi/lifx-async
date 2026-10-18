@@ -94,7 +94,9 @@ class DeviceStateManager:
         """Capture current device state.
 
         A capture within the settle window of the light's last restore returns
-        the prestate that restore wrote, without reading the device.
+        the prestate that restore wrote, without reading the device. Only a
+        restore whose every write landed opens the window; after one that
+        failed or skipped a write, the device is read.
 
         Captures power state, colour, zone colours (for multizone devices) and
         the colours of every tile (for matrix lights) to enable restoration
@@ -220,11 +222,16 @@ class DeviceStateManager:
         # off goes dark first and gets its colours back once it reports off,
         # so they never show as a flash; if it never reports off, they are
         # not written at all.
+        # ``complete`` stays True only while every write the restore needs
+        # has landed: a failed or skipped write, or a fallback to one color,
+        # leaves the light showing something other than the prestate.
         write_colours = True
         exact = False
+        complete = True
         if not prestate.power:
-            await self._restore_power(light, prestate.power)
+            complete = await self._restore_power(light, prestate.power)
             write_colours = await self._wait_until_off(light)
+            complete = complete and write_colours
 
         if write_colours:
             # SetColor paints every zone, so it must never follow zones or
@@ -234,13 +241,17 @@ class DeviceStateManager:
                 exact = await self._restore_zones(light, prestate.zone_colors)
                 if not exact:
                     await self._restore_color(light, prestate.color)
+                complete = complete and exact
             elif isinstance(light, MatrixLight) and prestate.tile_colors:
                 exact = await self._restore_tiles(light, prestate.tile_colors)
+                complete = complete and exact
             else:
-                await self._restore_color(light, prestate.color)
+                written = await self._restore_color(light, prestate.color)
+                complete = complete and written
 
         if prestate.power:
-            await self._restore_power(light, prestate.power)
+            powered = await self._restore_power(light, prestate.power)
+            complete = complete and powered
 
         # The zones or tiles are back exactly, so the light shows what the
         # record described. After a failed or skipped write, a fallback to one
@@ -253,13 +264,18 @@ class DeviceStateManager:
             await reinstate_stored_colors(light, prestate.stored_colors)
 
         # Stamped once the writes are done, so the count includes them and only
-        # a later caller write ends the window.
-        if self._settle_window > 0:
+        # a later caller write ends the window. Only a complete restore is
+        # stamped: after a failed or skipped write the light may still show
+        # the effect or a fallback color, so the next capture must read it,
+        # and an entry from an earlier restore no longer describes it either.
+        if self._settle_window > 0 and complete:
             self._restored[light.serial] = (
                 self._clock(),
                 light._state_writes,
                 prestate,
             )
+        else:
+            self._restored.pop(light.serial, None)
 
     async def restore_component(
         self, light: ComponentMatrixLight, component: ComponentName, prestate: PreState
@@ -449,16 +465,20 @@ class DeviceStateManager:
             )
             return False
 
-    async def _restore_color(self, light: Light, color: HSBK) -> None:
+    async def _restore_color(self, light: Light, color: HSBK) -> bool:
         """Restore device color.
 
         Args:
             light: Light device to restore color to
             color: HSBK color to restore
+
+        Returns:
+            Whether the color was written
         """
         try:
             await light.set_color(light._clamp_color(color), duration=0.0)
             await asyncio.sleep(COLOR_UPDATE_SETTLE_DELAY)  # Let color update
+            return True
         except Exception as e:
             _LOGGER.warning(
                 {
@@ -477,6 +497,7 @@ class DeviceStateManager:
                     },
                 }
             )
+            return False
 
     async def _wait_until_off(self, light: Light) -> bool:
         """Wait for a power-off to take effect before colours are written.
@@ -506,15 +527,19 @@ class DeviceStateManager:
         )
         return False
 
-    async def _restore_power(self, light: Light, power: bool) -> None:
+    async def _restore_power(self, light: Light, power: bool) -> bool:
         """Restore power state.
 
         Args:
             light: Light device to restore power to
             power: Power state to restore (True=on, False=off)
+
+        Returns:
+            Whether the power was written
         """
         try:
             await light.set_power(power, duration=0.0)
+            return True
         except Exception as e:
             _LOGGER.warning(
                 {
@@ -525,6 +550,7 @@ class DeviceStateManager:
                     "values": {"serial": light.serial, "power": power},
                 }
             )
+            return False
 
     def __repr__(self) -> str:
         """String representation of DeviceStateManager."""
