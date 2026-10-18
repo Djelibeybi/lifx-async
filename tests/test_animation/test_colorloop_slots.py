@@ -119,6 +119,24 @@ class TestTwoColourLoopsOnOneTile:
         assert tile[63 * 4] == _hue_at(2.0)
         assert tile[0] == _hue_at(2.0)
 
+    async def test_a_writer_beyond_the_participants_sends_unclamped(
+        self, mock_udp_socket: MockUdpSocket, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A writer with no participant of its own has no range to clamp to."""
+        monkeypatch.setattr(AckGate, "gated", property(lambda _self: False))
+        ceiling = _ceiling()
+        loops = await self._loops(ceiling)
+        up, up_writer, down, down_writer = loops
+        self._now = 1001.0
+        frame, ctx = self._frame(down, down_writer, 1.0)
+        down._deliver(0, down_writer, frame, ctx, False)
+        sent = len(self._sent_durations(mock_udp_socket))
+
+        frame, ctx = self._frame(up, up_writer, 1.0)
+        up._deliver(1, up_writer, frame, ctx, False)
+
+        assert len(self._sent_durations(mock_udp_socket)) == sent + 1
+
     async def test_neither_loop_streams_a_held_fade_on_thread(
         self, mock_udp_socket: MockUdpSocket, monkeypatch: pytest.MonkeyPatch
     ) -> None:

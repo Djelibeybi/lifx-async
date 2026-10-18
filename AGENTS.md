@@ -285,6 +285,7 @@ gh workflow run docs.yml
    - `products/`: Product registry module
      - `products/__init__.py`: Public API exports
      - `products/registry.py`: Auto-generated product database (from products.json)
+     - `products/hidden_cells.py`: Hand-maintained cells with no LED per Candle, Ceiling and Luna family (`ProductInfo.hidden_zones`); each family's `verified` field records the date the maintainer verified it on hardware, or "pending" until then
      - `products/generator.py`: Generator to download and parse products.json
 
 ### Device Capabilities Matrix
@@ -473,10 +474,10 @@ Local generator quirks:
   back to the same value. `FirmwareEffect` and `TileEffectSkyType` are open: LIFX say effect
   replies are polymorphic by effect type until they rebuild the effect messages, and a Mirror
   running the button-started Color Sweep reports `sky_type` 13
-- **sensor packets**: Adds undocumented ambient light sensor packets:
-  - `SensorGetAmbientLight` (401): Request packet with no parameters
-  - `SensorStateAmbientLight` (402): Response packet with lux field (float32)
-  - These packets are not in the official protocol.yml but are supported by LIFX devices with ambient light sensors
+- **no sensor or thread quirks**: the ambient light sensor packets (`SensorGetAmbientLight` 401,
+  `SensorStateAmbientLight` 402) and the Thread packets (`ThreadGetInfo` 1200, `ThreadStateInfo`
+  1201) were once injected locally but are now defined upstream in `protocol.yml`, so they are
+  generated like any other packet. The generator contains no injection code for either
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 

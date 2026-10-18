@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import socket
 import struct
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from lifx.animation.animator import Animator
+from lifx.animation.flow import ACK_INFLIGHT_LIMIT
 from lifx.animation.packets import HEADER_SIZE
 from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
@@ -340,6 +342,73 @@ class TestWriters:
     def test_a_writer_needs_a_prepared_animator(self) -> None:
         with pytest.raises(RuntimeError, match="prepare"):
             _matrix().animator._writer()
+
+
+class TestAnimatorFollowsTheDevice:
+    """Device.update_address() moves the Animator the device already owns."""
+
+    def test_frames_go_to_the_new_endpoint_on_the_same_socket_family(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        light = Light(serial="d073d5000001", ip="192.0.2.10")
+        animator = light.animator
+        animator.send_frame([(0, 0, 65535, 3500)])
+
+        assert light.update_address("192.0.2.11", 56701) is True
+        animator.send_frame([(0, 0, 65535, 3500)])
+
+        addresses = [c.args[1] for c in mock_udp_socket.sock.sendto.call_args_list]
+        assert addresses == [("192.0.2.10", 56700), ("192.0.2.11", 56701)]
+
+    def test_a_cross_family_move_opens_a_socket_of_the_new_family(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        light = Light(serial="d073d5000001", ip="192.0.2.10")
+        animator = light.animator
+        animator.send_frame([(0, 0, 65535, 3500)])
+
+        assert light.update_address("2001:db8::10") is True
+        animator.send_frame([(0, 0, 65535, 3500)])
+
+        families = [c.args[0] for c in mock_udp_socket.socket_class.call_args_list]
+        assert families == [socket.AF_INET, socket.AF_INET6]
+        mock_udp_socket.sock.close.assert_called_once()
+        address = mock_udp_socket.sock.sendto.call_args_list[-1].args[1]
+        assert address[:2] == ("2001:db8::10", 56700)
+
+    def test_probes_sent_to_the_old_endpoint_no_longer_gate(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        light = Light(serial="d073d5000001", ip="192.0.2.10")
+        animator = light.animator
+        for _ in range(ACK_INFLIGHT_LIMIT):
+            animator.send_frame([(0, 0, 65535, 3500)])
+        assert animator.send_frame([(0, 0, 65535, 3500)]).gated is True
+
+        assert light.update_address("192.0.2.11") is True
+
+        stats = animator.send_frame([(0, 0, 65535, 3500)])
+        assert stats.gated is False
+        assert stats.acks_outstanding == 1
+
+    def test_a_light_without_an_animator_moves_without_making_one(self) -> None:
+        light = Light(serial="d073d5000001", ip="192.0.2.10")
+
+        assert light.update_address("192.0.2.11") is True
+
+        assert light._animator is None
+        assert light.animator._ip == "192.0.2.11"
+
+    def test_the_same_address_leaves_the_animator_alone(
+        self, mock_udp_socket: MockUdpSocket
+    ) -> None:
+        light = Light(serial="d073d5000001", ip="192.0.2.10")
+        animator = light.animator
+        animator.send_frame([(0, 0, 65535, 3500)])
+
+        assert light.update_address("192.0.2.10") is False
+
+        mock_udp_socket.sock.close.assert_not_called()
 
 
 async def test_a_single_light_describes_its_own_geometry() -> None:

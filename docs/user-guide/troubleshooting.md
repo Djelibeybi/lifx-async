@@ -198,6 +198,26 @@ async def resilient_operation(ip: str, max_retries: int = 3):
     print("All retries exhausted")
 ```
 
+### Unknown Product
+
+**Symptom:** a device's `capabilities.name` reads `Unknown product 123`, or
+`device.is_unknown_product` is `True`.
+
+**Cause:** the device is a LIFX product newer than the product registry bundled
+with your version of lifx-async. The library does not refuse it. It asks the
+device which queries it answers: a matrix chain answer makes it a `MatrixLight`,
+an extended color zones answer makes it a `MultiZoneLight`, and neither makes it
+a `Light`. Color is assumed, and the color temperature range is the library's
+default (2500 to 9000 K). Ceiling and Mirror products are never inferred,
+because telling them apart needs a known product id.
+
+**What to do:** upgrade lifx-async, which ships a newer registry. If the product
+is still unknown after upgrading, open an issue at
+<https://github.com/Djelibeybi/lifx-async/issues> and include the product id
+from the name (the number after "Unknown product"), the product name on the
+box, and the device class you got. Do not include your serial number or IP
+address.
+
 ## Timeout Errors
 
 ### Request Timeouts

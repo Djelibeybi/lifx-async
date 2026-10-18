@@ -790,7 +790,11 @@ class Animator:
         if not self._slot_writers:
             # A whole-tile frame replaces a tile left over from slots.
             self._hold = None
-        return self._transmit(lambda: canvas.apply(hsbk), duration_ms, start_time)
+        return self._transmit(
+            lambda: self._mask_hidden_cells(canvas.apply(hsbk)),
+            duration_ms,
+            start_time,
+        )
 
     def _slot_writer(
         self,
@@ -995,10 +999,35 @@ class Animator:
         if settled:
             for component, (slot, canvas, fade) in self._slot_targets.items():
                 frames[component] = (slot, canvas, fade.frame_at(ends_at))
+        drawn: set[int] = set()
         for slot, canvas, frame in frames.values():
             mapped = canvas.apply(frame)
             for position, source in zip(slot.positions, slot.sources):
                 tile[position] = mapped[source]
+            drawn.update(slot.positions)
+        return self._mask_hidden_cells(tile, only=drawn)
+
+    def _mask_hidden_cells(
+        self,
+        tile: list[tuple[int, int, int, int]],
+        only: set[int] | None = None,
+    ) -> list[tuple[int, int, int, int]]:
+        """Send the cells with no LED dark, once, as the frame is assembled.
+
+        The canvas keeps its full rectangle; only the assembled frame changes.
+        A Ceiling's uplight is never masked, so it stays addressable. A light
+        component's frame darkens only the cells it draws (``only``), so the
+        other component's held colors pass through untouched.
+
+        :meth:`lifx.devices.matrix.MatrixLight._to_painted` applies the same
+        mask to HSBK colors at paint time; keep the two in step. This one stays
+        on protocol tuples so the frame hot path does no conversion.
+        """
+        capabilities = self._device.capabilities if self._device else None
+        masked = capabilities.masked_zones if capabilities else frozenset()
+        for index in masked if only is None else masked & only:
+            hue, saturation, _brightness, kelvin = tile[index]
+            tile[index] = (hue, saturation, 0, kelvin)
         return tile
 
     def _transmit(
@@ -1077,6 +1106,21 @@ class Animator:
             total_time_ms=(end_time - start_time) * 1000,
             acks_outstanding=self._ack_gate.outstanding_count,
         )
+
+    def _follow(self, ip: str, port: int) -> None:
+        """Send every later frame to a new endpoint; see `Device.update_address`.
+
+        The socket is closed and reopened on the next frame, so a move across
+        address families gets a socket of the right family and a late ack
+        from the old endpoint can never free a probe sent to the new one.
+        The ack gate starts open: its outstanding probes were sent to an
+        endpoint that will not answer them. Writers borrowed from this
+        Animator send through it, so they follow without being told.
+        """
+        validate_address(ip)
+        self.close()
+        self._ip = ip
+        self._port = port
 
     def close(self) -> None:
         """Close the UDP socket.

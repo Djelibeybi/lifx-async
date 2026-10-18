@@ -135,3 +135,14 @@ async def main():
         async with device:
             await device.set_power(True)
 ```
+
+## Device Watcher
+
+Continuous discovery with `added`, `updated` and `removed` events. See the
+[discovery guide](../user-guide/discovery.md#watching-devices-continuously).
+
+::: lifx.watcher.DeviceWatcher
+
+::: lifx.watcher.DeviceEvent
+
+::: lifx.watcher.DeviceEventType

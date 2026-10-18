@@ -114,7 +114,9 @@ class LIFXEffect(ABC):
                     if not isinstance(light, MatrixLight):
                         # Set the startup colour immediately, then power on
                         startup_color = await self.from_poweroff_hsbk(light)
-                        await light.set_color(startup_color, duration=0)
+                        await light.set_color(
+                            light._clamp_color(startup_color), duration=0
+                        )
                     await light.set_power(True, duration=POWER_ON_TRANSITION_DURATION)
                     return True
                 return False

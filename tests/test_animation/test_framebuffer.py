@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from lifx.animation.framebuffer import FrameBuffer, TileRegion
+from lifx.animation.orientation import Orientation, build_orientation_lut
+from tests.test_animation.conftest import MockTileInfo
 
 
 class TestFrameBuffer:
@@ -135,6 +137,75 @@ class TestFrameBufferClassMethods:
         assert fb.canvas_width == 8
         assert fb.canvas_height == 8
         assert fb.tile_regions is None  # No tile regions for non-chain devices
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_orients_a_luna_by_its_own_axes(
+        self, mock_tile_upright
+    ) -> None:
+        """Test a Luna, which has no chain, still gets an orientation LUT."""
+        mock_tile_upright.accel_meas_x = 0
+        mock_tile_upright.accel_meas_y = 0
+        mock_tile_upright.accel_meas_z = 100  # RotatedLeft on a Luna
+        device = MagicMock()
+        device.device_chain = [mock_tile_upright]
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = False
+        device.capabilities.pid = 219
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert fb.tile_regions is not None
+        assert len(fb.tile_regions) == 1
+        assert fb.tile_regions[0].x == 0
+        assert fb.tile_regions[0].y == 0
+        assert fb.tile_regions[0].orientation_lut == build_orientation_lut(
+            8, 8, Orientation.ROTATED_270
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("accel_z", "orientation"),
+        [(100, Orientation.ROTATED_270), (-100, Orientation.ROTATED_90)],
+    )
+    async def test_for_matrix_turns_a_luna_on_its_side_into_a_5_by_7_canvas(
+        self, accel_z: int, orientation: Orientation
+    ) -> None:
+        """Test a 7x5 Luna lying on a side presents a 5 wide by 7 high canvas."""
+        tile = MockTileInfo(
+            tile_index=0, width=7, height=5, accel_meas_y=0, accel_meas_z=accel_z
+        )
+        device = MagicMock()
+        device.device_chain = [tile]
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = False
+        device.capabilities.pid = 219
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert fb.pixel_count == 35
+        assert (fb.canvas_width, fb.canvas_height) == (5, 7)
+        canvas = [(i, 0, 0, 0) for i in range(35)]
+        lut = build_orientation_lut(7, 5, orientation)
+        assert fb.apply(canvas) == [canvas[src] for src in lut]
+        assert fb.apply(canvas) != canvas
+
+    @pytest.mark.asyncio
+    async def test_for_matrix_turns_an_upside_down_luna_around(self) -> None:
+        """Test a 7x5 Luna upside down keeps a 7 wide by 5 high canvas."""
+        tile = MockTileInfo(
+            tile_index=0, width=7, height=5, accel_meas_x=100, accel_meas_y=0
+        )
+        device = MagicMock()
+        device.device_chain = [tile]
+        device.capabilities = MagicMock()
+        device.capabilities.has_chain = False
+        device.capabilities.pid = 219
+
+        fb = await FrameBuffer.for_matrix(device)
+
+        assert (fb.canvas_width, fb.canvas_height) == (7, 5)
+        canvas = [(i, 0, 0, 0) for i in range(35)]
+        assert fb.apply(canvas) == canvas[::-1]
 
     @pytest.mark.asyncio
     async def test_for_matrix_loads_capabilities_when_none(

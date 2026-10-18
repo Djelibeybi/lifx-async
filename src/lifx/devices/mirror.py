@@ -963,7 +963,7 @@ class MirrorLight(ComponentMatrixLight):
 
         layout = self.layout
         generator = MatrixGenerator([((0, 0), (layout.width, layout.height))])
-        rendered = generator.get_theme_colors(theme)[0]
+        rendered = self._clamp_colors(generator.get_theme_colors(theme)[0])
 
         colors = _gather(rendered, self._component_positions(component))
 

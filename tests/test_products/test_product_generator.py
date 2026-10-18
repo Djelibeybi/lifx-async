@@ -21,6 +21,7 @@ from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
+from lifx._upstream import UpstreamCommit
 from lifx.products import ProductRegistry
 from lifx.products.generator import (
     download_products,
@@ -548,6 +549,15 @@ class TestGenerateRegistryFile:
 
 class TestMain:
     """Tests for the main generator entry point."""
+
+    @pytest.fixture(autouse=True)
+    def _offline_commit_lookup(self):
+        """Keep main() off the network when it looks up the upstream commit."""
+        with patch(
+            "lifx.products.generator.fetch_upstream_commit",
+            return_value=UpstreamCommit(),
+        ):
+            yield
 
     def test_main_success(self, tmp_path: Path, minimal_products_data: dict) -> None:
         """Test successful main execution."""
