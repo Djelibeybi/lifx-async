@@ -4,16 +4,30 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import logging
 
 import pytest
 
 from lifx.onboard import (
+    HomeNetwork,
+    HostRejoinError,
     OnboardEvent,
     OnboardEventQueue,
     OnboardEventType,
     OnboardPhase,
+    onboard,
 )
 from tests.conftest import HANG_GUARD_TIMEOUT
+from tests.test_onboard.conftest import (
+    HOME_PASSWORD,
+    HOME_SSID,
+    ORIGINAL_SSID,
+    FakeSoftApClient,
+    make_joiner,
+    make_scanner,
+    softap_network,
+)
+from tests.test_onboard.test_onboard import FAST
 
 
 def _event(n: int) -> OnboardEvent:
@@ -97,3 +111,88 @@ async def test_closing_wakes_a_waiting_iterator() -> None:
     queue.close()
     with pytest.raises(StopAsyncIteration):
         await asyncio.wait_for(waiter, HANG_GUARD_TIMEOUT)
+
+
+class TestDeliveryDuringOnboarding:
+    async def test_a_raising_callback_does_not_abort_onboarding(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        calls = 0
+
+        def explode(event: OnboardEvent) -> None:
+            nonlocal calls
+            calls += 1
+            raise RuntimeError("ui crashed")
+
+        with caplog.at_level(logging.ERROR, logger="lifx.onboard"):
+            result = await onboard(
+                home_network,
+                scanner=make_scanner([softap_network()]),
+                joiner=make_joiner(current=ORIGINAL_SSID, reporter=True),
+                softap=FakeSoftApClient(),
+                verify=False,
+                on_event=explode,
+                **FAST,
+            )
+        assert result.phase is None
+        assert calls == 10
+        assert "event callback failed" in caplog.text
+
+    async def test_a_full_queue_drops_the_oldest_events(
+        self, home_network: HomeNetwork
+    ) -> None:
+        queue = OnboardEventQueue(maxsize=3)
+        await onboard(
+            home_network,
+            scanner=make_scanner([softap_network()]),
+            joiner=make_joiner(current=ORIGINAL_SSID, reporter=True),
+            softap=FakeSoftApClient(),
+            verify=False,
+            events=queue,
+            **FAST,
+        )
+        assert queue.dropped == 7
+        queue.close()
+        assert [event.type async for event in queue] == [
+            OnboardEventType.CONFIGURED,
+            OnboardEventType.REJOINING,
+            OnboardEventType.REJOINED,
+        ]
+
+    async def test_the_password_never_appears_in_events_logs_or_errors(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        seen: list[OnboardEvent] = []
+        joiner = make_joiner(
+            current=ORIGINAL_SSID,
+            reporter=True,
+            forgetter=True,
+            disassociator=True,
+            rejoin_failures=10_000,
+            forget_error=OSError("no such profile"),
+        )
+        with caplog.at_level(logging.DEBUG):
+            with pytest.raises(HostRejoinError) as info:
+                await onboard(
+                    home_network,
+                    scanner=make_scanner([softap_network()]),
+                    joiner=joiner,
+                    softap=FakeSoftApClient(),
+                    verify=False,
+                    on_event=seen.append,
+                    events=OnboardEventQueue(),
+                    rejoin_ssid=HOME_SSID,
+                    rejoin_password="override-secret",
+                    **FAST,
+                )
+        assert seen, "the run emitted events"
+        for event in seen:
+            assert HOME_PASSWORD not in repr(event)
+            assert "override-secret" not in repr(event)
+        assert HOME_PASSWORD not in caplog.text
+        assert "override-secret" not in caplog.text
+        error = info.value
+        assert HOME_PASSWORD not in str(error)
+        assert HOME_PASSWORD not in repr(error)
+        assert HOME_PASSWORD not in repr(error.result)
+        assert HOME_SSID in caplog.text, "SSIDs may be logged"
