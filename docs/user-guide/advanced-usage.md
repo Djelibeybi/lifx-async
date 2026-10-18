@@ -7,6 +7,7 @@ This guide covers advanced lifx patterns and techniques for building robust LIFX
 - [Discovery Methods](#discovery-methods)
 - [Storing State](#storing-state)
 - [Connection Management](#connection-management)
+- [Measuring Reachability](#measuring-reachability)
 - [Concurrency Patterns](#concurrency-patterns)
 - [Error Handling](#error-handling)
 - [Device Capabilities](#device-capabilities)
@@ -231,6 +232,21 @@ async def main():
 - Lazy opening: connection opens only when needed
 - Automatic cleanup on context exit
 - Concurrent requests are supported: responses are correlated to each request, so they never mix
+
+## Measuring Reachability
+
+`Device.ping()` measures the round-trip time to a device without changing its state. It sends an echo request with a 64-byte payload (an 8-byte counter followed by random bytes), waits for the echo response carrying the same payload, and returns the round-trip time in seconds. A response with a different payload is ignored.
+
+```python
+from lifx import Device
+
+async def check(ip: str) -> None:
+    async with await Device.connect(ip) as light:
+        rtt = await light.ping()
+        print(f"Round trip: {rtt * 1000:.1f} ms")
+```
+
+`ping()` uses the connection's normal retransmission, so the reported time includes any retransmits. If no matching response arrives before the request deadline it raises `LifxTimeoutError`. Concurrent pings on one device each receive their own response.
 
 ## Concurrency Patterns
 

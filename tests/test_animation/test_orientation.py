@@ -5,8 +5,12 @@ from __future__ import annotations
 import pytest
 
 from lifx.animation.orientation import (
+    LUNA_PRODUCT_IDS,
+    TILE_PRODUCT_ID,
     Orientation,
     build_orientation_lut,
+    nearest_orientation,
+    orientation_group,
 )
 
 
@@ -165,3 +169,67 @@ class TestBuildOrientationLut:
         assert lut[0] == 7
         # Last physical position maps to first framebuffer index
         assert lut[7] == 0
+
+
+class TestOrientationGroups:
+    """Tests for the per-product accelerometer axis maps."""
+
+    def test_groups_by_product(self) -> None:
+        """Test Tile and Luna products find their group, others none."""
+        assert orientation_group(TILE_PRODUCT_ID) == "Tile"
+        assert LUNA_PRODUCT_IDS == (219, 220)
+        assert all(orientation_group(pid) == "Luna" for pid in LUNA_PRODUCT_IDS)
+        assert orientation_group(57) is None  # Candle
+
+    def test_negative_x_differs_between_luna_and_tile(self) -> None:
+        """Test the same reading means different things on each product."""
+        assert nearest_orientation(219, -100, 0, 0) == "Upright"
+        assert nearest_orientation(TILE_PRODUCT_ID, -100, 0, 0) == "RotatedLeft"
+
+    @pytest.mark.parametrize(
+        ("reading", "expected"),
+        [
+            ((100, 0, 0), "UpsideDown"),
+            ((-100, 0, 0), "Upright"),
+            ((0, 100, 0), "FaceDown"),
+            ((0, -100, 0), "FaceUp"),
+            ((0, 0, 100), "RotatedLeft"),
+            ((0, 0, -100), "RotatedRight"),
+        ],
+    )
+    @pytest.mark.parametrize("pid", LUNA_PRODUCT_IDS)
+    def test_luna_map(
+        self, pid: int, reading: tuple[int, int, int], expected: str
+    ) -> None:
+        """Test each dominant Luna axis."""
+        assert nearest_orientation(pid, *reading) == expected
+
+    @pytest.mark.parametrize(
+        ("reading", "expected"),
+        [
+            ((100, 0, 0), "RotatedRight"),
+            ((-100, 0, 0), "RotatedLeft"),
+            ((0, 100, 0), "UpsideDown"),
+            ((0, -100, 0), "Upright"),
+            ((0, 0, 100), "FaceDown"),
+            ((0, 0, -100), "FaceUp"),
+        ],
+    )
+    def test_tile_map(self, reading: tuple[int, int, int], expected: str) -> None:
+        """Test each dominant Tile axis."""
+        assert nearest_orientation(TILE_PRODUCT_ID, *reading) == expected
+
+    def test_invalid_reading_is_upright(self) -> None:
+        """Test the all -1 sentinel reads as upright on both groups."""
+        assert nearest_orientation(219, -1, -1, -1) == "Upright"
+        assert nearest_orientation(TILE_PRODUCT_ID, -1, -1, -1) == "Upright"
+
+    def test_ties_fall_back_to_y_axis(self) -> None:
+        """Test a tie with no dominant axis is decided by the sign of Y."""
+        assert nearest_orientation(219, 5, 5, 5) == "FaceDown"
+        assert nearest_orientation(219, 5, -5, 5) == "FaceUp"
+
+    def test_product_in_neither_group_has_no_orientation(self) -> None:
+        """Test a Candle is never given an orientation, whatever it reports."""
+        assert nearest_orientation(57, 100, 0, 0) is None
+        assert nearest_orientation(57, -1, -1, -1) is None

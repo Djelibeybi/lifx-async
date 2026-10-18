@@ -422,3 +422,130 @@ async def test_restore_state_multizone_keeps_its_zones(state_manager) -> None:
 
     assert shown == zone_colors
     light.set_color.assert_not_awaited()
+
+
+class _FakeClock:
+    """A clock the test advances by hand."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def _colour_light(serial: str = "d073d5000099") -> MagicMock:
+    light = MagicMock()
+    light.serial = serial
+    light.set_color = AsyncMock()
+    light.set_power = AsyncMock()
+    light._state_writes = 0
+    light.get_color = AsyncMock(
+        return_value=(HSBK(hue=10, saturation=1.0, brightness=0.5, kelvin=3500), 0, "")
+    )
+    return light
+
+
+class TestSettleWindow:
+    """A capture soon after a restore returns what was restored."""
+
+    async def test_capture_inside_the_window_returns_the_restored_prestate(
+        self,
+    ) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _colour_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+        # The device is mid-fade and would report something else.
+        light.get_color.return_value = (
+            HSBK(hue=200, saturation=1.0, brightness=1.0, kelvin=3500),
+            65535,
+            "",
+        )
+
+        clock.now += 4.9
+        second = await manager.capture_state(light)
+
+        assert second == first
+        light.get_color.assert_not_called()
+
+    async def test_capture_past_the_window_reads_the_device(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _colour_light()
+        first = await manager.capture_state(light)
+        await manager.restore_state(light, first)
+        light.get_color.reset_mock()
+
+        clock.now += 5.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_fresh_read_ends_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _colour_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        clock.now += 6.0
+        await manager.capture_state(light)
+        light.get_color.reset_mock()
+
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_a_light_that_was_not_restored_is_read(self) -> None:
+        manager = DeviceStateManager(clock=_FakeClock())
+        restored = _colour_light("d073d5000001")
+        other = _colour_light("d073d5000002")
+        await manager.restore_state(restored, await manager.capture_state(restored))
+
+        await manager.capture_state(other)
+
+        other.get_color.assert_awaited_once()
+
+    async def test_zero_disables_the_window(self) -> None:
+        manager = DeviceStateManager(settle_window=0, clock=_FakeClock())
+        light = _colour_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
+
+    async def test_the_window_is_configurable(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(settle_window=1.0, clock=clock)
+        assert manager.settle_window == 1.0
+        light = _colour_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        clock.now += 0.9
+        await manager.capture_state(light)
+        light.get_color.assert_not_called()
+
+        clock.now += 0.2
+        await manager.capture_state(light)
+        light.get_color.assert_awaited_once()
+
+    def test_a_negative_window_is_refused(self) -> None:
+        with pytest.raises(ValueError):
+            DeviceStateManager(settle_window=-1)
+
+    async def test_a_caller_write_after_the_restore_ends_the_window(self) -> None:
+        clock = _FakeClock()
+        manager = DeviceStateManager(clock=clock)
+        light = _colour_light()
+        await manager.restore_state(light, await manager.capture_state(light))
+        light.get_color.reset_mock()
+
+        light._state_writes += 1
+        clock.now += 1.0
+        await manager.capture_state(light)
+
+        light.get_color.assert_awaited_once()
