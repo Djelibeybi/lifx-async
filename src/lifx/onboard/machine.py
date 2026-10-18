@@ -2,11 +2,11 @@
 
 ``onboard()`` takes a device from its SoftAP onto the home network: resolve
 the target, scan, join, wait for the control socket, dial, configure, return
-the host to its own network and (ticket #331) verify the device on the LAN.
+the host to its own network and verify the device on the LAN.
 Each phase emits events, every failure is a typed ``LifxOnboardError`` whose
-``result`` describes the run, and once the host has joined the SoftAP any
-failure or cancellation runs host recovery so the machine is never left on
-the device's network.
+``result`` describes the run, and from the moment the host joins the SoftAP
+until it has rejoined its own network, any failure or cancellation runs host
+recovery so the machine is never left on the device's network.
 
 The timing defaults are lifx-onboard's, tuned on hardware. The password is
 never logged; SSIDs and phases are.
@@ -50,6 +50,7 @@ from lifx.onboard.softap import (
     SoftApClient,
     SoftApConnection,
 )
+from lifx.onboard.verify import LanVerification
 from lifx.protocol.models import Serial
 from lifx.watcher import DeviceWatcher
 
@@ -281,6 +282,7 @@ class _Run:
         _LOGGER.debug("onboarding starts on host network %r", self._original_ssid)
 
         joined = False
+        rejoined = False
         verified = False
         # Nothing is awaited inside the handler: an exception raised while
         # recovering would otherwise chain the failure as its __context__.
@@ -295,13 +297,16 @@ class _Run:
             await self._dial_phase()
             await self._configure_phase()
             self._host_network = await self._rejoin_phase()
+            rejoined = True
             verified = await self._verify_phase()
         except BaseException as error:
             failure = error
         if failure is None:
             return self._result(verified=verified)
         cancellation = None
-        if joined:
+        # Once the rejoin has succeeded the host is home; a verify failure or
+        # a cancellation during verification leaves nothing to recover.
+        if joined and not rejoined:
             cancellation = await _await_shielded(self._recover_host())
         if isinstance(failure, LifxOnboardError):
             failure.result = self._result(phase=failure.phase, error=failure)
@@ -642,13 +647,47 @@ class _Run:
             return
         _LOGGER.warning("host recovery exhausted every target")
 
-    # ---- verification (ticket #331) -------------------------------------
+    # ---- verification ----------------------------------------------------
 
     async def _verify_phase(self) -> bool:
-        """Confirm the device on the LAN; replaced by ticket #331."""
+        """Wait for the device to answer discovery off the SoftAP address.
+
+        ``verify`` is a caller's running watcher, used as is, or ``True`` for
+        a library-owned watcher that lives for this phase only. The listener
+        is registered before ``VERIFYING`` is emitted and before the owned
+        watcher's initial sweep, so a device that is already answering on
+        the LAN verifies at once, while whatever a caller's watcher recorded
+        before this moment is never consulted.
+        """
         if not self._verify:
             return False
-        raise NotImplementedError("LAN verification lands in ticket #331")
+        assert self._serial is not None
+        if self._verify is True:
+            owned = True
+            watcher: DeviceWatcher = DeviceWatcher(
+                sweep_interval=self._verify_poll, mdns=False
+            )
+        else:
+            owned = False
+            watcher = self._verify
+        verification = LanVerification(
+            watcher, self._serial, softap_address=self._softap.address
+        )
+        self._emit(
+            OnboardEventType.VERIFYING,
+            OnboardPhase.VERIFY,
+            serial=self._serial,
+            timeout=self._verify_timeout,
+        )
+        sighting = await verification.wait(self._verify_timeout, open_watcher=owned)
+        self._emit(
+            OnboardEventType.VERIFIED,
+            OnboardPhase.VERIFY,
+            serial=self._serial,
+            address=sighting.address,
+            took=sighting.took,
+        )
+        return True
 
 
 async def onboard(

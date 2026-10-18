@@ -12,13 +12,22 @@ import socket
 import ssl
 import warnings
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from types import MappingProxyType
+from typing import Any, cast
 
 import pytest
+from lifx_emulator import EmulatedLifxServer
+from lifx_emulator.devices import DeviceManager
+from lifx_emulator.factories import create_color_light
+from lifx_emulator.repositories import DeviceRepository
+from lifx_emulator.scenarios import HierarchicalScenarioManager
 
+from lifx import DeviceEvent, DeviceEventType, DeviceWatcher
+from lifx.network.discovery.mdns.discovery import _override_mdns_service_source
 from lifx.onboard import (
     SOFTAP_ADDRESS,
     SOFTAP_PORT,
@@ -27,7 +36,7 @@ from lifx.onboard import (
     SoftApUnreachableError,
 )
 from lifx.protocol.models import Serial
-from tests.conftest import HANG_GUARD_TIMEOUT
+from tests.conftest import HANG_GUARD_TIMEOUT, EmulatorRunner, get_free_port
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FAKE_AP_CERT = FIXTURES / "lifx-fake-ap.crt"
@@ -357,3 +366,118 @@ class FakeSoftApClient:
 
     async def close(self) -> None:
         self.closed += 1
+
+
+# ---- LAN verification: the emulator and a scriptable watcher ---------------
+
+LOOPBACK = "127.0.0.1"
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_mdns() -> Iterator[None]:
+    """Keep a real mDNS responder on the host out of every watcher sweep."""
+
+    async def empty_source():
+        return
+        yield  # noqa: B901
+
+    with _override_mdns_service_source(empty_source):
+        yield
+
+
+@contextmanager
+def emulator(serials: tuple[str, ...], port: int | None = None) -> Iterator[int]:
+    """Run the embedded emulator on the loopback with one color light per serial."""
+    scenario_manager = HierarchicalScenarioManager()
+    port = port or get_free_port()
+    server = EmulatedLifxServer(
+        devices=[
+            create_color_light(serial=s, scenario_manager=scenario_manager)
+            for s in serials
+        ],
+        device_manager=DeviceManager(DeviceRepository()),
+        bind_address=LOOPBACK,
+        port=port,
+        scenario_manager=scenario_manager,
+    )
+    runner = EmulatorRunner(server)
+    runner.start()
+    try:
+        yield port
+    finally:
+        runner.stop()
+
+
+def loopback_watcher(port: int, **kwargs: Any) -> DeviceWatcher:
+    """A ``DeviceWatcher`` that sweeps only the loopback, quickly."""
+    kwargs.setdefault("sweep_interval", 3600.0)
+    kwargs.setdefault("discovery_timeout", 0.5)
+    kwargs.setdefault("idle_timeout_multiplier", 0.5)
+    kwargs.setdefault("device_timeout", 2.0)
+    return DeviceWatcher(broadcast_address=LOOPBACK, port=port, **kwargs)
+
+
+@dataclass(frozen=True)
+class FakeSighting:
+    """Stands in for the device object a ``DeviceEvent`` carries."""
+
+    serial: str
+    ip: str
+    port: int
+
+
+class FakeWatcher:
+    """The listener surface of a ``DeviceWatcher``, driven by the test.
+
+    ``emit()`` delivers a ``DeviceEvent`` to every registered listener, so a
+    test can stage sightings the emulator cannot produce, such as a device
+    first seen at the SoftAP address.
+    """
+
+    def __init__(self, *, enter_takes: float = 0.0) -> None:
+        self.enter_takes = enter_takes
+        self._listeners: list[Any] = []
+        self.entered = 0
+        self.exited = 0
+        self.running = False
+
+    @property
+    def listener_count(self) -> int:
+        return len(self._listeners)
+
+    def add_listener(self, listener: Any) -> Any:
+        self._listeners.append(listener)
+
+        def remove() -> None:
+            if listener in self._listeners:
+                self._listeners.remove(listener)
+
+        return remove
+
+    async def __aenter__(self) -> FakeWatcher:
+        self.entered += 1
+        await asyncio.sleep(self.enter_takes)
+        self.running = True
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        self.exited += 1
+        self.running = False
+
+    def emit(
+        self,
+        event_type: DeviceEventType,
+        serial: str,
+        ip: str,
+        port: int = 56700,
+        changes: dict[str, tuple[object, object]] | None = None,
+    ) -> DeviceEvent:
+        event = DeviceEvent(
+            type=event_type,
+            serial=serial,
+            device=cast(Any, FakeSighting(serial, ip, port)),
+            changes=MappingProxyType(dict(changes or {})),
+        )
+        for listener in tuple(self._listeners):
+            listener(event)
+        return event

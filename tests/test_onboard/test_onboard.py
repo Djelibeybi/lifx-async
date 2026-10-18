@@ -53,6 +53,9 @@ HAPPY_PATH_EVENTS = [
     OnboardEventType.REJOINED,
 ]
 
+#: What a ``verify=True`` run appends to the happy path.
+VERIFY_EVENTS = [OnboardEventType.VERIFYING, OnboardEventType.VERIFIED]
+
 
 async def test_full_ssid_target_skips_the_scan(home_network: HomeNetwork) -> None:
     joiner = make_joiner(current=ORIGINAL_SSID, reporter=True)
@@ -367,26 +370,6 @@ class TestWait:
             )
         assert info.value.phase is OnboardPhase.WAIT
         assert "127.0.0.1" in str(info.value)
-
-
-class TestVerifyHook:
-    async def test_verify_true_is_not_implemented_yet_after_rejoin(
-        self, home_network: HomeNetwork
-    ) -> None:
-        joiner = make_joiner(current=ORIGINAL_SSID, reporter=True)
-        seen = []
-        with pytest.raises(NotImplementedError, match="331"):
-            await onboard(
-                home_network,
-                scanner=make_scanner([softap_network()]),
-                joiner=joiner,
-                softap=FakeSoftApClient(),
-                verify=True,
-                on_event=seen.append,
-                **FAST,
-            )
-        assert seen[-1].type is OnboardEventType.REJOINED
-        assert joiner.rejoins
 
 
 class TestEventsDelivery:
