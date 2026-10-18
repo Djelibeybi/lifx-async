@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 
 import pytest
 
@@ -473,5 +474,46 @@ class TestCancellation:
         task.cancel()
         with pytest.raises(asyncio.CancelledError) as info:
             await asyncio.wait_for(task, HANG_GUARD_TIMEOUT)
-        assert isinstance(info.value.__cause__, SoftApWaitTimeoutError)
+        # The failure is logged, not chained: a chained error could carry a
+        # backend's message into the cancellation's traceback.
+        assert info.value.__cause__ is None
+        assert info.value.__context__ is None
         assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+
+class TestNoPasswordInTracebacks:
+    async def test_cancel_while_sleeping_after_a_rejoin_error_leaves_no_trace(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner(rejoin_failures=10_000, rejoin_error_echoes_password=True)
+        joiner.after_disassociate = [None] * 100_000
+        task = asyncio.ensure_future(
+            _run(
+                home_network,
+                joiner,
+                rejoin_poll=0.5,
+                rejoin_timeout=0.05,
+                auto_join_wait=0.01,
+            )
+        )
+        # The first rejoin attempt has failed and the loop is sleeping.
+        while not joiner.rejoins:
+            await asyncio.sleep(0.001)
+        await asyncio.sleep(0.005)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError) as info:
+            await asyncio.wait_for(task, HANG_GUARD_TIMEOUT)
+        error = info.value
+        rendered = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        assert HOME_PASSWORD not in rendered
+        assert "nmcli" not in rendered
+        chain = []
+        link: BaseException | None = error
+        while link is not None:
+            chain.append(link)
+            link = link.__context__
+        assert all(HOME_PASSWORD not in str(link) for link in chain)
+        # Recovery still ran, and its own rejoin errors left no trace either.
+        assert len(joiner.rejoins) >= 2

@@ -281,6 +281,10 @@ class _Run:
         _LOGGER.debug("onboarding starts on host network %r", self._original_ssid)
 
         joined = False
+        verified = False
+        # Nothing is awaited inside the handler: an exception raised while
+        # recovering would otherwise chain the failure as its __context__.
+        failure: BaseException | None = None
         try:
             if self._softap_network is None:
                 self._softap_network = await self._scan_phase()
@@ -293,23 +297,24 @@ class _Run:
             self._host_network = await self._rejoin_phase()
             verified = await self._verify_phase()
         except BaseException as error:
-            cancellation = None
-            if joined:
-                cancellation = await _await_shielded(self._recover_host())
-            if isinstance(error, LifxOnboardError):
-                error.result = self._result(phase=error.phase, error=error)
-                self._emit(
-                    OnboardEventType.FAILED,
-                    error.phase,
-                    serial=self._serial,
-                    error=error,
-                )
-            if cancellation is not None and not isinstance(
-                error, asyncio.CancelledError
-            ):
-                raise cancellation from error
-            raise
-        return self._result(verified=verified)
+            failure = error
+        if failure is None:
+            return self._result(verified=verified)
+        cancellation = None
+        if joined:
+            cancellation = await _await_shielded(self._recover_host())
+        if isinstance(failure, LifxOnboardError):
+            failure.result = self._result(phase=failure.phase, error=failure)
+            self._emit(
+                OnboardEventType.FAILED,
+                failure.phase,
+                serial=self._serial,
+                error=failure,
+            )
+        if cancellation is not None and not isinstance(failure, asyncio.CancelledError):
+            _LOGGER.info("cancelled while recovering from %s", _name(failure))
+            raise cancellation from None
+        raise failure
 
     def _result(
         self,
@@ -391,18 +396,20 @@ class _Run:
         started = time.monotonic()
         deadline = started + self._find_timeout
         while True:
+            failed: str | None = None
             try:
                 await self._joiner.join(network)
             except Exception as error:
-                _LOGGER.warning("joining %r failed: %s", network.ssid, _name(error))
-                if time.monotonic() >= deadline:
-                    raise SoftApJoinError(
-                        f"Could not join {network.ssid!r} within "
-                        f"{self._find_timeout}s: {_name(error)}"
-                    ) from None
-                await asyncio.sleep(self._find_poll)
-            else:
+                failed = _name(error)
+            if failed is None:
                 break
+            _LOGGER.warning("joining %r failed: %s", network.ssid, failed)
+            if time.monotonic() >= deadline:
+                raise SoftApJoinError(
+                    f"Could not join {network.ssid!r} within "
+                    f"{self._find_timeout}s: {failed}"
+                )
+            await asyncio.sleep(self._find_poll)
         self._emit(
             OnboardEventType.JOINED,
             OnboardPhase.JOIN,
@@ -566,23 +573,25 @@ class _Run:
             if landed is not None:
                 return landed
         while True:
+            # The Joiner was handed the password, so its error is never
+            # logged, chained or kept alive across an await: only its type is.
+            failed: str | None = None
             try:
                 await self._joiner.rejoin(target.ssid, target.password)
             except Exception as error:
-                # The Joiner was handed the password, so its message and
-                # traceback are never logged or chained: only its type is.
-                if await self._current_ssid() == target.ssid:
-                    _LOGGER.debug("already on %r despite %s", target.ssid, _name(error))
-                    return target.ssid
-                _LOGGER.warning("rejoining %r failed: %s", target.ssid, _name(error))
-                if time.monotonic() >= deadline:
-                    raise HostRejoinError(
-                        f"Could not rejoin {target.ssid!r} within "
-                        f"{self._rejoin_timeout}s: {_name(error)}"
-                    ) from None
-                await asyncio.sleep(self._rejoin_poll)
-            else:
+                failed = _name(error)
+            if failed is None:
                 return target.ssid
+            if await self._current_ssid() == target.ssid:
+                _LOGGER.debug("already on %r despite %s", target.ssid, failed)
+                return target.ssid
+            _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
+            if time.monotonic() >= deadline:
+                raise HostRejoinError(
+                    f"Could not rejoin {target.ssid!r} within "
+                    f"{self._rejoin_timeout}s: {failed}"
+                )
+            await asyncio.sleep(self._rejoin_poll)
 
     async def _await_auto_join(self, deadline: float) -> str | None:
         """Give the OS auto-join a chance before forcing a join.
