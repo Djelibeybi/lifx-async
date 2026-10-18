@@ -840,6 +840,13 @@ class MultiZoneLight(PaintTracking, Light):
         This is more efficient than set_color_zones when setting different colors
         for many zones at once.
 
+        Note:
+            A multi-chunk write is normally sent as NO_APPLY chunks with
+            APPLY on the last one. The reference library lifxlan-go instead
+            sends every chunk with NO_APPLY and then an empty APPLY_ONLY
+            packet. That alternative is a fallback if a device mis-applies
+            the last chunk. This method's behavior is unchanged.
+
         Args:
             zone_index: Starting zone index
             colors: List of HSBK colors to set (max 82)
