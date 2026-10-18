@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Sequence
 
+from lifx.animation.transitions import TransitionWrite, clip_transitions
 from lifx.color import HSBK
 from lifx.const import MOOD_SCROLL_MAX_FADE_SECONDS, MOOD_SCROLL_STEP_SECONDS
 from lifx.devices.light import Light
@@ -149,7 +150,15 @@ class EffectScroll(LIFXEffect):
                 )
             plans.append((matrix, tiles, frames))
 
-        fade = min(MOOD_SCROLL_STEP_SECONDS, MOOD_SCROLL_MAX_FADE_SECONDS)
+        # One step's fade, clipped to the gap before the next step's write.
+        fade = clip_transitions(
+            [
+                TransitionWrite(0.0, "scroll", MOOD_SCROLL_MAX_FADE_SECONDS),
+                TransitionWrite(
+                    MOOD_SCROLL_STEP_SECONDS, "scroll", MOOD_SCROLL_MAX_FADE_SECONDS
+                ),
+            ]
+        )[0].duration
         step = 0
         while True:
             step += 1
