@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from typing import cast
+from unittest.mock import mock_open, patch
 
 import pytest
 
+from lifx._upstream import UpstreamCommit
 from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
@@ -26,6 +28,9 @@ from lifx.protocol.generator import (
     parse_field_type,
     to_snake_case,
     validate_protocol_spec,
+)
+from lifx.protocol.generator import (
+    main as generator_main,
 )
 from lifx.protocol.packets import PACKET_REGISTRY, get_packet_class
 from lifx.protocol.protocol_types import (
@@ -1282,3 +1287,54 @@ class TestBitFields:
         }
 
         assert validate_protocol_spec(protocol) == []
+
+
+STAMP = UpstreamCommit(
+    "abc123def456abc123def456abc123def456abcd", "2026-03-04T05:06:07Z"
+)
+
+
+class TestUpstreamStamp:
+    """Generated protocol headers name the upstream commit they came from."""
+
+    def test_types_header_carries_commit_and_timestamp(self):
+        code = generate_types_file({}, {}, upstream=STAMP)
+
+        assert STAMP.sha in code.split('"""', 2)[1]
+        assert STAMP.date in code.split('"""', 2)[1]
+
+    def test_packets_header_carries_commit_and_timestamp(self):
+        code = generate_packets_file({}, {}, upstream=STAMP)
+
+        assert STAMP.sha in code.split('"""', 2)[1]
+        assert STAMP.date in code.split('"""', 2)[1]
+
+    def test_headers_say_unknown_without_a_lookup(self):
+        assert "unknown" in generate_types_file({}, {}).split('"""', 2)[1]
+        assert "unknown" in generate_packets_file({}, {}).split('"""', 2)[1]
+
+    def test_main_stamps_both_files_with_looked_up_commit(self):
+        stamps = []
+
+        def fake_types(*args, upstream):
+            stamps.append(upstream)
+            return "x = 1\n"
+
+        def fake_packets(*args, upstream):
+            stamps.append(upstream)
+            return "y = 1\n"
+
+        with (
+            patch("lifx.protocol.generator.download_protocol", return_value={}),
+            patch(
+                "lifx.protocol.generator.fetch_upstream_commit", return_value=STAMP
+            ) as fetch,
+            patch("lifx.protocol.generator.generate_types_file", fake_types),
+            patch("lifx.protocol.generator.generate_packets_file", fake_packets),
+            patch("lifx.protocol.generator.format_generated_files"),
+            patch("builtins.open", mock_open()),
+        ):
+            generator_main()
+
+        assert stamps == [STAMP, STAMP]
+        assert fetch.call_args.args[0] == "LIFX/public-protocol"
