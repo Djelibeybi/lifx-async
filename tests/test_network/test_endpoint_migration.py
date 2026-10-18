@@ -71,8 +71,19 @@ def _silent_socket() -> Iterator[socket.socket]:
 
 
 async def _receive(sock: socket.socket) -> tuple[bytes, tuple[str, int]]:
+    """Receive one datagram without the 3.11-only ``loop.sock_recvfrom``.
+
+    The socket is read from a worker thread with a socket timeout, which
+    works on every supported Python version and event loop.
+    """
     loop = asyncio.get_running_loop()
-    return await asyncio.wait_for(loop.sock_recvfrom(sock, 2048), timeout=5.0)
+    sock.settimeout(5.0)
+    return await loop.run_in_executor(None, sock.recvfrom, 2048)
+
+
+def _send(sock: socket.socket, data: bytes, client: tuple[str, int]) -> None:
+    """Send one datagram; UDP ``sendto`` never blocks on loopback."""
+    sock.sendto(data, client)
 
 
 def _state_label(request: bytes, label: str) -> bytes:
@@ -258,8 +269,7 @@ class TestDeviceMigration:
                 data, client = await _receive(old)
                 conn.update_address(LOOPBACK, new_port)
                 # A late reply from the address the device moved away from.
-                loop = asyncio.get_running_loop()
-                await loop.sock_sendto(old, _state_label(data, "stale"), client)
+                _send(old, _state_label(data, "stale"), client)
                 state = await asyncio.wait_for(request, timeout=5.0)
                 assert state.label != "stale"
                 assert any(
@@ -281,8 +291,7 @@ class TestDeviceMigration:
                 data, client = await _receive(old)
                 conn.update_address(LOOPBACK, other)
                 conn.update_address(LOOPBACK, old.getsockname()[1])
-                loop = asyncio.get_running_loop()
-                await loop.sock_sendto(old, _state_label(data, "back"), client)
+                _send(old, _state_label(data, "back"), client)
                 state = await asyncio.wait_for(request, timeout=5.0)
                 assert state.label == "back"
             finally:
@@ -298,8 +307,7 @@ class TestDeviceMigration:
                     conn.request(packets.Device.GetLabel(), timeout=5.0)
                 )
                 data, client = await _receive(old)
-                loop = asyncio.get_running_loop()
-                await loop.sock_sendto(old, _state_label(data, "ok"), client)
+                _send(old, _state_label(data, "ok"), client)
                 assert (await request).label == "ok"
             finally:
                 await conn.close()
