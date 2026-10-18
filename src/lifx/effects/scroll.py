@@ -168,8 +168,8 @@ class EffectScroll(LIFXEffect):
                         tiles,
                         scrolled(
                             frames,
-                            [t.width for t in tiles],
-                            tiles[0].height,
+                            [matrix._logical_size(t)[0] for t in tiles],
+                            matrix._logical_size(tiles[0])[1],
                             step,
                             vertical=self.vertical,
                         ),

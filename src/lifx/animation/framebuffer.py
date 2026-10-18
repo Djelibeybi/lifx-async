@@ -43,6 +43,7 @@ from typing import TYPE_CHECKING
 from lifx.animation.orientation import (
     Orientation,
     build_orientation_lut,
+    logical_tile_size,
     nearest_orientation,
 )
 
@@ -59,9 +60,11 @@ class TileRegion:
     Attributes:
         x: X offset in canvas coordinates
         y: Y offset in canvas coordinates
-        width: Tile width in pixels
-        height: Tile height in pixels
-        orientation_lut: Lookup table for orientation remapping (optional)
+        width: Width of the tile's region on the canvas in pixels. A tile on
+            its side presents its height here (see ``logical_tile_size``)
+        height: Height of the tile's region on the canvas in pixels
+        orientation_lut: Lookup table for orientation remapping (optional).
+            Indexes the region's canvas pixels in row-major order
     """
 
     x: int
@@ -242,22 +245,24 @@ class FrameBuffer:
             )
             if orientation is not None:
                 # A fixed panel with an orientation group (a Luna): one tile at
-                # the canvas origin, remapped by its own axis map.
-                lut = build_orientation_lut(
-                    first_tile.width,
-                    first_tile.height,
-                    Orientation.from_string(orientation),
+                # the canvas origin, remapped by its own axis map. On its side
+                # it presents a canvas of swapped size (a 7x5 Luna is drawn
+                # 5 wide by 7 high) and the LUT turns that onto the tile.
+                turned = Orientation.from_string(orientation)
+                lut = build_orientation_lut(first_tile.width, first_tile.height, turned)
+                canvas_width, canvas_height = logical_tile_size(
+                    first_tile.width, first_tile.height, turned
                 )
                 return cls(
                     pixel_count=pixel_count,
-                    canvas_width=first_tile.width,
-                    canvas_height=first_tile.height,
+                    canvas_width=canvas_width,
+                    canvas_height=canvas_height,
                     tile_regions=[
                         TileRegion(
                             x=0,
                             y=0,
-                            width=first_tile.width,
-                            height=first_tile.height,
+                            width=canvas_width,
+                            height=canvas_height,
                             orientation_lut=lut,
                         )
                     ],

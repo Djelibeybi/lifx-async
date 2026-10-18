@@ -9,6 +9,7 @@ from lifx.animation.orientation import (
     TILE_PRODUCT_ID,
     Orientation,
     build_orientation_lut,
+    logical_tile_size,
     nearest_orientation,
     orientation_group,
 )
@@ -137,25 +138,49 @@ class TestBuildOrientationLut:
             # All indices should be in valid range
             assert all(0 <= i < 64 for i in lut)
 
-    def test_rotated_90_non_square_falls_back_to_identity(self) -> None:
-        """Test ROTATED_90 on non-square tile falls back to identity.
+    def test_rotated_90_non_square_reads_a_swapped_canvas(self) -> None:
+        """Test a 7x5 tile on its right side shows a 5 wide by 7 high canvas.
 
-        Non-square tiles cannot be rotated 90/270 degrees without changing
-        dimensions, so we fall back to identity transformation.
+        Physical (x, y) reads logical (height - 1 - y, x) on a canvas whose
+        width is the tile's height, so the logical top row lands on the
+        physical left column.
         """
-        lut = build_orientation_lut(16, 8, Orientation.ROTATED_90)
-        # Should be identity since 90 rotation isn't valid for non-square
-        assert lut == tuple(range(128))
+        lut = build_orientation_lut(7, 5, Orientation.ROTATED_90)
+        assert len(lut) == 35
+        assert sorted(lut) == list(range(35))
+        # Physical left column, top to bottom, reads the logical top row
+        # from its right end to its left.
+        assert [lut[y * 7] for y in range(5)] == [4, 3, 2, 1, 0]
+        # Physical bottom-right corner reads the logical bottom-left corner.
+        assert lut[34] == 30
 
-    def test_rotated_270_non_square_falls_back_to_identity(self) -> None:
-        """Test ROTATED_270 on non-square tile falls back to identity.
+    def test_rotated_270_non_square_reads_a_swapped_canvas(self) -> None:
+        """Test a 7x5 tile on its left side shows a 5 wide by 7 high canvas."""
+        lut = build_orientation_lut(7, 5, Orientation.ROTATED_270)
+        assert len(lut) == 35
+        assert sorted(lut) == list(range(35))
+        # Physical top-left corner reads the logical bottom-left corner.
+        assert lut[0] == 30
+        # Physical right column, top to bottom, reads the logical top row.
+        assert [lut[y * 7 + 6] for y in range(5)] == [0, 1, 2, 3, 4]
 
-        Non-square tiles cannot be rotated 90/270 degrees without changing
-        dimensions, so we fall back to identity transformation.
-        """
-        lut = build_orientation_lut(16, 8, Orientation.ROTATED_270)
-        # Should be identity since 270 rotation isn't valid for non-square
-        assert lut == tuple(range(128))
+    def test_quarter_turns_undo_each_other_on_a_non_square_tile(self) -> None:
+        """Test a side rotation applied through the LUT is undone by its inverse."""
+        canvas = list(range(35))
+        for orientation in (Orientation.ROTATED_90, Orientation.ROTATED_270):
+            lut = build_orientation_lut(7, 5, orientation)
+            physical = [canvas[src] for src in lut]
+            logical = [0] * 35
+            for dst, src in enumerate(lut):
+                logical[src] = physical[dst]
+            assert logical == canvas
+
+    def test_square_quarter_turns_are_unchanged(self) -> None:
+        """Test the 8x8 LUT still reads the square formula pixel for pixel."""
+        lut = build_orientation_lut(8, 8, Orientation.ROTATED_90)
+        assert lut == tuple((7 - y) + x * 8 for y in range(8) for x in range(8))
+        lut = build_orientation_lut(8, 8, Orientation.ROTATED_270)
+        assert lut == tuple(y + (7 - x) * 8 for y in range(8) for x in range(8))
 
     def test_rotated_180_works_for_non_square(self) -> None:
         """Test ROTATED_180 works correctly for non-square tiles.
@@ -169,6 +194,29 @@ class TestBuildOrientationLut:
         assert lut[0] == 7
         # Last physical position maps to first framebuffer index
         assert lut[7] == 0
+
+
+class TestLogicalTileSize:
+    """logical_tile_size(): the canvas a tile presents in its orientation."""
+
+    @pytest.mark.parametrize(
+        ("orientation", "expected"),
+        [
+            (Orientation.RIGHT_SIDE_UP, (7, 5)),
+            (Orientation.ROTATED_90, (5, 7)),
+            (Orientation.ROTATED_180, (7, 5)),
+            (Orientation.ROTATED_270, (5, 7)),
+            (Orientation.FACE_UP, (7, 5)),
+            (Orientation.FACE_DOWN, (7, 5)),
+        ],
+    )
+    def test_quarter_turns_swap_the_sides(
+        self, orientation: Orientation, expected: tuple[int, int]
+    ) -> None:
+        assert logical_tile_size(7, 5, orientation) == expected
+
+    def test_a_square_tile_keeps_its_size(self) -> None:
+        assert logical_tile_size(8, 8, Orientation.ROTATED_90) == (8, 8)
 
 
 class TestOrientationGroups:

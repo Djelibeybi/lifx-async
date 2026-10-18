@@ -24,6 +24,7 @@ from lifx.animation.framebuffer import FrameBuffer
 from lifx.animation.orientation import (
     Orientation,
     build_orientation_lut,
+    logical_tile_size,
     nearest_orientation,
 )
 from lifx.animation.packets import MatrixPacketGenerator, PacketGenerator
@@ -1670,11 +1671,15 @@ class MatrixLight(PaintTracking, Light):
         await self.ensure_capabilities()
         has_chain = bool(self.capabilities and self.capabilities.has_chain)
 
-        # Render the theme across the whole chain in one pass
+        # Render the theme across the whole chain in one pass. A fixed panel
+        # on its side (a Luna) is rendered on the canvas it presents, 5 wide
+        # by 7 high, and turned onto the tile below.
         if has_chain:
             generator = MatrixGenerator.from_tiles(tiles)
         else:
-            generator = MatrixGenerator([((0, 0), (t.width, t.height)) for t in tiles])
+            generator = MatrixGenerator(
+                [((0, 0), self._logical_size(t)) for t in tiles]
+            )
         tile_colors = [
             self._clamp_colors(colors) for colors in generator.get_theme_colors(theme)
         ]
@@ -1721,6 +1726,20 @@ class MatrixLight(PaintTracking, Light):
             tile.accel_meas_x,
             tile.accel_meas_y,
             tile.accel_meas_z,
+        )
+
+    def _logical_size(self, tile: TileInfo) -> tuple[int, int]:
+        """The canvas a tile presents, as (width, height).
+
+        A tile on its side presents a canvas of swapped size: a 7x5 Luna
+        lying on a side is painted 5 wide by 7 high. A tile whose product
+        applies no orientation keeps its own size.
+        """
+        orientation = self._tile_orientation(tile)
+        if orientation is None:
+            return tile.width, tile.height
+        return logical_tile_size(
+            tile.width, tile.height, Orientation.from_string(orientation)
         )
 
     def _to_physical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
@@ -1843,9 +1862,10 @@ class MatrixLight(PaintTracking, Light):
             )
         else:
             vertical = bool(self.version and has_vertical_theme(self.version.product))
+            width, height = self._logical_size(tiles[0])
             frames = [
                 generator.get_matrix_colors(
-                    tiles[0].width, tiles[0].height, brightness, vertical=vertical
+                    width, height, brightness, vertical=vertical
                 )
             ]
         frames = [self._clamp_colors(frame) for frame in frames]
