@@ -131,6 +131,9 @@ class Light(Device[LightState]):
     # Only lights that track paints (see ``PaintTracking``) ever set it, but
     # every color write ends it through ``_clear_paint_record()``.
     _paint_record: PaintRecord | None = None
+    # Counts color and power writes, so the effects state manager can tell
+    # whether anything wrote to the light since it last restored it.
+    _state_writes: int = 0
 
     @property
     def animator(self) -> Animator:
@@ -616,6 +619,7 @@ class Light(Device[LightState]):
         an in-flight transition, so a later component write does not undo a
         color change made through an inherited method.
         """
+        self._state_writes += 1
         self._clear_paint_record()
 
     async def get_power(self) -> int:
@@ -754,6 +758,8 @@ class Light(Device[LightState]):
                 "values": {"level": power_level, "duration": duration_ms},
             }
         )
+
+        self._state_writes += 1
 
         # Update state on acknowledgement
         if result and self._state is not None:

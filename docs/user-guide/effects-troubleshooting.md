@@ -504,6 +504,16 @@ await asyncio.sleep(0.5)
 await conductor.start(effect, lights)
 ```
 
+3. **Effect started right after another one stopped**
+
+A light that was just restored is still settling, and a device read at that moment
+would report colors the effect painted. For 5 seconds after a restore, the state
+manager hands the next start the prior state it restored rather than reading the
+light, so stopping an effect and immediately starting another puts back the
+original colors. A color or power write to the light in that time ends the window.
+The window is the `settle_window` argument of `DeviceStateManager` (in seconds);
+`0` turns it off.
+
 ---
 
 ### State Restoration Fails Silently
