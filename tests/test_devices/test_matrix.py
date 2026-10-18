@@ -1747,6 +1747,29 @@ class TestSunsetSoftOff:
         assert self._sent_parameter_bytes(matrix)[4] == byte
         assert matrix._tile_effect.soft_off is soft_off
 
+    async def test_sunset_ignores_cloud_saturation_min(
+        self, mock_device_factory
+    ) -> None:
+        matrix = self._matrix_light(mock_device_factory)
+        await matrix.set_effect(
+            FirmwareEffect.SKY,
+            speed=3.0,
+            sky_type=TileEffectSkyType.SUNSET,
+            soft_off=False,
+            cloud_saturation_min=1,
+        )
+        assert self._sent_parameter_bytes(matrix)[4] == 0
+
+    async def test_clouds_sends_cloud_saturation_min(self, mock_device_factory) -> None:
+        matrix = self._matrix_light(mock_device_factory)
+        await matrix.set_effect(
+            FirmwareEffect.SKY,
+            speed=3.0,
+            sky_type=TileEffectSkyType.CLOUDS,
+            cloud_saturation_min=77,
+        )
+        assert self._sent_parameter_bytes(matrix)[4] == 77
+
     @pytest.mark.parametrize(
         ("effect_type", "sky_type"),
         [

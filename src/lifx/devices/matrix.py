@@ -1503,29 +1503,6 @@ class MatrixLight(PaintTracking, Light):
             ...     speed=3.0,
             ... )
         """
-        if soft_off and not (
-            effect_type == FirmwareEffect.SKY and sky_type == TileEffectSkyType.SUNSET
-        ):
-            raise ValueError("soft_off applies to the SKY effect with SUNSET only")
-
-        if effect_type == FirmwareEffect.SKY:
-            try:
-                supported, reason = await self._resolve_sky_support()
-            except LifxTimeoutError:
-                # The support probe is best-effort. A device that fails to
-                # answer is not evidence of missing support, so the effect is
-                # still sent and the device's own reply decides the outcome.
-                _LOGGER.debug(
-                    "SKY support probe timed out for %s, sending the effect anyway",
-                    self.label or self.serial,
-                )
-            else:
-                if not supported:
-                    raise LifxUnsupportedCommandError(
-                        f"{self.label or self.serial} does not support the SKY"
-                        f" effect: {reason}"
-                    )
-
         _LOGGER.debug(
             "Setting matrix effect %s (speed=%gs) for %s",
             effect_type,
@@ -1567,6 +1544,24 @@ class MatrixLight(PaintTracking, Light):
             soft_off=soft_off,
         )
 
+        if effect_type == FirmwareEffect.SKY:
+            try:
+                supported, reason = await self._resolve_sky_support()
+            except LifxTimeoutError:
+                # The support probe is best-effort. A device that fails to
+                # answer is not evidence of missing support, so the effect is
+                # still sent and the device's own reply decides the outcome.
+                _LOGGER.debug(
+                    "SKY support probe timed out for %s, sending the effect anyway",
+                    self.label or self.serial,
+                )
+            else:
+                if not supported:
+                    raise LifxUnsupportedCommandError(
+                        f"{self.label or self.serial} does not support the SKY"
+                        f" effect: {reason}"
+                    )
+
         if effect_type == FirmwareEffect.MORPH and palette is None:
             # Rebuild rather than assign effect.palette directly: replace()
             # reruns __post_init__, so a derived palette passes the same
@@ -1601,7 +1596,8 @@ class MatrixLight(PaintTracking, Light):
                 # Sunset reads this byte as the soft-off flag
                 cloud_saturation_min=(
                     int(effect.soft_off)
-                    if effect.soft_off
+                    if effect.effect_type == FirmwareEffect.SKY
+                    and effect.sky_type == TileEffectSkyType.SUNSET
                     else effect.cloud_saturation_min
                 ),
                 cloud_saturation_max=effect.cloud_saturation_max,
