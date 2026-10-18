@@ -394,3 +394,25 @@ class TestGenerateProtocolFrame:
         assert len(effect.protocol_frame_calls) > 0
         # generate_frame should NOT have been called (overridden)
         assert len(effect.generate_frame_calls) == 0
+
+
+class TestFramesBeyondTheParticipants:
+    """Animators with no participant of their own."""
+
+    async def test_extra_animator_gets_an_unclamped_frame(self) -> None:
+        light = MagicMock()
+        light._clamp_frame.side_effect = lambda frame: [(0, 0, 0, 1234)] * len(frame)
+        own, extra = MagicMock(), MagicMock()
+        for animator in (own, extra):
+            animator.pixel_count = 2
+            animator.canvas_width = 2
+            animator.canvas_height = 1
+            animator.wraps = False
+        effect = ConcreteFrameEffect(fps=30.0, duration=0.05)
+        effect.participants = [light]
+        effect._animators = [own, extra]
+
+        await asyncio.wait_for(effect.async_play(), timeout=2.0)
+
+        assert {k for *_, k in own.send_frame.call_args_list[0][0][0]} == {1234}
+        assert {k for *_, k in extra.send_frame.call_args_list[0][0][0]} == {3500}
