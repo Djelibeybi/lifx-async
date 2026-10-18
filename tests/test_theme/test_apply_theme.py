@@ -464,6 +464,79 @@ class TestMatrixLightApplyTheme:
 
         assert ceiling_light.set_matrix_colors.call_args[0][1] == expected
 
+    @pytest.mark.parametrize(
+        ("accel", "orientation"),
+        [
+            ((1, 0, 0), Orientation.ROTATED_180),
+            ((-1, 0, 0), Orientation.RIGHT_SIDE_UP),
+            ((0, 1, 0), Orientation.FACE_DOWN),
+            ((0, -1, 0), Orientation.FACE_UP),
+            ((0, 0, 1), Orientation.ROTATED_270),
+            ((0, 0, -1), Orientation.ROTATED_90),
+        ],
+    )
+    async def test_apply_theme_orients_a_luna_on_its_own_axes(
+        self,
+        luna_light: MatrixLight,
+        accel: tuple[int, int, int],
+        orientation: Orientation,
+    ) -> None:
+        """Test a Luna is remapped by the Luna axis map, not the Tile's."""
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(0, accel=accel)]
+
+        random.seed(20260801)
+        canvas = MatrixGenerator([((0, 0), (8, 8))]).get_theme_colors(theme)[0]
+        lut = build_orientation_lut(8, 8, orientation)
+
+        random.seed(20260801)
+        luna_light.get_device_chain = AsyncMock(return_value=tiles)
+        await luna_light.apply_theme(theme)
+
+        sent = luna_light.set_matrix_colors.call_args[0][1]
+        assert sent == [canvas[src_idx] for src_idx in lut]
+
+    async def test_apply_theme_rotates_a_luna_lying_on_a_side(
+        self, luna_light: MatrixLight
+    ) -> None:
+        """Test a rotated Luna really reorders the colors."""
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(0, accel=(0, 0, 1))]  # RotatedLeft on a Luna
+
+        random.seed(20260801)
+        canvas = MatrixGenerator([((0, 0), (8, 8))]).get_theme_colors(theme)[0]
+
+        random.seed(20260801)
+        luna_light.get_device_chain = AsyncMock(return_value=tiles)
+        await luna_light.apply_theme(theme)
+
+        assert luna_light.set_matrix_colors.call_args[0][1] != canvas
+
+    async def test_unknown_product_is_never_rotated(
+        self, luna_light: MatrixLight
+    ) -> None:
+        """Test a device whose capabilities are not loaded applies no orientation."""
+        luna_light._capabilities = None
+        tile = make_tile(0, accel=(1, 0, 0))
+
+        assert luna_light._tile_orientation(tile) is None
+
+    async def test_apply_theme_never_rotates_a_candle(
+        self, candle_light: MatrixLight
+    ) -> None:
+        """Test a matrix product in neither group ignores what it reports."""
+        theme = Theme([Colors.RED, Colors.GREEN, Colors.BLUE])
+        tiles = [make_tile(0, accel=(1, 0, 0))]
+
+        random.seed(20260801)
+        canvas = MatrixGenerator([((0, 0), (8, 8))]).get_theme_colors(theme)[0]
+
+        random.seed(20260801)
+        candle_light.get_device_chain = AsyncMock(return_value=tiles)
+        await candle_light.apply_theme(theme)
+
+        assert candle_light.set_matrix_colors.call_args[0][1] == canvas
+
     async def test_apply_theme_ceiling_uses_reported_geometry(
         self, ceiling_light: CeilingLight
     ) -> None:
