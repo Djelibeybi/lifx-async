@@ -554,16 +554,20 @@ class MultiZoneLight(PaintTracking, Light):
                 zone_count = state.count
                 self._store_zone_count(zone_count)
                 end = min(zone_count - 1, end)
-                # Extract colors from response (up to 8 colors)
+                # A request covering exactly one zone is answered with
+                # StateZone (503), which carries a single color; any wider
+                # range gets StateMultiZone (506) with up to 8 colors.
+                reply_colors = (
+                    [state.color]
+                    if isinstance(state, packets.MultiZone.StateZone)
+                    else state.colors
+                )
                 zones_in_response = min(
                     8,
                     current_end - current_start + 1,
                     max(0, end - current_start + 1),
                 )
-                for i in range(zones_in_response):
-                    if i >= len(state.colors):
-                        break
-                    protocol_hsbk = state.colors[i]
+                for protocol_hsbk in reply_colors[:zones_in_response]:
                     colors.append(HSBK.from_protocol(protocol_hsbk))
                 break  # Single response per request
 
