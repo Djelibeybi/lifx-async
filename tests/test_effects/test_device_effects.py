@@ -13,6 +13,7 @@ from lifx.devices.light import Light
 from lifx.effects.base import LIFXEffect
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
+from tests.test_hidden_cell_support import darkened
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
@@ -331,7 +332,9 @@ async def test_ceiling_gets_its_components_back_after_stop_effect(ceiling_device
         await ceiling.start_effect(_SolidFrames(RED))
 
         async def showing_frames() -> bool:
-            return (await ceiling.get_all_tile_colors())[0] == [RED] * 128
+            return (await ceiling.get_all_tile_colors())[0] == darkened(
+                [RED] * 128, 201
+            )
 
         await _eventually(showing_frames)
         await ceiling.stop_effect()

@@ -15,6 +15,12 @@ The `CeilingLight` class provides high-level control over these components while
 | LIFX Ceiling 13x26 (US/Intl) | 128 | 16x8 grid, zone 127 = uplight |
 | LIFX Ceiling 13" (US/Intl) | 64 | 8x8 grid, zone 63 = uplight |
 
+The downlight has 63 addressable zones on the 8x8 models and 127 on the 16x8 model, but
+only 56 and 120 of them have an LED. The corner cells have nothing behind them. Themes,
+moods and software effects send those cells dark, and `ProductInfo.hidden_zones` and
+`ProductInfo.visible_zone_count` report them. Zone counts, color lists and slices keep
+their full length, and the uplight stays addressable through its own methods.
+
 All LIFX Ceiling devices are gen4, so the first command after a period of idle may
 arrive with a short wake-up delay — see
 [Gen4 Power-Save Wake Tail](troubleshooting.md#gen4-power-save-wake-tail) for details.

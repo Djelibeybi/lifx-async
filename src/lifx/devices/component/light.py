@@ -970,4 +970,4 @@ class ComponentMatrixLight(MatrixLight):
         duration: float,
     ) -> None:
         """Write the one shared tile through the component-aware path."""
-        await self._write_tile(frames[0], duration)
+        await self._write_tile(self._to_painted(tiles[0], frames[0]), duration)

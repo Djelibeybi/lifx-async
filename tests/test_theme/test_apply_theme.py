@@ -14,6 +14,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import MatrixGenerator, Theme
+from tests.test_hidden_cell_support import darkened
 from tests.test_theme.conftest import make_tile
 
 
@@ -462,7 +463,9 @@ class TestMatrixLightApplyTheme:
         ceiling_light.get_device_chain = AsyncMock(return_value=tiles)
         await ceiling_light.apply_theme(theme)
 
-        assert ceiling_light.set_matrix_colors.call_args[0][1] == expected
+        assert ceiling_light.set_matrix_colors.call_args[0][1] == darkened(
+            expected, 201
+        )
 
     @pytest.mark.parametrize(
         ("accel", "orientation"),
@@ -494,7 +497,7 @@ class TestMatrixLightApplyTheme:
         await luna_light.apply_theme(theme)
 
         sent = luna_light.set_matrix_colors.call_args[0][1]
-        assert sent == [canvas[src_idx] for src_idx in lut]
+        assert sent == darkened([canvas[src_idx] for src_idx in lut], 219)
 
     async def test_apply_theme_rotates_a_luna_lying_on_a_side(
         self, luna_light: MatrixLight
@@ -535,7 +538,7 @@ class TestMatrixLightApplyTheme:
         candle_light.get_device_chain = AsyncMock(return_value=tiles)
         await candle_light.apply_theme(theme)
 
-        assert candle_light.set_matrix_colors.call_args[0][1] == canvas
+        assert candle_light.set_matrix_colors.call_args[0][1] == darkened(canvas, 57)
 
     async def test_apply_theme_ceiling_uses_reported_geometry(
         self, ceiling_light: CeilingLight

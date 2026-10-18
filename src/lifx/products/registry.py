@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import IntEnum
 
+from lifx.products.hidden_cells import hidden_cell_family
+
 
 class ProductCapability(IntEnum):
     """Product capability flags."""
@@ -134,6 +136,33 @@ class ProductInfo:
     def has_extended_multizone(self) -> bool:
         """Check if product supports extended multizone."""
         return self.has_capability(ProductCapability.EXTENDED_MULTIZONE)
+
+    @property
+    def hidden_zones(self) -> frozenset[int]:
+        """Zones with no LED, empty for a product with none.
+
+        Rendering still covers the full rectangle; these cells are sent dark.
+        On a Ceiling the uplight zone is included, though the uplight
+        component still addresses it.
+        """
+        family = hidden_cell_family(self.pid)
+        return family.zones if family else frozenset()
+
+    @property
+    def masked_zones(self) -> frozenset[int]:
+        """Hidden zones a frame sends dark: ``hidden_zones`` less the uplight."""
+        family = hidden_cell_family(self.pid)
+        return family.masked_zones if family else frozenset()
+
+    @property
+    def visible_zone_count(self) -> int | None:
+        """Cells that have an LED, or None when the registry knows no size.
+
+        Only the products with hidden cells have a registry size; for every
+        other product the count is whatever the device reports.
+        """
+        family = hidden_cell_family(self.pid)
+        return family.visible_zone_count if family else None
 
     def supports_extended_multizone(self, firmware_version: int | None = None) -> bool:
         """Check if extended multizone is supported for given firmware version.

@@ -19,6 +19,7 @@ from lifx.effects.registry import get_effect_registry
 from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
 from tests.test_devices.test_component_transitions import Rig, build_rig
+from tests.test_hidden_cell_support import darkened
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
@@ -51,6 +52,11 @@ class _SolidFrames(FrameEffect):
     def generate_frame(self, ctx: FrameContext) -> list[HSBK]:
         self.contexts.append(ctx)
         return [self.colour] * ctx.pixel_count
+
+
+def _drawn(colour: HSBK) -> list[HSBK]:
+    """The downlight an effect draws in ``colour``: hidden cells sent dark."""
+    return darkened([colour] * 128, 201)[:DOWNLIGHT]
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
@@ -106,7 +112,7 @@ class TestCeilingComponentEffects:
             await ceiling.downlight.start_effect(effect)
 
             async def downlight_red() -> bool:
-                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                return (await _tile(ceiling))[:DOWNLIGHT] == _drawn(RED)
 
             await _eventually(downlight_red)
             assert (await _tile(ceiling))[UPLIGHT] == DIM_BLUE
@@ -149,7 +155,7 @@ class TestCeilingComponentEffects:
             await ceiling.downlight.start_effect(effect)
 
             async def downlight_red() -> bool:
-                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                return (await _tile(ceiling))[:DOWNLIGHT] == _drawn(RED)
 
             await _eventually(downlight_red)
 
@@ -162,7 +168,7 @@ class TestCeilingComponentEffects:
             for _ in range(10):  # later frames keep it
                 tile = await _tile(ceiling)
                 assert tile[UPLIGHT] == AMBER
-                assert tile[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                assert tile[:DOWNLIGHT] == _drawn(RED)
                 await asyncio.sleep(0.05)
 
             await ceiling.turn_uplight_off()
@@ -173,7 +179,7 @@ class TestCeilingComponentEffects:
             await _eventually(uplight_dark)
             assert not ceiling.uplight_is_on
             assert (await ceiling.get_power()) == 65535
-            assert (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+            assert (await _tile(ceiling))[:DOWNLIGHT] == _drawn(RED)
 
             await ceiling.turn_uplight_on()
             await _eventually(uplight_amber)
@@ -195,7 +201,7 @@ class TestCeilingComponentEffects:
             await conductor.start(effect, [ceiling.downlight])
 
             async def downlight_red() -> bool:
-                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                return (await _tile(ceiling))[:DOWNLIGHT] == _drawn(RED)
 
             await _eventually(downlight_red)
 
@@ -246,7 +252,7 @@ class TestCeilingComponentEffects:
             await conductor.start(effect, [ceiling.uplight, ceiling.downlight])
 
             async def all_red() -> bool:
-                return (await _tile(ceiling)) == [RED] * 128
+                return (await _tile(ceiling)) == darkened([RED] * 128, 201)
 
             await _eventually(all_red)
 
@@ -262,7 +268,7 @@ class TestCeilingComponentEffects:
             for _ in range(5):  # the downlight keeps drawing, the uplight keeps amber
                 tile = await _tile(ceiling)
                 assert tile[UPLIGHT] == AMBER
-                assert tile[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                assert tile[:DOWNLIGHT] == _drawn(RED)
                 await asyncio.sleep(0.05)
 
             await conductor.stop([ceiling.downlight])
@@ -281,7 +287,7 @@ class TestCeilingComponentEffects:
             await conductor.start(effect, [ceiling.uplight, ceiling.downlight])
 
             async def all_red() -> bool:
-                return (await _tile(ceiling)) == [RED] * 128
+                return (await _tile(ceiling)) == darkened([RED] * 128, 201)
 
             await _eventually(all_red)
 
@@ -298,7 +304,7 @@ class TestCeilingComponentEffects:
             for _ in range(5):  # the downlight keeps drawing, the uplight is back
                 tile = await _tile(ceiling)
                 assert tile[UPLIGHT] == DIM_BLUE
-                assert tile[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                assert tile[:DOWNLIGHT] == _drawn(RED)
                 await asyncio.sleep(0.05)
             assert len(effect.contexts) > drawn
 
@@ -319,7 +325,7 @@ class TestCeilingComponentEffects:
             await ceiling.downlight.start_effect(effect)
 
             async def downlight_red() -> bool:
-                return (await _tile(ceiling))[:DOWNLIGHT] == [RED] * DOWNLIGHT
+                return (await _tile(ceiling))[:DOWNLIGHT] == _drawn(RED)
 
             await _eventually(downlight_red)
 
@@ -538,7 +544,7 @@ class TestCeilingComponentEffects:
             await ceiling.downlight.start_effect(_SolidFrames(RED))
 
             async def downlight_red() -> bool:
-                return (await _tile(ceiling))[0] == RED
+                return (await _tile(ceiling))[2] == RED
 
             await _eventually(downlight_red)
 
@@ -556,15 +562,15 @@ class TestCeilingComponentEffects:
             else:
                 await ceiling.turn_downlight_off()
 
-            darkening = [t for t in writes if t[0].brightness == 0]
+            darkening = [t for t in writes if t[2].brightness == 0]
             assert darkening
             for tile in darkening:
-                assert (tile[0].hue, tile[0].saturation, tile[0].kelvin) == (
+                assert (tile[2].hue, tile[0].saturation, tile[0].kelvin) == (
                     RED.hue,
                     RED.saturation,
                     RED.kelvin,
                 )
-            assert (await _tile(ceiling))[0].brightness == 0
+            assert (await _tile(ceiling))[2].brightness == 0
             assert ceiling.state.stored_downlight_colors == [GREEN] * DOWNLIGHT
 
     async def test_a_restore_keeps_the_other_components_change_during_the_effect(
@@ -701,7 +707,7 @@ class TestCeilingComponentEffects:
 
             async def both_drawn() -> bool:
                 tile = await _tile(ceiling)
-                return tile[UPLIGHT] == RED and tile[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+                return tile[UPLIGHT] == RED and tile[:DOWNLIGHT] == _drawn(WHITE)
 
             await _eventually(both_drawn)
 
@@ -803,7 +809,7 @@ class TestCeilingComponentEffects:
             async def uplight_keeps_moving() -> bool:
                 tile = await _tile(ceiling)
                 seen.add(tile[UPLIGHT].hue)
-                return tile[:DOWNLIGHT] == [RED] * DOWNLIGHT and len(seen) >= 3
+                return tile[:DOWNLIGHT] == _drawn(RED) and len(seen) >= 3
 
             await _eventually(uplight_keeps_moving)
             assert ceiling.uplight.animator._animating() == {"uplight", "downlight"}

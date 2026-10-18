@@ -27,6 +27,7 @@ from tests.test_effects.test_component_effects import (
     _SolidFrames,
     _tile,
 )
+from tests.test_hidden_cell_support import darkened
 
 BLUE = HSBK.from_protocol(HSBK(240, 1, 1, 3500).to_protocol())
 
@@ -86,7 +87,7 @@ class TestConcurrentComponentEffects:
                 tile = await _tile(ceiling)
                 return (
                     tile[UPLIGHT] in (RED, AMBER)
-                    and tile[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+                    and tile[:DOWNLIGHT] == darkened([WHITE] * 128, 201)[:DOWNLIGHT]
                 )
 
             await _eventually(both_drawn)
@@ -113,7 +114,9 @@ class TestConcurrentComponentEffects:
             await ceiling.downlight.start_effect(solid)
 
             async def downlight_white() -> bool:
-                return (await _tile(ceiling))[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+                return (await _tile(ceiling))[:DOWNLIGHT] == darkened(
+                    [WHITE] * 128, 201
+                )[:DOWNLIGHT]
 
             await _eventually(downlight_white)
 
@@ -131,7 +134,7 @@ class TestConcurrentComponentEffects:
             for _ in range(5):  # the downlight effect keeps drawing
                 tile = await _tile(ceiling)
                 assert tile[UPLIGHT] == DIM_BLUE
-                assert tile[:DOWNLIGHT] == [WHITE] * DOWNLIGHT
+                assert tile[:DOWNLIGHT] == darkened([WHITE] * 128, 201)[:DOWNLIGHT]
                 await asyncio.sleep(0.05)
             assert solid.contexts[-1] is not frames
 
@@ -229,7 +232,7 @@ class TestConcurrentComponentEffects:
             await conductor.start(effect, [ceiling.uplight, ceiling.downlight])
 
             async def all_red() -> bool:
-                return (await _tile(ceiling)) == [RED] * 128
+                return (await _tile(ceiling)) == darkened([RED] * 128, 201)
 
             await _eventually(all_red)
             contexts = list(effect.contexts)
@@ -275,7 +278,7 @@ class TestConcurrentComponentEffects:
                 zones = await strip.get_all_color_zones()
                 colour, _, _ = await bulb.get_color()
                 return (
-                    tile[:DOWNLIGHT] == [BLUE] * DOWNLIGHT
+                    tile[:DOWNLIGHT] == darkened([BLUE] * 128, 201)[:DOWNLIGHT]
                     and all(zone == BLUE for zone in zones)
                     and colour == BLUE
                 )

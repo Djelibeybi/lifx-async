@@ -1679,7 +1679,7 @@ class MatrixLight(PaintTracking, Light):
             # The canvas renders in row-major screen order, so a physically
             # rotated tile needs the same orientation remapping the animation
             # layer applies in FrameBuffer._for_multi_tile().
-            oriented = self._to_physical(tile, colors)
+            oriented = self._to_painted(tile, colors)
             painted.append(oriented)
 
             # Apply with appropriate timing
@@ -1719,6 +1719,22 @@ class MatrixLight(PaintTracking, Light):
         if orientation is None:
             return colors
         return self._orient_tile_colors(tile, colors, orientation)
+
+    def _to_painted(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
+        """The colors a paint writes: physical order, hidden cells sent dark.
+
+        Rendering keeps the full rectangle; the cells with no LED are turned off
+        here, once, at paint time. Caller writes and state restore go through
+        :meth:`set_matrix_colors` and are never masked.
+        """
+        physical = self._to_physical(tile, colors)
+        masked = self.capabilities.masked_zones if self.capabilities else frozenset()
+        if not masked:
+            return physical
+        return [
+            HSBK(c.hue, c.saturation, 0.0, c.kelvin) if index in masked else c
+            for index, c in enumerate(physical)
+        ]
 
     def _to_logical(self, tile: TileInfo, colors: list[HSBK]) -> list[HSBK]:
         """Undo :meth:`_to_physical` for colors read back from the tile."""
@@ -1830,7 +1846,7 @@ class MatrixLight(PaintTracking, Light):
             self._shown_colors(
                 tiles,
                 [
-                    self._to_physical(tile, colors)
+                    self._to_painted(tile, colors)
                     for tile, colors in zip(tiles, frames, strict=True)
                 ],
             ),
@@ -1862,7 +1878,7 @@ class MatrixLight(PaintTracking, Light):
     ) -> None:
         """Write one frame per tile, remapping a rotated Tile."""
         for tile, colors in zip(tiles, frames, strict=True):
-            oriented = self._to_physical(tile, colors)
+            oriented = self._to_painted(tile, colors)
             await self.set_matrix_colors(
                 tile.tile_index, oriented, duration=round(duration * 1000)
             )

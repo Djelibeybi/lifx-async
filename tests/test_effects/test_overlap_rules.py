@@ -26,6 +26,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.products import get_product
 from lifx.protocol import packets
 from tests.test_devices import test_component_transitions as transitions
+from tests.test_hidden_cell_support import darkened
 
 # Set64 colours start after the 36-byte header and the 10-byte payload prefix
 # (tile index, length, rect and duration).
@@ -424,7 +425,9 @@ async def _prepare(ceiling: CeilingLight) -> None:
 async def _shows(ceiling: CeilingLight, uplight: HSBK, downlight: HSBK) -> None:
     async def check() -> bool:
         tile = await _tile(ceiling)
-        return tile[UPLIGHT] == uplight and tile[:DOWNLIGHT] == [downlight] * DOWNLIGHT
+        plain = [downlight] * DOWNLIGHT
+        drawn = darkened([downlight] * 128, 201)[:DOWNLIGHT]
+        return tile[UPLIGHT] == uplight and tile[:DOWNLIGHT] in (plain, drawn)
 
     await _eventually(check)
 
@@ -457,7 +460,7 @@ class TestCeilingOverlapRules:
             assert components.effect(ceiling.downlight) is None
             await _shows(ceiling, VIOLET, VIOLET)
             for _ in range(5):  # no component effect draws over it
-                assert await _tile(ceiling) == [VIOLET] * 128
+                assert await _tile(ceiling) == darkened([VIOLET] * 128, 201)
                 await asyncio.sleep(0.05)
 
             await conductor.stop([ceiling])

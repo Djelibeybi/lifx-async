@@ -790,7 +790,11 @@ class Animator:
         if not self._slot_writers:
             # A whole-tile frame replaces a tile left over from slots.
             self._hold = None
-        return self._transmit(lambda: canvas.apply(hsbk), duration_ms, start_time)
+        return self._transmit(
+            lambda: self._mask_hidden_cells(canvas.apply(hsbk)),
+            duration_ms,
+            start_time,
+        )
 
     def _slot_writer(
         self,
@@ -995,10 +999,31 @@ class Animator:
         if settled:
             for component, (slot, canvas, fade) in self._slot_targets.items():
                 frames[component] = (slot, canvas, fade.frame_at(ends_at))
+        drawn: set[int] = set()
         for slot, canvas, frame in frames.values():
             mapped = canvas.apply(frame)
             for position, source in zip(slot.positions, slot.sources):
                 tile[position] = mapped[source]
+            drawn.update(slot.positions)
+        return self._mask_hidden_cells(tile, only=drawn)
+
+    def _mask_hidden_cells(
+        self,
+        tile: list[tuple[int, int, int, int]],
+        only: set[int] | None = None,
+    ) -> list[tuple[int, int, int, int]]:
+        """Send the cells with no LED dark, once, as the frame is assembled.
+
+        The canvas keeps its full rectangle; only the assembled frame changes.
+        A Ceiling's uplight is never masked, so it stays addressable. A light
+        component's frame darkens only the cells it draws (``only``), so the
+        other component's held colors pass through untouched.
+        """
+        capabilities = self._device.capabilities if self._device else None
+        masked = capabilities.masked_zones if capabilities else frozenset()
+        for index in masked if only is None else masked & only:
+            hue, saturation, _brightness, kelvin = tile[index]
+            tile[index] = (hue, saturation, 0, kelvin)
         return tile
 
     def _transmit(
