@@ -752,6 +752,11 @@ class Device(Generic[StateT]):
         ``port`` change, requests already in flight retransmit to the new
         address, and replies from the old address are ignored from now on.
 
+        A light's Animator, and every writer borrowed from it, moves with
+        the device: its next frame goes to the new endpoint over a fresh
+        socket, and probes still awaiting an ack from the old endpoint no
+        longer gate it.
+
         Nothing else changes. Cached label, firmware, group, location,
         capabilities, discovery metadata and the device's own transport report
         are kept and nothing is re-read, and no color, power or restore write
@@ -779,7 +784,15 @@ class Device(Generic[StateT]):
             return False
         self.ip = ip
         self.port = port
+        self._endpoint_moved()
         return True
+
+    def _endpoint_moved(self) -> None:
+        """Tell anything else that sends to this device that it has moved.
+
+        A plain device sends only through its connection, which has already
+        followed the move. A light overrides this to move its Animator too.
+        """
 
     @classmethod
     async def from_ip(

@@ -326,6 +326,37 @@ class TestDeviceMigration:
                 assert light.update_address(LOOPBACK, port4) is True
                 await light.get_label()
 
+    async def test_the_animator_follows_the_move(self) -> None:
+        """Frames from the device's Animator, and its writers, land at the new port."""
+        with _silent_socket() as old, _emulator_on_new_port() as new_port:
+            old_port = old.getsockname()[1]
+            light = Light(serial=SERIAL, ip=LOOPBACK, port=old_port, timeout=2.0)
+            animator = light.animator
+            writer = animator._writer()
+            animator.send_frame([(0, 0, 65535, 3500)])
+            await _receive(old)
+
+            assert light.update_address(LOOPBACK, new_port) is True
+            animator.send_frame([(21845, 65535, 65535, 3500)])
+            writer.send_frame([(43690, 65535, 65535, 3500)])
+            await asyncio.sleep(0.2)
+            async with light:
+                color, _power, _label = await light.get_color()
+            assert color.hue == pytest.approx(240, abs=1)
+            old.setblocking(False)
+            with pytest.raises(BlockingIOError):
+                old.recv(2048)
+
+    async def test_an_animator_made_after_the_move_uses_the_new_port(self) -> None:
+        with _emulator_on_new_port() as first, _emulator_on_new_port() as second:
+            light = Light(serial=SERIAL, ip=LOOPBACK, port=first, timeout=2.0)
+            assert light.update_address(LOOPBACK, second) is True
+            light.animator.send_frame([(21845, 65535, 65535, 3500)])
+            await asyncio.sleep(0.2)
+            async with light:
+                color, _power, _label = await light.get_color()
+            assert color.hue == pytest.approx(120, abs=1)
+
     async def test_a_flapping_device_keeps_bounded_memory(self) -> None:
         conn = DeviceConnection(SERIAL, "192.0.2.10", 56700)
         for index in range(40):

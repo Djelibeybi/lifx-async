@@ -137,6 +137,9 @@ What a move does:
   device's own `connectivity` report are kept. Nothing is re-read.
 - No color, power or restore write is ever sent. A move only changes where
   packets go.
+- The light's Animator, and any software effect running through it, sends its
+  next frame to the new address. Probes still awaiting an ack from the old
+  address no longer gate it.
 - Announcing the address a device already has changes nothing. A change of IPv6
   zone counts as a move.
 

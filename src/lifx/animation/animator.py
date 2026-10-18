@@ -1107,6 +1107,21 @@ class Animator:
             acks_outstanding=self._ack_gate.outstanding_count,
         )
 
+    def _follow(self, ip: str, port: int) -> None:
+        """Send every later frame to a new endpoint; see `Device.update_address`.
+
+        The socket is closed and reopened on the next frame, so a move across
+        address families gets a socket of the right family and a late ack
+        from the old endpoint can never free a probe sent to the new one.
+        The ack gate starts open: its outstanding probes were sent to an
+        endpoint that will not answer them. Writers borrowed from this
+        Animator send through it, so they follow without being told.
+        """
+        validate_address(ip)
+        self.close()
+        self._ip = ip
+        self._port = port
+
     def close(self) -> None:
         """Close the UDP socket.
 

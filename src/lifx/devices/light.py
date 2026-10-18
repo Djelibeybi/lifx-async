@@ -162,6 +162,11 @@ class Light(Device[LightState]):
             self._animator = animator
         return animator
 
+    def _endpoint_moved(self) -> None:
+        """Move the Animator this light owns, if it has one, to the new endpoint."""
+        if self._animator is not None:
+            self._animator._follow(self.ip, self.port)
+
     def _animation_geometry(self) -> tuple[FrameBuffer, PacketGenerator] | None:
         """The canvas and packets this light's Animator draws with, if known.
 
