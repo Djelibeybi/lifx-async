@@ -8,9 +8,12 @@ A failed lookup never stops generation: it records ``unknown`` instead.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from urllib.parse import urlencode
 from urllib.request import urlopen
+
+_LOGGER = logging.getLogger(__name__)
 
 UNKNOWN = "unknown"
 
@@ -56,5 +59,12 @@ def fetch_upstream_commit(repo: str, branch: str, path: str) -> UpstreamCommit:
             date=str(latest["commit"]["committer"]["date"]),
         )
     except (OSError, ValueError, LookupError, TypeError) as exc:
-        print(f"Warning: could not look up upstream commit for {path}: {exc}")
+        _LOGGER.warning(
+            {
+                "function": "fetch_upstream_commit",
+                "action": "lookup_failed",
+                "path": path,
+                "error": str(exc),
+            }
+        )
         return UpstreamCommit()
