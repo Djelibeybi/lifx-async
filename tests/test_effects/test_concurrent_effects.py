@@ -27,7 +27,7 @@ from tests.test_effects.test_component_effects import (
     _SolidFrames,
     _tile,
 )
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 BLUE = HSBK.from_protocol(HSBK(240, 1, 1, 3500).to_protocol())
 

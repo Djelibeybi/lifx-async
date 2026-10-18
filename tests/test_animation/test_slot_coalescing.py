@@ -20,7 +20,7 @@ from tests.test_animation.test_component_slots import (
 from tests.test_animation.test_component_slots import (
     sent as sent,  # noqa: F401 - fixture
 )
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 ORANGE = HSBK(30, 1, 1, 3500)
 VIOLET = HSBK(270, 1, 1, 3500)

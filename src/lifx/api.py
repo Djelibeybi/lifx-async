@@ -471,7 +471,7 @@ class DeviceGroup:
         await asyncio.gather(*(light.set_power(on, duration) for light in self.lights))
 
     def _check_colors(self, color: HSBK) -> None:
-        """Reject a colour any light in the group cannot show.
+        """Reject a color any light in the group cannot show.
 
         Checked for every light before the first packet, so one light with a
         narrower kelvin range does not leave the rest already changed.

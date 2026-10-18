@@ -13,7 +13,7 @@ from lifx.devices.light import Light
 from lifx.effects.base import LIFXEffect
 from lifx.effects.conductor import Conductor
 from lifx.effects.frame_effect import FrameContext, FrameEffect
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())

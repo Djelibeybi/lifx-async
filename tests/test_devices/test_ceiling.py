@@ -54,7 +54,7 @@ class TestCeilingLightComponentDetection:
         self, product: int, width: int, zone: int
     ) -> None:
         """The uplight zone is x + y * the width the device reports."""
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
         ceiling._version = MagicMock()
         ceiling._version.product = product
         ceiling._device_chain = [MagicMock(width=width)]
@@ -65,7 +65,7 @@ class TestCeilingLightComponentDetection:
 
     def test_uplight_zone_follows_reported_width(self) -> None:
         """A wider reported tile moves the zone, proving the width is read."""
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
         ceiling._version = MagicMock()
         ceiling._version.product = 176
         ceiling._device_chain = [MagicMock(width=10)]
@@ -73,13 +73,13 @@ class TestCeilingLightComponentDetection:
         assert ceiling.uplight_zone == 7 + 7 * 10
 
     def test_uplight_zone_requires_version(self) -> None:
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
 
         with pytest.raises(LifxError, match="version not available"):
             _ = ceiling.uplight_zone
 
     def test_uplight_zone_rejects_non_ceiling_product(self) -> None:
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
         ceiling._version = MagicMock()
         ceiling._version.product = 27
         ceiling._device_chain = [MagicMock(width=8)]
@@ -88,7 +88,7 @@ class TestCeilingLightComponentDetection:
             _ = ceiling.uplight_zone
 
     def test_uplight_zone_rejects_unknown_product(self) -> None:
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
         ceiling._version = MagicMock()
         ceiling._version.product = 99999
         ceiling._device_chain = [MagicMock(width=8)]
@@ -97,7 +97,7 @@ class TestCeilingLightComponentDetection:
             _ = ceiling.uplight_zone
 
     def test_uplight_zone_requires_tile_chain(self) -> None:
-        ceiling = CeilingLight(serial="d073d5010203", ip="192.168.1.100")
+        ceiling = CeilingLight(serial="d073d5010203", ip="192.0.2.10")
         ceiling._version = MagicMock()
         ceiling._version.product = 176
 

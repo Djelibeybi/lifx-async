@@ -1104,14 +1104,14 @@ class Light(Device[LightState]):
         return low, high
 
     def _check_colors(self, *colors: HSBK) -> None:
-        """Reject a caller-supplied colour outside this light's kelvin range.
+        """Reject a caller-supplied color outside this light's kelvin range.
 
         This is the one validation point for caller writes. Kelvin 0 (no white
         component) always passes, and an unknown range leaves only the
         1000-10000 check that ``HSBK`` already makes.
 
         Raises:
-            ValueError: If a colour's kelvin is outside the range
+            ValueError: If a color's kelvin is outside the range
         """
         bounds = self._kelvin_range()
         if bounds is None:
@@ -1125,9 +1125,9 @@ class Light(Device[LightState]):
                 )
 
     def _clamp_color(self, color: HSBK) -> HSBK:
-        """Clamp a library-generated colour into this light's kelvin range.
+        """Clamp a library-generated color into this light's kelvin range.
 
-        Kelvin 0 is kept, and a colour already in range is returned as is.
+        Kelvin 0 is kept, and a color already in range is returned as is.
         """
         bounds = self._kelvin_range()
         if bounds is None or color.kelvin == KELVIN_SATURATED:
@@ -1136,7 +1136,7 @@ class Light(Device[LightState]):
         return color if kelvin == color.kelvin else color.with_kelvin(kelvin)
 
     def _clamp_colors(self, colors: Sequence[HSBK]) -> list[HSBK]:
-        """Clamp every library-generated colour in ``colors``."""
+        """Clamp every library-generated color in ``colors``."""
         return [self._clamp_color(color) for color in colors]
 
     def _clamp_frame(

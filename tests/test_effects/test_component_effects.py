@@ -19,7 +19,7 @@ from lifx.effects.registry import get_effect_registry
 from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
 from tests.test_devices.test_component_transitions import Rig, build_rig
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 RED = HSBK.from_protocol(HSBK(0, 1, 1, 3500).to_protocol())
 GREEN = HSBK.from_protocol(HSBK(120, 1, 1, 3500).to_protocol())
@@ -54,9 +54,9 @@ class _SolidFrames(FrameEffect):
         return [self.colour] * ctx.pixel_count
 
 
-def _drawn(colour: HSBK) -> list[HSBK]:
-    """The downlight an effect draws in ``colour``: hidden cells sent dark."""
-    return darkened([colour] * 128, 201)[:DOWNLIGHT]
+def _drawn(color: HSBK) -> list[HSBK]:
+    """The downlight an effect draws in ``color``: hidden cells sent dark."""
+    return darkened([color] * 128, 201)[:DOWNLIGHT]
 
 
 async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:

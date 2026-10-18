@@ -434,7 +434,7 @@ class _FakeClock:
         return self.now
 
 
-def _colour_light(serial: str = "d073d5000099") -> MagicMock:
+def _color_light(serial: str = "d073d5000099") -> MagicMock:
     light = MagicMock()
     light.serial = serial
     light.set_color = AsyncMock()
@@ -454,7 +454,7 @@ class TestSettleWindow:
     ) -> None:
         clock = _FakeClock()
         manager = DeviceStateManager(clock=clock)
-        light = _colour_light()
+        light = _color_light()
         first = await manager.capture_state(light)
         await manager.restore_state(light, first)
         light.get_color.reset_mock()
@@ -474,7 +474,7 @@ class TestSettleWindow:
     async def test_capture_past_the_window_reads_the_device(self) -> None:
         clock = _FakeClock()
         manager = DeviceStateManager(clock=clock)
-        light = _colour_light()
+        light = _color_light()
         first = await manager.capture_state(light)
         await manager.restore_state(light, first)
         light.get_color.reset_mock()
@@ -487,7 +487,7 @@ class TestSettleWindow:
     async def test_a_fresh_read_ends_the_window(self) -> None:
         clock = _FakeClock()
         manager = DeviceStateManager(clock=clock)
-        light = _colour_light()
+        light = _color_light()
         await manager.restore_state(light, await manager.capture_state(light))
         clock.now += 6.0
         await manager.capture_state(light)
@@ -499,8 +499,8 @@ class TestSettleWindow:
 
     async def test_a_light_that_was_not_restored_is_read(self) -> None:
         manager = DeviceStateManager(clock=_FakeClock())
-        restored = _colour_light("d073d5000001")
-        other = _colour_light("d073d5000002")
+        restored = _color_light("d073d5000001")
+        other = _color_light("d073d5000002")
         await manager.restore_state(restored, await manager.capture_state(restored))
 
         await manager.capture_state(other)
@@ -509,7 +509,7 @@ class TestSettleWindow:
 
     async def test_zero_disables_the_window(self) -> None:
         manager = DeviceStateManager(settle_window=0, clock=_FakeClock())
-        light = _colour_light()
+        light = _color_light()
         await manager.restore_state(light, await manager.capture_state(light))
         light.get_color.reset_mock()
 
@@ -521,7 +521,7 @@ class TestSettleWindow:
         clock = _FakeClock()
         manager = DeviceStateManager(settle_window=1.0, clock=clock)
         assert manager.settle_window == 1.0
-        light = _colour_light()
+        light = _color_light()
         await manager.restore_state(light, await manager.capture_state(light))
         light.get_color.reset_mock()
 
@@ -540,7 +540,7 @@ class TestSettleWindow:
     async def test_a_caller_write_after_the_restore_ends_the_window(self) -> None:
         clock = _FakeClock()
         manager = DeviceStateManager(clock=clock)
-        light = _colour_light()
+        light = _color_light()
         await manager.restore_state(light, await manager.capture_state(light))
         light.get_color.reset_mock()
 

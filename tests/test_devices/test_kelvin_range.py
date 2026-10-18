@@ -1,7 +1,7 @@
 """Tests for the product kelvin range on caller writes and library colors.
 
-A caller-supplied colour outside the product's range fails at the call site;
-colours the library generates (themes, moods, effects, firmware palettes) are
+A caller-supplied color outside the product's range fails at the call site;
+colors the library generates (themes, moods, effects, firmware palettes) are
 clamped into the range instead.
 """
 
@@ -149,7 +149,7 @@ class TestLightCallerWrites:
 
 
 class TestLightThemeClamps:
-    """A Light's theme colour is clamped into range, never rejected."""
+    """A Light's theme color is clamped into range, never rejected."""
 
     async def test_apply_theme_clamps(self, ranged_light: Light) -> None:
         ranged_light.get_power = AsyncMock(return_value=True)  # type: ignore[method-assign]
@@ -334,7 +334,7 @@ class TestComponentWrites:
             await mirror.set_front_colors(LOW)
         mirror.set_matrix_colors.assert_not_called()
 
-    async def test_turn_on_with_colour_rejects(self, mirror: MirrorLight) -> None:
+    async def test_turn_on_with_color_rejects(self, mirror: MirrorLight) -> None:
         with pytest.raises(ValueError, match=r"2500.*9000"):
             await mirror.turn_back_on(HIGH)
         mirror.set_matrix_colors.assert_not_called()
@@ -346,7 +346,7 @@ class TestComponentWrites:
         ceiling.set_matrix_colors.assert_awaited_once()
 
     async def test_composed_tile_is_clamped(self, ceiling: CeilingLight) -> None:
-        """Preserved colours read from the device are library colours."""
+        """Preserved colors read from the device are library colors."""
         stale = HSBK(0, 0, 1.0, 1200)
         ceiling.get_all_tile_colors = AsyncMock(return_value=[[stale] * 64])
         await ceiling.set_uplight_color(OK)
@@ -391,7 +391,7 @@ class TestDeviceGroup:
 
 
 class TestSoftwareEffectsClamp:
-    """Software effect colours are clamped into the product's range."""
+    """Software effect colors are clamped into the product's range."""
 
     def test_frame_is_clamped_keeping_kelvin_zero(self, ranged_light: Light) -> None:
         frame = [(1, 2, 3, 1500), (4, 5, 6, 9500), (7, 8, 9, 0), (1, 1, 1, 3500)]
@@ -446,7 +446,7 @@ class TestSoftwareEffectsClamp:
 
 
 class TestMoodClamps:
-    async def test_bulb_mood_colour_is_clamped(self, ranged_light: Light) -> None:
+    async def test_bulb_mood_color_is_clamped(self, ranged_light: Light) -> None:
         ranged_light.set_color = AsyncMock()  # type: ignore[method-assign]
         ranged_light.set_power = AsyncMock()  # type: ignore[method-assign]
         await ranged_light._paint_mood(

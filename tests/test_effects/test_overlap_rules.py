@@ -26,7 +26,7 @@ from lifx.effects.frame_effect import FrameContext, FrameEffect
 from lifx.products import get_product
 from lifx.protocol import packets
 from tests.test_devices import test_component_transitions as transitions
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 # Set64 colours start after the 36-byte header and the 10-byte payload prefix
 # (tile index, length, rect and duration).

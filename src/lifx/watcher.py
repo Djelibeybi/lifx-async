@@ -114,7 +114,7 @@ class DeviceEvent:
 EventListener = Callable[[DeviceEvent], None]
 
 
-def _normalise(serial: str) -> str:
+def _normalize(serial: str) -> str:
     return Serial.from_string(serial).to_string()
 
 
@@ -282,7 +282,7 @@ class DeviceWatcher:
             serial: Device serial, with or without separators, any case.
         """
         try:
-            return self._devices.get(_normalise(serial))
+            return self._devices.get(_normalize(serial))
         except ValueError:
             return None
 
@@ -466,7 +466,7 @@ class DeviceWatcher:
 
     def _ingest(self, device: Device[Any]) -> None:
         """Record a discovery result. Known serials arrive as the held object."""
-        serial = _normalise(device.serial)
+        serial = _normalize(device.serial)
         self._heard[serial] = self._now()
         if serial not in self._devices:
             self._devices[serial] = device

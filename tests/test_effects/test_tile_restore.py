@@ -19,7 +19,7 @@ from lifx.effects.state_manager import DeviceStateManager
 from lifx.exceptions import LifxTimeoutError
 from lifx.protocol import packets
 from tests.test_devices import test_component_transitions as transitions
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 GREEN = HSBK.from_protocol(transitions.GREEN.to_protocol())
 BLUE = HSBK.from_protocol(transitions.BLUE.to_protocol())

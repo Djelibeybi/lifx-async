@@ -382,7 +382,7 @@ class FrameEffect(LIFXEffect):
                     # generate_protocol_frame for zero-HSBK-allocation path)
                     protocol_frame = self.generate_protocol_frame(ctx)
                     if idx < len(participants):
-                        # Frames are the library's own colours: clamp, not refuse
+                        # Frames are the library's own colors: clamp, not refuse
                         protocol_frame = participants[idx]._clamp_frame(protocol_frame)
                     # Populated by the default generate_protocol_frame, None
                     # for direct overrides; always cleared so no stale frame

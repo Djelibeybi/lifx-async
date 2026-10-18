@@ -16,7 +16,7 @@ from lifx.protocol import packets
 from lifx.protocol.protocol_types import LightHsbk
 from tests.test_animation.conftest import MockUdpSocket, make_ack_datagram
 from tests.test_devices.test_component_transitions import Rig, build_rig
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 
 _SET64_COLOURS = HEADER_SIZE + 10
 

@@ -14,7 +14,7 @@ from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.theme import MatrixGenerator, Theme
-from tests.test_hidden_cell_support import darkened
+from tests.test_products.test_hidden_cell_support import darkened
 from tests.test_theme.conftest import make_tile
 
 

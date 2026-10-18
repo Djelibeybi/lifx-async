@@ -40,7 +40,7 @@ LOOPBACK = "127.0.0.1"
 
 @contextmanager
 def _emulator_on_new_port(serial: str = SERIAL) -> Iterator[int]:
-    """Run one emulated colour light on a fresh port and yield that port."""
+    """Run one emulated color light on a fresh port and yield that port."""
     scenario_manager = HierarchicalScenarioManager()
     port = get_free_port()
     server = EmulatedLifxServer(
