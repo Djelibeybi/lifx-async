@@ -227,6 +227,64 @@ class TestMultiZoneLight:
             }
         ]
 
+    async def test_get_color_zones_single_zone_reads_state_zone_reply(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """A one-zone GetColorZones is answered by StateZone (503), not StateMultiZone.
+
+        Regression test for issue #324: firmware replies to a request whose range
+        covers exactly one zone with ``StateZone``, which carries a single
+        ``color`` rather than a ``colors`` list.
+        """
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        expected = HSBK(hue=120, saturation=0.5, brightness=0.75, kelvin=3500)
+        mock_state = packets.MultiZone.StateZone(
+            count=16, index=2, color=expected.to_protocol()
+        )
+        multizone_light.connection.request_stream = async_generator_mock([mock_state])
+
+        result = await multizone_light.get_color_zones(2, 2)
+
+        assert result == [expected]
+        assert multizone_light.zone_count == 16
+
+    async def test_get_color_zones_final_single_zone_chunk_reads_state_zone(
+        self, multizone_light: MultiZoneLight, mock_product_info
+    ) -> None:
+        """A multi-chunk request whose last chunk is one zone also gets StateZone.
+
+        ``get_color_zones(0, 8)`` on a nine-zone strip sends 0-7 then 8-8; the
+        device answers the second request with StateZone (issue #324).
+        """
+        multizone_light._capabilities = mock_product_info(has_extended_multizone=False)
+        first_eight = [
+            HSBK(hue=i * 40, saturation=0.5, brightness=0.75, kelvin=3500)
+            for i in range(8)
+        ]
+        last = HSBK(hue=330, saturation=0.5, brightness=0.75, kelvin=3500)
+        replies = iter(
+            [
+                packets.MultiZone.StateMultiZone(
+                    count=9, index=0, colors=[c.to_protocol() for c in first_eight]
+                ),
+                packets.MultiZone.StateZone(count=9, index=8, color=last.to_protocol()),
+            ]
+        )
+
+        def _stream(*args, **kwargs) -> AsyncIterator:
+            reply = next(replies)
+
+            async def _generator() -> AsyncIterator:
+                yield reply
+
+            return _generator()
+
+        multizone_light.connection.request_stream = _stream
+
+        result = await multizone_light.get_color_zones(0, 8)
+
+        assert result == first_eight + [last]
+
     async def test_get_color_zones(
         self, multizone_light: MultiZoneLight, mock_product_info
     ) -> None:
