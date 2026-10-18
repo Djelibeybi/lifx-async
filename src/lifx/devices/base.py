@@ -1448,9 +1448,9 @@ class Device(Generic[StateT]):
             ```
         """
         payload = next(self._ping_counter).to_bytes(8, "big") + secrets.token_bytes(56)
-        started = time.monotonic()
+        started = time.perf_counter()
         await self.connection.echo(payload)
-        return time.monotonic() - started
+        return time.perf_counter() - started
 
     async def get_version(self) -> DeviceVersion:
         """Get device version information.

@@ -146,6 +146,109 @@ conflicting announcements: a second host that claims a serial can move the
 object. Use `device.connection.address_epoch`, which counts moves, if you need
 to tell that one happened.
 
+## Watching devices continuously
+
+`discover()` answers "what is on the network now". To keep an application in
+step with the network over hours, open a `DeviceWatcher`. It hands you one
+device object per serial, keeps those objects current, and tells you when a
+device appears, changes or goes quiet.
+
+```python
+from lifx import DeviceEventType, DeviceWatcher
+
+async with DeviceWatcher() as watcher:
+    # The initial discovery has finished; watcher.devices is populated.
+    async for event in watcher:
+        if event.type is DeviceEventType.UPDATED:
+            print(event.serial, dict(event.changes))
+```
+
+On entry the watcher runs one discovery. After that it sweeps every
+`sweep_interval` seconds (default 30) through the same process-wide sweep
+coordinator `discover()` uses, so several consumers do not multiply broadcast
+traffic. Pass `mdns=True` to add an mDNS leg for Thread and IPv6 devices.
+`await watcher.sweep()` forces a sweep now.
+
+### Events
+
+| Event | Meaning |
+|-------|---------|
+| `ADDED` | A serial was seen for the first time, or answered again after `REMOVED` |
+| `UPDATED` | A tracked field changed |
+| `REMOVED` | The device has been silent for longer than the threshold |
+
+`event.device` is always the same object for a serial, and `watcher.get(serial)`
+and `watcher.devices` return it too. `UPDATED` carries `event.changes`, a
+mapping from each changed field (`address`, `label`, `group`, `location`,
+`host_firmware`, `wifi_firmware`) to its `(old, new)` values. A device that
+restarts on a new address produces one `UPDATED` with an `address` change,
+through [endpoint migration](#when-a-device-moves), not a `REMOVED` followed by
+an `ADDED`. Label, group, location and firmware are reported when the cached
+values on the device object change, for example after you call `get_label()`.
+
+Read events with `async for event in watcher`, or register callbacks:
+
+```python
+remove = watcher.add_listener(lambda event: print(event.type, event.serial))
+```
+
+Callbacks run inside the sweep, see every event in order, and a callback that
+raises is logged without affecting the others. The iterator reads from a queue
+of `max_queue_size` events (default 256). When it is full the oldest event is
+dropped and `watcher.dropped_events` increases; a slow consumer never delays a
+sweep.
+
+### Liveness
+
+A device is silent when it has answered nothing, neither a discovery reply nor
+any request on its connection, for longer than `silence_threshold`. The default
+is the larger of 30 seconds and five sweep intervals. Silence is measured from
+the connection's `last_response_at`, so a device you are talking to is never
+removed while it answers, even if sweeps miss it. A silent device's object is
+kept. When it answers again `ADDED` is emitted for the same object.
+
+### State polling
+
+By default the watcher sends nothing but discovery traffic. Two optional polls
+keep device state fresh without a loop of your own. Each has its own flag and
+interval, and both are off by default.
+
+```python
+async with DeviceWatcher(
+    high_frequency_polling=True,    # color and power, plus zones or tiles
+    high_frequency_interval=10.0,   # seconds, the default
+    low_frequency_polling=True,     # label, firmware, group, location
+    low_frequency_interval=300.0,   # seconds, the default
+) as watcher:
+    async for event in watcher:
+        ...
+```
+
+| Flag | Reads | Reported field names |
+|------|-------|----------------------|
+| `high_frequency_polling` | color and power; zones on a multizone light; tiles on a matrix light | `color`, `power`, `zones`, `tiles` |
+| `low_frequency_polling` | label, host firmware, wifi firmware, group, location | `label`, `host_firmware`, `wifi_firmware`, `group`, `location` |
+
+A poll refreshes the device's cached state and any difference from the previous
+reading is an `UPDATED` event whose `changes` names the fields. The first
+reading of a field is a baseline and is not reported. Polls run on their own
+timers, so an interval shorter than `sweep_interval` is honored. A device that
+is silent is not polled.
+
+A device evidenced as Thread gets no high-frequency polling, because a Thread
+mesh is not built for that traffic. Pass `enable_thread=True`, the same opt-in
+the software effect path uses, to poll it anyway. Low-frequency polling still
+reads a Thread device, except for wifi firmware, which Thread firmware cannot
+answer.
+
+A poll that fails is logged. It does not stop the polls of other devices and
+does not by itself mark the device silent; only the silence threshold does
+that. Polling only reads.
+
+The watcher listens, discovers and, when asked, polls. It never writes color or
+power, and it closes no device object: leaving the `async with` block stops the
+sweeps and polls and leaves the devices you hold open for you.
+
 ## Choosing a discovery method
 
 | Scenario | Recommended method |

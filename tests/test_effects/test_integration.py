@@ -82,6 +82,9 @@ def mock_light() -> MagicMock:
     light.serial = "d073d5123456"
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
+    light._clamp_color.side_effect = lambda color: color
+    light._clamp_colors.side_effect = lambda colors: colors
+    light._clamp_frame.side_effect = lambda frame: frame
 
     # Setup common mock responses
     light.get_power = AsyncMock(return_value=True)
@@ -225,6 +228,8 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     light2.serial = "d073d5fedcba"
     light2.capabilities = MagicMock()
     light2.capabilities.has_color = True
+    light2._clamp_color.side_effect = lambda color: color
+    light2._clamp_frame.side_effect = lambda frame: frame
     light2.get_power = AsyncMock(return_value=True)
     color = HSBK(hue=180, saturation=1.0, brightness=0.8, kelvin=3500)
     light2.color = (color, 100)
@@ -888,6 +893,8 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
     light2.serial = "d073d5pulse01"
     light2.capabilities = MagicMock()
     light2.capabilities.has_color = True
+    light2._clamp_color.side_effect = lambda color: color
+    light2._clamp_frame.side_effect = lambda frame: frame
     light2.get_power = AsyncMock(return_value=True)
     color = HSBK(hue=180, saturation=1.0, brightness=0.8, kelvin=3500)
     light2.color = (color, 100)
