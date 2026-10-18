@@ -212,6 +212,24 @@ for i in range(0, 101, 10):
 await conductor.stop([strip_light])
 ```
 
+### Firmware Sunset Soft Off
+
+Matrix devices can run a Sunset in firmware (`FirmwareEffect.SKY` with `TileEffectSkyType.SUNSET`).
+Pass `soft_off=True` to `MatrixLight.set_effect()` and the light turns itself off when the sunset ends.
+`get_effect()` reports the flag as `MatrixEffect.soft_off`.
+
+```python
+await matrix.set_effect(
+    FirmwareEffect.SKY,
+    speed=1800.0,
+    sky_type=TileEffectSkyType.SUNSET,
+    soft_off=True,
+)
+```
+
+`soft_off` applies to the Sunset sky type only. Any other effect or sky type raises `ValueError`
+and sends nothing.
+
 ### Sunrise and Sunset Effects
 
 `EffectSunrise` and `EffectSunset` are duration-based effects for matrix devices (tiles, candles, Ceiling lights) that simulate natural light transitions:
