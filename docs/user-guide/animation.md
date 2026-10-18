@@ -367,6 +367,32 @@ print(f"Total packets: {total_packets}")
 print(f"Avg packets/frame: {total_packets / frame_count:.1f}")
 ```
 
+## Clipping Transition Durations
+
+When you schedule your own timed writes, a fade that is longer than the gap to the next write
+on the same target is cut off by that write, and a write that would get less than 20 ms does
+nothing visible. `clip_transitions()` applies both rules to a list of
+`TransitionWrite(time, target, duration)` entries (times and durations in seconds). Each
+duration is clipped to the gap before the next write on the same target, and a write whose gap is
+under 20 ms is removed. Targets never clip each other. Instant writes (duration 0) and the last
+write on each target are kept, and the surviving writes come back in the order you gave them.
+
+```python
+from lifx.animation import TransitionWrite, clip_transitions
+
+writes = [
+    TransitionWrite(0.0, "strip", 2.0),
+    TransitionWrite(1.25, "strip", 2.0),
+]
+print(clip_transitions(writes))
+# [TransitionWrite(time=0.0, target='strip', duration=1.25),
+#  TransitionWrite(time=1.25, target='strip', duration=2.0)]
+```
+
+The helper does no I/O and knows nothing about devices. The animated mood's scroll uses it so a
+step's fade never outlives the gap to the next step. Effects run by the Conductor do not: their
+transition stays 1.5 frames at the effect's frame rate.
+
 ## Streaming and Flow Control
 
 The animation layer paces frame delivery against device acknowledgements
