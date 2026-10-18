@@ -1,5 +1,7 @@
 """Tests for generated protocol types and packets."""
 
+import logging
+
 import pytest
 
 from lifx.protocol.packets import PACKET_REGISTRY, Device, Light, Sensor, Thread, Wifi
@@ -323,3 +325,39 @@ class TestWifiSetAccessPoint:
         assert decoded.ssid == b"home".ljust(32, b"\0")
         assert decoded.password == b"secret".ljust(64, b"\0")
         assert decoded.security == WifiSecurity.WPA2_AES_PSK
+
+
+class TestWifiSetAccessPointSecrecy:
+    """The WiFi password never reaches a repr or the unpack debug log."""
+
+    GOLDEN = (
+        b"\x02"
+        + b"home".ljust(32, b"\0")
+        + b"hunter2hunter2".ljust(64, b"\0")
+        + b"\x05"
+    )
+
+    def test_repr_hides_password_but_shows_ssid(self) -> None:
+        packet = Wifi.SetAccessPoint(
+            interface=WifiInterface.STATION,
+            ssid=b"home",
+            password=b"hunter2hunter2",
+            security=WifiSecurity.WPA2_AES_PSK,
+        )
+
+        text = repr(packet)
+
+        assert "hunter2" not in text
+        assert "password" not in text
+        assert "home" in text
+
+    def test_unpack_debug_log_redacts_password(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.DEBUG, logger="lifx.protocol.base"):
+            packet = Wifi.SetAccessPoint.unpack(self.GOLDEN)
+
+        assert "hunter2" not in caplog.text
+        assert "<redacted>" in caplog.text
+        assert "home" in caplog.text
+        assert packet.password == b"hunter2hunter2".ljust(64, b"\0")

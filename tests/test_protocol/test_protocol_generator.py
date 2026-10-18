@@ -1485,3 +1485,42 @@ class TestWifiAccessPointQuirk:
 
         assert seen["packets"]["wifi"]["WifiSetAccessPoint"]["pkt_type"] == 305
         assert {"WifiInterface", "WifiSecurity"} <= set(seen["enums"])
+
+
+class TestSensitiveFields:
+    """A field marked sensitive stays out of the generated dataclass repr."""
+
+    @staticmethod
+    def _packets(sensitive):
+        secret = {"name": "Secret", "type": "[8]byte", "size_bytes": 8}
+        if sensitive:
+            secret["sensitive"] = True
+        return {
+            "device": {
+                "DeviceSetThing": {
+                    "pkt_type": 9000,
+                    "fields": [secret, {"name": "Plain", "type": "uint8"}],
+                }
+            }
+        }
+
+    def test_sensitive_field_is_emitted_without_repr(self):
+        code = generate_nested_packet_code(self._packets(True))
+        assert "secret: bytes = field(repr=False)" in code
+        assert "plain: int\n" in code
+
+    def test_plain_field_is_emitted_unchanged(self):
+        code = generate_nested_packet_code(self._packets(False))
+        assert "secret: bytes\n" in code
+        assert "repr=False" not in code
+
+    def test_packets_file_imports_field_only_when_used(self):
+        with_secret = generate_packets_file(self._packets(True), {})
+        without = generate_packets_file(self._packets(False), {})
+        assert "from dataclasses import dataclass, field\n" in with_secret
+        assert "from dataclasses import dataclass\n" in without
+
+    def test_wifi_quirk_marks_only_the_password(self):
+        _, packets = apply_wifi_access_point_quirk({}, {})
+        fields = packets["wifi"]["WifiSetAccessPoint"]["fields"]
+        assert [f["name"] for f in fields if f.get("sensitive")] == ["Password"]

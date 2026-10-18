@@ -21,6 +21,16 @@ _serializer: ModuleType | None = None
 _protocol_types: ModuleType | None = None
 
 
+def _loggable_values(packet: Packet) -> dict[str, Any]:
+    """Return the packet's field values with sensitive fields redacted."""
+    values = asdict(packet)
+    for field_item in packet._fields:
+        if field_item.get("sensitive"):
+            name = packet._protocol_to_python_name(field_item["name"])
+            values[name] = "<redacted>"
+    return values
+
+
 def _get_serializer() -> ModuleType:
     """Get the serializer module, importing on first use."""
     global _serializer  # noqa: PLW0603
@@ -156,7 +166,7 @@ class Packet:
                     "class": "Packet",
                     "method": "unpack",
                     "packet_type": type(packet).__name__,
-                    "values": asdict(packet),
+                    "values": _loggable_values(packet),
                 }
             )
 
