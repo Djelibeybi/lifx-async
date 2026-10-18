@@ -6,6 +6,7 @@ including serial number handling and HEV (High Energy Visible) cycle types.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 #: Firmware whose MAC address is the serial with the final octet incremented:
@@ -23,6 +24,14 @@ from dataclasses import dataclass
 #: one source of truth for this protocol quirk.
 MAC_OFFSET_FIRMWARE_MAJOR = 3
 MAC_OFFSET_FIRMWARE_MIN_MINOR = 70
+
+#: The three-byte organisationally unique identifier shared by LIFX serials
+#: (``d0:73:d5``).
+LIFX_OUI = b"\xd0\x73\xd5"
+
+_SUFFIX_PATTERN = re.compile(r"[0-9a-fA-F]{6}")
+_SOFTAP_PREFIX = "LIFX"
+_SOFTAP_MIN_LENGTH = 10
 
 
 def mac_candidates_for_serial(serial: str) -> tuple[str, str]:
@@ -134,6 +143,68 @@ class Serial:
         serial_bytes = cls._parse_hex(serial_clean)
 
         return cls(value=serial_bytes)
+
+    @classmethod
+    def from_suffix(cls, text: str) -> Serial:
+        """Create Serial from the last six hex characters of a serial.
+
+        The :data:`LIFX_OUI` is prepended to the three bytes given.
+
+        Args:
+            text: Exactly six hex characters, in either case (e.g. "8274eb")
+
+        Returns:
+            Serial instance
+
+        Raises:
+            ValueError: If text is not exactly six hex characters
+            TypeError: If text is not a string
+
+        Example:
+            >>> Serial.from_suffix("8274eb").to_string()
+            'd073d58274eb'
+        """
+        cls._validate_string_type(text)
+        if _SUFFIX_PATTERN.fullmatch(text) is None:
+            raise ValueError(
+                f"Serial suffix must be exactly 6 hex characters, got {text!r}"
+            )
+        return cls(value=LIFX_OUI + bytes.fromhex(text))
+
+    @classmethod
+    def from_softap_ssid(cls, ssid: str) -> Serial:
+        """Create Serial from the name of a LIFX SoftAP network.
+
+        A device in setup mode advertises a network such as
+        ``"LIFX Candle Color 8274eb"``. The name must start with ``LIFX``, be
+        at least ten characters long and end in six hex characters, which are
+        taken as the serial suffix.
+
+        Open hardware gate (#334): on firmware 3.70 and later the MAC differs
+        from the serial by one in the last octet (see
+        :func:`mac_candidates_for_serial`). It is not yet known whether the
+        SoftAP name carries the MAC suffix or the serial suffix. If it carries
+        the MAC, one must be subtracted to get the serial discovery reports.
+        The plain suffix rule ships until the hardware check settles it.
+
+        Args:
+            ssid: SoftAP network name
+
+        Returns:
+            Serial instance
+
+        Raises:
+            ValueError: If the name is not a LIFX SoftAP name
+            TypeError: If ssid is not a string
+
+        Example:
+            >>> Serial.from_softap_ssid("LIFX Candle Color 8274eb").to_string()
+            'd073d58274eb'
+        """
+        cls._validate_string_type(ssid)
+        if not ssid.startswith(_SOFTAP_PREFIX) or len(ssid) < _SOFTAP_MIN_LENGTH:
+            raise ValueError(f"Not a LIFX SoftAP network name: {ssid!r}")
+        return cls.from_suffix(ssid[-6:])
 
     @staticmethod
     def _validate_string_type(value: str) -> None:
