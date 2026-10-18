@@ -356,6 +356,69 @@ class TestMdns:
                     assert event.serial == IPV6_DEVICE_SERIAL
                     assert watcher.devices == [event.device]
 
+    async def test_an_advertisement_that_never_answers_is_not_added(
+        self, clock: FakeClock
+    ) -> None:
+        dead_port = get_free_port()
+        record = _LifxServiceRecord(
+            serial=SERIAL_A,
+            ip=LOOPBACK,
+            port=dead_port,
+            product_id=27,
+            firmware="4.112",
+            connectivity="thread",
+            service_instance="device._lifx._udp.local",
+        )
+
+        async def source():
+            yield record
+
+        with _override_mdns_service_source(source):
+            async with _watcher(get_free_port(), mdns=True) as watcher:
+                for _ in range(3):
+                    clock.now += 20.0
+                    await watcher.sweep()
+                assert _drain(watcher) == []
+                assert watcher.devices == []
+                assert watcher.get(SERIAL_A) is None
+
+    async def test_a_lingering_advertisement_does_not_keep_a_device_alive(
+        self, clock: FakeClock
+    ) -> None:
+        port = get_free_port()
+        record = _LifxServiceRecord(
+            serial=SERIAL_A,
+            ip=LOOPBACK,
+            port=port,
+            product_id=27,
+            firmware="4.112",
+            connectivity="wifi",
+            service_instance="device._lifx._udp.local",
+        )
+
+        async def source():
+            yield record
+
+        with _override_mdns_service_source(source):
+            with _emulator((SERIAL_A,), port):
+                watcher = _watcher(port, mdns=True, silence_threshold=30.0)
+                await watcher.__aenter__()
+                light = watcher.get(SERIAL_A)
+                assert light is not None
+                _drain(watcher)
+            try:
+                # The emulator is gone; only the advertisement remains.
+                clock.now += 20.0
+                await watcher.sweep()
+                assert _drain(watcher) == []
+                clock.now += 11.0
+                await watcher.sweep()
+                (removed,) = _drain(watcher)
+                assert removed.type is DeviceEventType.REMOVED
+                assert removed.device is light
+            finally:
+                await watcher.__aexit__(None, None, None)
+
     async def test_mdns_is_off_by_default(self) -> None:
         asked = False
 

@@ -213,6 +213,14 @@ the connection's `last_response_at`, so a device you are talking to is never
 removed while it answers, even if sweeps miss it. A silent device's object is
 kept. When it answers again `ADDED` is emitted for the same object.
 
+Only a correlated response counts as an answer. A UDP discovery reply is one. An
+mDNS advertisement is not: a Thread border router keeps advertising a device
+after it stops responding (see [Limitations](#limitations)), so the watcher's
+mDNS leg sends each advertised endpoint one bounded read-only request and
+treats the device as seen only when it answers. An advertisement that never
+answers is never added, and a tracked device whose advertisements continue but
+whose requests all fail is removed at the silence threshold like any other.
+
 ### State polling
 
 By default the watcher sends nothing but discovery traffic. Two optional polls

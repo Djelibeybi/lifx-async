@@ -17,7 +17,7 @@ from enum import Enum
 from types import MappingProxyType, TracebackType
 from typing import TYPE_CHECKING, Any
 
-from lifx.api import discover_mdns, discover_udp
+from lifx.api import _follow_known_device, _index_known_devices, discover_udp
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_REQUEST_TIMEOUT,
@@ -30,6 +30,7 @@ from lifx.devices.light import Light
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.multizone import MultiZoneLight
 from lifx.network import connection as _connection
+from lifx.network.discovery.mdns.discovery import _discover_verified_devices_mdns
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
@@ -457,7 +458,21 @@ class DeviceWatcher:
         await self._consume(stream)
 
     async def _mdns_leg(self) -> None:
-        await self._consume(discover_mdns(**self._discovery_kwargs()))
+        """Consume mDNS candidates that answered a correlated request.
+
+        An advertisement is not an answer: a Thread border router keeps
+        advertising a lamp long after the lamp stops responding, so a device
+        built from DNS-SD records alone would reset its silence clock on every
+        sweep. The verified candidate path probes each record with one bounded
+        read-only request and yields only the devices that answered, which is
+        what ``_ingest`` counts as being heard.
+        """
+        kwargs = self._discovery_kwargs()
+        known = _index_known_devices(kwargs.pop("known_devices"))
+        stream = _discover_verified_devices_mdns(**kwargs)
+        async with aclosing(stream):
+            async for device in stream:
+                self._ingest(await _follow_known_device(device, known))
 
     async def _consume(self, stream: AsyncGenerator[Device[Any], None]) -> None:
         async with aclosing(stream):
@@ -465,7 +480,13 @@ class DeviceWatcher:
                 self._ingest(device)
 
     def _ingest(self, device: Device[Any]) -> None:
-        """Record a discovery result. Known serials arrive as the held object."""
+        """Record a discovery result. Known serials arrive as the held object.
+
+        Every stream fed here is correlated: a UDP sighting is a StateService
+        reply to this sweep's request and an mDNS sighting has answered the
+        verification probe, so the sighting itself counts as the device being
+        heard.
+        """
         serial = _normalize(device.serial)
         self._heard[serial] = self._now()
         if serial not in self._devices:
