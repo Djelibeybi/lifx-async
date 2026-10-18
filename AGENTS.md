@@ -478,6 +478,12 @@ Local generator quirks:
   `SensorStateAmbientLight` 402) and the Thread packets (`ThreadGetInfo` 1200, `ThreadStateInfo`
   1201) were once injected locally but are now defined upstream in `protocol.yml`, so they are
   generated like any other packet. The generator contains no injection code for either
+- **wifi access point packet**: `WifiSetAccessPoint` (305, 98-byte payload) and the `WifiInterface`
+  and `WifiSecurity` enums are not in upstream `protocol.yml`, so `apply_wifi_access_point_quirk()`
+  injects them, each only while absent, so an upstream definition would win unchanged. It is the
+  only locally injected packet. The layout comes from two third-party sources, lifxjs `Protocol.md`
+  and tserong's `onboard.py`. The fields are bytes, as `label` is on other packets, and the
+  validator checks that the field sizes sum to the declared 98 bytes
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 

@@ -11,6 +11,7 @@ from lifx.protocol import packets
 from lifx.protocol.generator import (
     TypeRegistry,
     apply_firmware_effect_enum_quirk,
+    apply_wifi_access_point_quirk,
     camel_to_snake_upper,
     convert_type_to_python,
     extract_packets_as_fields,
@@ -1338,3 +1339,149 @@ class TestUpstreamStamp:
 
         assert stamps == [STAMP, STAMP]
         assert fetch.call_args.args[0] == "LIFX/public-protocol"
+
+
+class TestWifiAccessPointQuirk:
+    """Packet 305 is injected locally because upstream does not define it."""
+
+    @staticmethod
+    def _spec(enums, packets_by_category):
+        return {
+            "enums": enums,
+            "fields": {},
+            "compound_fields": {},
+            "unions": {},
+            "packets": packets_by_category,
+        }
+
+    def test_adds_definitions_when_absent(self):
+        """A spec without packet 305 gains the packet and both enums."""
+        enums, packets_by_category = apply_wifi_access_point_quirk({}, {})
+
+        packet = packets_by_category["wifi"]["WifiSetAccessPoint"]
+        assert packet["pkt_type"] == 305
+        assert packet["size_bytes"] == 98
+        assert [
+            (f.get("name"), f["type"], f["size_bytes"]) for f in packet["fields"]
+        ] == [
+            ("Interface", "<WifiInterface>", 1),
+            ("Ssid", "[32]byte", 32),
+            ("Password", "[64]byte", 64),
+            ("Security", "<WifiSecurity>", 1),
+        ]
+        assert {v["name"]: v["value"] for v in enums["WifiInterface"]["values"]} == {
+            "UNKNOWN": 0,
+            "SOFT_AP": 1,
+            "STATION": 2,
+        }
+        assert enums["WifiSecurity"]["values"][-1] == {
+            "name": "WPA2_MIXED_PSK",
+            "value": 7,
+        }
+        assert len(enums["WifiSecurity"]["values"]) == 8
+
+    def test_injected_definitions_validate(self):
+        """The injected spec passes the same validation as a downloaded one."""
+        enums, packets_by_category = apply_wifi_access_point_quirk({}, {})
+
+        assert validate_protocol_spec(self._spec(enums, packets_by_category)) == []
+
+    def test_leaves_upstream_definitions_untouched_when_present(self):
+        """Once LIFX ship the packet, the upstream definitions win unchanged."""
+        upstream_interface = {"type": "uint8", "values": [{"name": "X", "value": 0}]}
+        upstream_security = {"type": "uint8", "values": [{"name": "Y", "value": 0}]}
+        upstream_packets = {"wifi": {"WifiSetAccessPoint": {"pkt_type": 305}}}
+
+        enums, packets_by_category = apply_wifi_access_point_quirk(
+            {"WifiInterface": upstream_interface, "WifiSecurity": upstream_security},
+            upstream_packets,
+        )
+
+        assert enums["WifiInterface"] is upstream_interface
+        assert enums["WifiSecurity"] is upstream_security
+        assert packets_by_category["wifi"] is upstream_packets["wifi"]
+
+    def test_does_not_mutate_its_inputs(self):
+        """The quirk returns new mappings rather than editing the parsed spec."""
+        enums: dict[str, object] = {}
+        packets_by_category: dict[str, object] = {}
+
+        out_enums, out_packets = apply_wifi_access_point_quirk(
+            enums, packets_by_category
+        )
+        out_packets["wifi"]["WifiSetAccessPoint"]["fields"].clear()
+
+        assert enums == {} and packets_by_category == {}
+        again = apply_wifi_access_point_quirk({}, {})[1]
+        assert len(again["wifi"]["WifiSetAccessPoint"]["fields"]) == 4
+
+    def test_validator_rejects_a_97_byte_variant(self):
+        """A packet whose fields sum to 97 bytes but declares 98 is rejected."""
+        enums, packets_by_category = apply_wifi_access_point_quirk({}, {})
+        packet = packets_by_category["wifi"]["WifiSetAccessPoint"]
+        packet["fields"][1] = {"name": "Ssid", "type": "[31]byte", "size_bytes": 31}
+
+        errors = validate_protocol_spec(self._spec(enums, packets_by_category))
+
+        assert len(errors) == 1
+        assert "WifiSetAccessPoint" in errors[0]
+        assert "97" in errors[0] and "98" in errors[0]
+
+    def test_validator_counts_bit_runs_in_whole_bytes(self):
+        """Bit-sized fields count as their packed width in bytes."""
+        packets_by_category = {
+            "x": {
+                "P": {
+                    "pkt_type": 1,
+                    "size_bytes": 2,
+                    "fields": [
+                        {"name": "A", "type": "uint8", "size_bits": 4},
+                        {"type": "reserved", "size_bits": 4},
+                        {"name": "B", "type": "uint8", "size_bytes": 1},
+                    ],
+                }
+            }
+        }
+
+        assert validate_protocol_spec(self._spec({}, packets_by_category)) == []
+
+    def test_validator_skips_packets_without_a_checkable_size(self):
+        """No declared size, or a field with no size, is not a size error."""
+        packets_by_category = {
+            "x": {
+                "NoSize": {"pkt_type": 1, "fields": []},
+                "NoFields": {"pkt_type": 2, "size_bytes": 4},
+                "Unsized": {
+                    "pkt_type": 3,
+                    "size_bytes": 4,
+                    "fields": [{"name": "A", "type": "uint8"}],
+                },
+            }
+        }
+
+        assert validate_protocol_spec(self._spec({}, packets_by_category)) == []
+
+    def test_main_applies_the_quirk(self):
+        """main() hands the generator packet 305 and both enums."""
+        seen = {}
+
+        def fake_types(enums, *args, upstream):
+            seen["enums"] = enums
+            return "x = 1\n"
+
+        def fake_packets(packets, *args, upstream):
+            seen["packets"] = packets
+            return "y = 1\n"
+
+        with (
+            patch("lifx.protocol.generator.download_protocol", return_value={}),
+            patch("lifx.protocol.generator.fetch_upstream_commit", return_value=STAMP),
+            patch("lifx.protocol.generator.generate_types_file", fake_types),
+            patch("lifx.protocol.generator.generate_packets_file", fake_packets),
+            patch("lifx.protocol.generator.format_generated_files"),
+            patch("builtins.open", mock_open()),
+        ):
+            generator_main()
+
+        assert seen["packets"]["wifi"]["WifiSetAccessPoint"]["pkt_type"] == 305
+        assert {"WifiInterface", "WifiSecurity"} <= set(seen["enums"])

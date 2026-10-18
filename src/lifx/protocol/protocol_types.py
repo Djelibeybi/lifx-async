@@ -132,6 +132,27 @@ class TileEffectSkyType(IntEnum):
         return member
 
 
+class WifiInterface(IntEnum):
+    """Auto-generated enum."""
+
+    UNKNOWN = 0
+    SOFT_AP = 1
+    STATION = 2
+
+
+class WifiSecurity(IntEnum):
+    """Auto-generated enum."""
+
+    UNKNOWN = 0
+    OPEN = 1
+    WEP_PSK = 2
+    WPA_TKIP_PSK = 3
+    WPA_AES_PSK = 4
+    WPA2_AES_PSK = 5
+    WPA2_TKIP_PSK = 6
+    WPA2_MIXED_PSK = 7
+
+
 @dataclass
 class DeviceStateHostFirmware:
     """Auto-generated field structure."""
