@@ -21,6 +21,7 @@ so every color write on the class can end it through one hook,
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -67,6 +68,12 @@ class PaintRecord:
         run: The software effect running the mood, for a record kept alive by
             a run rather than by colors. ``None`` unless the record is a
             software-run one.
+        settles_at: When the paint's fade ends, on ``time.monotonic()``. A
+            paint written with a duration is still fading when the write
+            returns, and the light reports the in-flight colors until the
+            fade ends, as firmware does. A reading taken before this instant
+            says nothing about whether the paint still shows. ``0.0`` for a
+            paint that landed at once.
     """
 
     kind: PaintKind
@@ -75,6 +82,7 @@ class PaintRecord:
     tiles: tuple[tuple[WireColor, ...], ...] = ()
     morph: tuple[WireColor, ...] | None = None
     run: LIFXEffect | None = None
+    settles_at: float = 0.0
 
     def matches_zones(self, zones: Iterable[HSBK]) -> bool:
         """Whether every zone still shows what was written."""
@@ -158,27 +166,50 @@ class PaintTracking:
             return
         self._paint_record = PaintRecord(kind=kind, slug=theme.slug, **shape)
 
+    @staticmethod
+    def _settles_at(duration: float) -> float:
+        """When a paint written with ``duration`` seconds of fade has landed.
+
+        Taken after the write returns, so the device started its fade no later
+        than this and has finished by the instant returned.
+        """
+        return time.monotonic() + duration if duration > 0 else 0.0
+
     def _record_paint(
         self,
         kind: PaintKind,
         theme: Theme,
         colors: Iterable[HSBK],
+        duration: float = 0.0,
     ) -> None:
-        """Remember a whole-light paint, or forget the old one if unslugged."""
-        self._remember(kind, theme, colors=tuple(to_wire(c) for c in colors))
+        """Remember a whole-light paint, or forget the old one if unslugged.
+
+        ``duration`` is the fade the colors were written with, in seconds.
+        """
+        self._remember(
+            kind,
+            theme,
+            colors=tuple(to_wire(c) for c in colors),
+            settles_at=self._settles_at(duration),
+        )
 
     def _record_tile_paint(
         self,
         kind: PaintKind,
         theme: Theme,
         tiles: Iterable[Iterable[HSBK]],
+        duration: float = 0.0,
     ) -> None:
         """Remember a whole-light matrix paint, or forget the old one if unslugged.
 
-        ``tiles`` holds each tile's pixels as the light stores them.
+        ``tiles`` holds each tile's pixels as the light stores them, and
+        ``duration`` is the fade they were written with, in seconds.
         """
         self._remember(
-            kind, theme, tiles=tuple(tuple(to_wire(c) for c in t) for t in tiles)
+            kind,
+            theme,
+            tiles=tuple(tuple(to_wire(c) for c in t) for t in tiles),
+            settles_at=self._settles_at(duration),
         )
 
     def _record_morph(

@@ -6,10 +6,12 @@ light's connection: the effect query a stop makes is allowed, a write is not.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
 
+from lifx.const import MOOD_FADE_SECONDS
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.effect_runner import effect_runner
 from lifx.devices.light import Light
@@ -68,6 +70,7 @@ class TestNothingRunning:
         self, matrix: MatrixLight, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         await matrix.apply_mood(make_theme("unit_test_a", static_mode="grid_static"))
+        await asyncio.sleep(MOOD_FADE_SECONDS)  # the mood fades in
         before = await matrix.get_all_tile_colors()
         sent = record_packets(matrix, monkeypatch)
         await matrix.stop_effect()

@@ -409,6 +409,15 @@ async def _eventually(check: Callable[[], Awaitable[bool]]) -> None:
     raise AssertionError("condition never held")
 
 
+async def _powered_on(light: CeilingLight) -> None:
+    """Wait for the power-on fade an effect starts on a light that was off."""
+
+    async def on() -> bool:
+        return await light.get_power() == 65535
+
+    await _eventually(on)
+
+
 async def _tile(ceiling: CeilingLight) -> list[HSBK]:
     return (await ceiling.get_all_tile_colors())[0]
 
@@ -483,7 +492,7 @@ class TestCeilingOverlapRules:
                 return (await _tile(ceiling))[UPLIGHT] == RED
 
             await _eventually(uplight_red)
-            assert await ceiling.get_power() == 65535
+            await _powered_on(ceiling)
 
             await ceiling.start_effect(_Solid(VIOLET))
             await _shows(ceiling, VIOLET, VIOLET)

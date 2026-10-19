@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v7.12.2 (2026-10-18)
+
+### Bug Fixes
+
+- Bump lifx-emulator-core to 3.15.0 and read a fading paint once it has landed
+  ([#335](https://github.com/Djelibeybi/lifx-async/pull/335),
+  [`65cc65c`](https://github.com/Djelibeybi/lifx-async/commit/65cc65cacae6c3e3d9bd70c9e3f2df4b3c1b477f))
+
+
 ## v7.12.1 (2026-10-18)
 
 ### Bug Fixes

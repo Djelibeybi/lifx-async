@@ -1708,7 +1708,12 @@ class MatrixLight(PaintTracking, Light):
         # Turn on light if requested and currently off
         if needs_power_on:
             await self.set_power(True, duration=duration)
-        self._record_tile_paint("theme", theme, self._shown_colors(tiles, painted))
+        self._record_tile_paint(
+            "theme",
+            theme,
+            self._shown_colors(tiles, painted),
+            0.0 if needs_power_on else duration,
+        )
 
     def _tile_orientation(self, tile: TileInfo) -> str | None:
         """The orientation to apply to a tile, or None to leave it alone.
@@ -1873,7 +1878,7 @@ class MatrixLight(PaintTracking, Light):
         async def write(duration: float) -> None:
             await self._write_mood_frames(tiles, frames, duration)
 
-        await self._write_mood(write, power_on)
+        fade = await self._write_mood(write, power_on)
         self._record_tile_paint(
             "mood",
             theme,
@@ -1884,6 +1889,7 @@ class MatrixLight(PaintTracking, Light):
                     for tile, colors in zip(tiles, frames, strict=True)
                 ],
             ),
+            fade,
         )
         return frames
 
@@ -2153,6 +2159,7 @@ class MatrixLight(PaintTracking, Light):
             LifxTimeoutError: If device does not respond
             LifxDeviceNotFoundError: If device cannot be reached
         """
+        await self._await_paint_settled()
         record = self._paint_record
         await super().refresh_state()
 
@@ -2178,8 +2185,9 @@ class MatrixLight(PaintTracking, Light):
         """Read what the record depends on and clear it unless it still holds.
 
         A software run needs no read, a Morph record reads the effect, and a
-        painted one reads every tile.
+        painted one reads every tile, once its fade has ended.
         """
+        await self._await_paint_settled()
         record = self._paint_record
         if record is None:
             return

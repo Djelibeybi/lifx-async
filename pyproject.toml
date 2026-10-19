@@ -1,6 +1,6 @@
 [project]
 name = "lifx-async"
-version = "7.12.1"
+version = "7.12.2"
 description = "A modern, type-safe, async Python library for controlling LIFX lights"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,7 +40,7 @@ Issues = "https://github.com/Djelibeybi/lifx-async/issues"
 [dependency-groups]
 dev = [
     "hatchling>=1.27.0",
-    "lifx-emulator-core>=3.12.4",
+    "lifx-emulator-core>=3.15.0",
     "llmstxt-standalone>=0.2.0",
     "mkdocstrings-python>=2.0.3",
     "prek>=0.3.6",
