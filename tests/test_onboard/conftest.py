@@ -188,6 +188,10 @@ class FakeJoiner:
     into it, which is how a test scripts what the OS reports over time. The
     ``after_join`` and ``after_disassociate`` lists are appended to
     ``ssid_sequence`` when those calls succeed.
+
+    The host has one WiFi interface, so a ``join()`` while a previous
+    ``join()`` has not been followed by a ``rejoin()`` is a test failure:
+    bulk onboarding must never overlap two devices.
     """
 
     def __init__(
@@ -219,19 +223,26 @@ class FakeJoiner:
         self.ssid_sequence: deque[str | None] = deque()
         self.after_join: list[str | None] = []
         self.after_disassociate: list[str | None] = []
+        self.on_softap: SoftApNetwork | None = None
 
     async def join(self, network: SoftApNetwork) -> None:
         self.calls.append("join")
+        if self.on_softap is not None:
+            raise AssertionError(
+                f"join({network.ssid!r}) while still on {self.on_softap.ssid!r}"
+            )
         if self.join_failures > 0:
             self.join_failures -= 1
             raise OSError("could not find network")
         self.joins.append(network)
+        self.on_softap = network
         self.current = network.ssid
         self.ssid_sequence.extend(self.after_join)
 
     async def rejoin(self, ssid: str, password: str = "") -> None:
         self.calls.append("rejoin")
         self.rejoins.append((ssid, password))
+        self.on_softap = None
         if self.rejoin_hangs:
             await asyncio.sleep(HANG_GUARD_TIMEOUT)
         applies = self.rejoin_failures_for is None or self.rejoin_failures_for == ssid
@@ -406,6 +417,37 @@ def emulator(serials: tuple[str, ...], port: int | None = None) -> Iterator[int]
         yield port
     finally:
         runner.stop()
+
+
+@contextmanager
+def growing_emulator(
+    port: int | None = None,
+) -> Iterator[tuple[EmulatedLifxServer, int]]:
+    """Run the embedded emulator on the loopback with no devices yet.
+
+    ``add_color_light(server, serial)`` adds one while it runs, which is how a
+    test makes a device appear on the LAN at a chosen moment.
+    """
+    scenario_manager = HierarchicalScenarioManager()
+    port = port or get_free_port()
+    server = EmulatedLifxServer(
+        devices=[],
+        device_manager=DeviceManager(DeviceRepository()),
+        bind_address=LOOPBACK,
+        port=port,
+        scenario_manager=scenario_manager,
+    )
+    runner = EmulatorRunner(server)
+    runner.start()
+    try:
+        yield server, port
+    finally:
+        runner.stop()
+
+
+def add_color_light(server: EmulatedLifxServer, serial: str) -> None:
+    """Add a color light to a running emulator so the next sweep finds it."""
+    assert server.add_device(create_color_light(serial=serial)), serial
 
 
 def loopback_watcher(port: int, **kwargs: Any) -> DeviceWatcher:
