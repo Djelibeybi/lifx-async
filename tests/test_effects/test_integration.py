@@ -80,6 +80,7 @@ def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
+    light._await_paint_settled = AsyncMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
     light._clamp_color.side_effect = lambda color: color
@@ -103,6 +104,7 @@ def mock_white_light() -> MagicMock:
     """Create a mock white light (no color support)."""
     light = MagicMock()
     light.serial = "d073d5abcdef"
+    light._await_paint_settled = AsyncMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = False
 
@@ -226,6 +228,7 @@ async def test_colorloop_synchronized_mode(conductor, mock_light) -> None:
     light1 = mock_light
     light2 = MagicMock()
     light2.serial = "d073d5fedcba"
+    light2._await_paint_settled = AsyncMock()
     light2.capabilities = MagicMock()
     light2.capabilities.has_color = True
     light2._clamp_color.side_effect = lambda color: color
@@ -370,6 +373,7 @@ async def test_effect_without_power_on(conductor) -> None:
     """Test effect with power_on=False doesn't power on lights."""
     # Create a fresh mock light that is powered off
     light = MagicMock()
+    light._await_paint_settled = AsyncMock()
     light.serial = "d073d5test123"
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
@@ -456,6 +460,7 @@ async def test_multiple_lights_parallel(conductor, mock_light) -> None:
     lights = []
     for i in range(5):
         light = MagicMock()
+        light._await_paint_settled = AsyncMock()
         light.serial = f"d073d512345{i}"
         light.capabilities = MagicMock()
         light.capabilities.has_color = True
@@ -487,6 +492,7 @@ async def test_conductor_exception_during_effect() -> None:
     # Create mock light
     light = MagicMock()
     light.serial = "d073d5eece01"
+    light._await_paint_settled = AsyncMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
     light.get_power = AsyncMock(return_value=True)
@@ -539,6 +545,7 @@ async def test_conductor_exception_during_async_perform() -> None:
 
     # Create mock light
     light = MagicMock()
+    light._await_paint_settled = AsyncMock()
     light.serial = "d073d5failtest"
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
@@ -569,6 +576,7 @@ async def test_conductor_stop_with_active_effects() -> None:
     # Create mock light
     light = MagicMock()
     light.serial = "d073d5ac71be"
+    light._await_paint_settled = AsyncMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = True
     light.get_power = AsyncMock(return_value=True)
@@ -611,6 +619,7 @@ async def test_conductor_filter_lights_without_capabilities() -> None:
     # Create mock light with color capabilities
     light = MagicMock()
     light.serial = "d073d500ca95"
+    light._await_paint_settled = AsyncMock()
     light.capabilities = MagicMock()
     light.capabilities.has_color = True  # Set color capability
     light.get_power = AsyncMock(return_value=True)
@@ -890,6 +899,7 @@ async def test_conductor_frame_effect_coexists_with_lifx_effect(
 
     # Light 2 runs a regular LIFXEffect (pulse)
     light2 = MagicMock()
+    light2._await_paint_settled = AsyncMock()
     light2.serial = "d073d5pulse01"
     light2.capabilities = MagicMock()
     light2.capabilities.has_color = True

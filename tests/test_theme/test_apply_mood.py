@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -369,6 +370,7 @@ class TestVerticalApplyMood:
 async def test_mirror_paints_bands_over_its_buffer(mirror_device) -> None:
     async with mirror_device:
         await mirror_device.apply_mood(Theme([RED, GREEN], static_mode="solid_static"))
+        await asyncio.sleep(MOOD_FADE_SECONDS)  # the mood fades in
         buffer = (await mirror_device.get_all_tile_colors())[0][:52]
     rows = [buffer[i : i + 4] for i in range(0, 52, 4)]
     band = MoodGenerator._stretch([RED, GREEN], 13)

@@ -11,6 +11,7 @@ from lifx_emulator.factories import create_device
 from lifx_emulator.scenarios import HierarchicalScenarioManager
 
 from lifx.color import HSBK
+from lifx.const import MOOD_FADE_SECONDS
 from lifx.devices.ceiling import CeilingLight
 from lifx.devices.matrix import MatrixLight
 from lifx.devices.mirror import MirrorLight
@@ -84,6 +85,7 @@ class TestHiddenCellsOnPaintAndFrames:
         masked = get_product(pid).masked_zones
         async with light:
             await light.apply_mood(get_theme("evening"))
+            await asyncio.sleep(MOOD_FADE_SECONDS)  # the mood fades in
             tile = (await light.get_all_tile_colors())[0]
             for index in masked:
                 assert tile[index].brightness == 0, index

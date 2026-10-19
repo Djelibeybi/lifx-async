@@ -24,6 +24,7 @@ def mock_light() -> MagicMock:
     """Create a mock light device."""
     light = MagicMock()
     light.serial = "d073d5123456"
+    light._await_paint_settled = AsyncMock()
     light._clamp_color.side_effect = lambda color: color
     light._clamp_colors.side_effect = lambda colors: colors
     return light
@@ -438,6 +439,7 @@ class _FakeClock:
 def _color_light(serial: str = "d073d5000099") -> MagicMock:
     light = MagicMock()
     light.serial = serial
+    light._await_paint_settled = AsyncMock()
     light.set_color = AsyncMock()
     light.set_power = AsyncMock()
     # Captured off, so a restore turns the light off and asks until it
