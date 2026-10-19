@@ -390,9 +390,14 @@ class _Run:
         saw_networks = False
         last_error: str | None = None
         while True:
+            remaining = max(deadline - time.monotonic(), 0.0)
             try:
-                networks = await self._scanner.scan(
-                    min_rssi=self._min_rssi, include_non_lifx=self._include_non_lifx
+                networks = await bounded(
+                    self._scanner.scan(
+                        min_rssi=self._min_rssi,
+                        include_non_lifx=self._include_non_lifx,
+                    ),
+                    remaining,
                 )
             except Exception as error:
                 last_error = _name(error)
@@ -414,7 +419,9 @@ class _Run:
                         return network
             if time.monotonic() >= deadline:
                 break
-            await asyncio.sleep(self._find_poll)
+            await asyncio.sleep(
+                min(self._find_poll, max(deadline - time.monotonic(), 0.0))
+            )
         wanted = f"for {self._serial}" if self._serial is not None else "at all"
         message = f"No LIFX SoftAP {wanted} found within {self._find_timeout}s"
         if completed and not saw_networks:
@@ -436,9 +443,13 @@ class _Run:
         started = time.monotonic()
         deadline = started + self._find_timeout
         while True:
+            # Each attempt is bounded by what is left of find_timeout: a
+            # backend that associates and then stalls must fail the phase,
+            # which starts host recovery, rather than wait to be cancelled.
+            remaining = max(deadline - time.monotonic(), 0.0)
             failed: str | None = None
             try:
-                await self._joiner.join(network)
+                await bounded(self._joiner.join(network), remaining)
             except Exception as error:
                 failed = _name(error)
             if failed is None:
@@ -449,7 +460,9 @@ class _Run:
                     f"Could not join {network.ssid!r} within "
                     f"{self._find_timeout}s: {failed}"
                 )
-            await asyncio.sleep(self._find_poll)
+            await asyncio.sleep(
+                min(self._find_poll, max(deadline - time.monotonic(), 0.0))
+            )
         self._sink.emit(
             OnboardEventType.JOINED,
             OnboardPhase.JOIN,
@@ -697,11 +710,15 @@ class _Run:
     async def _recover_host(self) -> None:
         """Return the host to a network after a failure, best effort.
 
-        The budget allots ``rejoin_timeout`` per target plus one
-        ``auto_join_wait``, so the auto-join wait is bounded by the latter
-        here and every fallback target still receives its attempt.
+        Leaving the SoftAP comes first, each of its calls bounded by
+        ``rejoin_timeout`` on its own, so a stalled forget or disassociate
+        never eats into the rejoin budget. That budget then allots
+        ``rejoin_timeout`` per target plus one ``auto_join_wait``, so the
+        auto-join wait is bounded by the latter here and every fallback
+        target still receives its attempt.
         """
         targets = self._rejoin_targets()
+        await self._leave_softap()
         budget = self._rejoin_timeout * len(targets) + self._auto_join_wait
         _LOGGER.info("recovering host network within %.1fs", budget)
         try:
@@ -710,7 +727,6 @@ class _Run:
             _LOGGER.warning("host recovery gave up after %.1fs", budget)
 
     async def _recover_targets(self, targets: list[_RejoinTarget]) -> None:
-        await self._leave_softap()
         for target in targets:
             try:
                 self._host_network = await self._rejoin_target(

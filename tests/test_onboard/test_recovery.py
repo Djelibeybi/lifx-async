@@ -17,6 +17,8 @@ from lifx.onboard import (
     OnboardEventType,
     OnboardPhase,
     SoftApDialError,
+    SoftApJoinError,
+    SoftApNotFoundError,
     SoftApSendError,
     SoftApWaitTimeoutError,
     onboard,
@@ -28,6 +30,7 @@ from tests.test_onboard.conftest import (
     ORIGINAL_SSID,
     SOFTAP_SSID,
     FakeJoiner,
+    FakeScanner,
     FakeSoftApClient,
     make_joiner,
     make_scanner,
@@ -610,7 +613,74 @@ class TestCancellation:
         assert joiner.rejoins == [(ORIGINAL_SSID, "")]
 
 
+class TestPhaseBudgets:
+    """SCAN and JOIN enforce find_timeout around the backend await itself."""
+
+    async def test_a_hanging_scan_fails_the_phase_within_find_timeout(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner()
+        with pytest.raises(SoftApNotFoundError) as info:
+            await asyncio.wait_for(
+                onboard(
+                    home_network,
+                    scanner=FakeScanner(hangs=True),
+                    joiner=joiner,
+                    softap=FakeSoftApClient(),
+                    verify=False,
+                    **{**FAST, "find_timeout": 0.05},
+                ),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.SCAN
+        assert "TimeoutError" in str(info.value)
+        assert "join" not in joiner.calls
+
+    async def test_a_hanging_join_fails_the_phase_and_recovers_the_host(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # The backend associates and then stalls: the phase must end on its
+        # own budget and start recovery, not wait to be cancelled.
+        joiner = _full_joiner(join_hangs=True)
+        with pytest.raises(SoftApJoinError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, find_timeout=0.05), HANG_GUARD_TIMEOUT
+            )
+        assert info.value.phase is OnboardPhase.JOIN
+        assert "TimeoutError" in str(info.value)
+        after_join = joiner.calls[joiner.calls.index("join") + 1 :]
+        assert "forget" in after_join
+        assert "disassociate" in after_join
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+
 class TestRejoinBudget:
+    async def test_recovery_cleanup_does_not_consume_the_rejoin_budget(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # Both cleanup calls stall. They are bounded on their own, so the
+        # home network, the only target without a reporter, is still joined.
+        joiner = make_joiner(
+            forgetter=True,
+            disassociator=True,
+            forget_hangs=True,
+            disassociate_hangs=True,
+        )
+        softap = FakeSoftApClient(probe_failures=100_000)
+        with pytest.raises(SoftApWaitTimeoutError):
+            await asyncio.wait_for(
+                _run(
+                    home_network,
+                    joiner,
+                    softap=softap,
+                    rejoin_timeout=0.05,
+                    auto_join_wait=0.01,
+                ),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert joiner.calls[-3:] == ["forget", "disassociate", "rejoin"]
+        assert joiner.rejoins == [(HOME_SSID, home_network.password)]
+
     async def test_a_hanging_forget_does_not_block_the_rejoin(
         self, home_network: HomeNetwork
     ) -> None:

@@ -162,14 +162,19 @@ class FakeScanner:
 
     interface = "fake0"
 
-    def __init__(self, *results: list[SoftApNetwork] | BaseException) -> None:
+    def __init__(
+        self, *results: list[SoftApNetwork] | BaseException, hangs: bool = False
+    ) -> None:
         self.results = list(results)
+        self.hangs = hangs
         self.calls: list[dict[str, Any]] = []
 
     async def scan(
         self, *, min_rssi: float = 0.0, include_non_lifx: bool = False
     ) -> list[SoftApNetwork]:
         self.calls.append({"min_rssi": min_rssi, "include_non_lifx": include_non_lifx})
+        if self.hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
         if not self.results:
             return []
         item = self.results.pop(0) if len(self.results) > 1 else self.results[0]
