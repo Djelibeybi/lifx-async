@@ -114,3 +114,44 @@ default brightness.
 The long-lived object that runs discovery on a schedule, holds one device
 object per serial, and reports added, updated and removed events. Its terms
 (silent, silence threshold, sweep) have no glossary entries yet.
+
+**SoftAP**:
+The open WiFi network a LIFX device raises when it is not on any network (factory
+fresh or reset). Its name is `LIFX`, a product name and six hex characters of the
+device identity, and the device listens on it at `172.16.0.1:56700` for one TLS
+connection carrying the home network. A device on a SoftAP is not on the LAN, so
+discovery cannot see it.
+_Avoid_: setup network, hotspot, ad hoc network.
+
+**Onboarding**:
+Taking a device from its SoftAP onto a home network: the host joins the SoftAP,
+hands the device the credentials, returns to its own network and confirms the
+device arrived. It is seven phases (scan, join, wait, dial, configure, rejoin,
+verify) and it is the whole sequence, not just the credential write.
+_Avoid_: provisioning, pairing, setup (setup mode is the device's state, not the act).
+
+**Home network**:
+The network a device is handed during onboarding, described by `HomeNetwork`
+(SSID, password and security mode). It is the only place the password lives.
+_Avoid_: target network, destination network.
+
+**Host network**:
+The network the machine running the onboarding is on. The host leaves it to join
+a SoftAP and must be returned to it afterwards, so it is recorded first when the
+host can report it. It is usually, but not necessarily, the home network.
+_Avoid_: original network, local network (as a synonym for the home network).
+
+**Handoff**:
+The moment during onboarding when the host sends the credential message
+(packet 305) over the SoftAP's TLS connection. It starts at the dial and ends at
+the configure phase; nothing is read back, so a handoff that succeeded is not
+proof the device joined.
+_Avoid_: pairing, provisioning.
+
+**Verification** (onboarding sense):
+Confirming after the handoff that the device is now on the LAN: the first
+`ADDED` or `UPDATED` watcher event for its serial at an address other than the
+SoftAP address. It answers "did the device arrive?" once, and is distinct from
+the device watcher's liveness, which asks whether a known device is still
+answering.
+_Avoid_: liveness, health check (those belong to the device watcher).

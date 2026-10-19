@@ -25,7 +25,7 @@ from dataclasses import dataclass
 MAC_OFFSET_FIRMWARE_MAJOR = 3
 MAC_OFFSET_FIRMWARE_MIN_MINOR = 70
 
-#: The three-byte organisationally unique identifier shared by LIFX serials
+#: The three-byte organizationally unique identifier shared by LIFX serials
 #: (``d0:73:d5``).
 LIFX_OUI = b"\xd0\x73\xd5"
 
