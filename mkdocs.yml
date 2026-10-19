@@ -126,6 +126,7 @@ plugins:
       - getting-started/effects.md
       User Guide:
       - user-guide/discovery.md
+      - user-guide/onboarding.md
       - user-guide/themes.md
       - user-guide/ceiling-lights.md
       - user-guide/mirror-lights.md
@@ -141,6 +142,7 @@ plugins:
       API Reference:
       - api/index.md
       - api/high-level.md
+      - api/onboarding.md
       - api/themes.md
       - api/effects.md
       - api/animation.md
@@ -206,6 +208,7 @@ nav:
   - Light Effects: getting-started/effects.md
 - User Guide:
   - Discovery: user-guide/discovery.md
+  - Onboarding: user-guide/onboarding.md
   - Light Effects: user-guide/effects.md
   - Effects Gallery: user-guide/effects-gallery.md
   - Custom Effects: user-guide/effects-custom.md
@@ -223,6 +226,7 @@ nav:
 - API Reference:
   - Overview: api/index.md
   - High-Level API: api/high-level.md
+  - Onboarding: api/onboarding.md
   - Themes: api/themes.md
   - Effects: api/effects.md
   - Animation: api/animation.md

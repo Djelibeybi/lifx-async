@@ -277,7 +277,27 @@ gh workflow run docs.yml
    - `generators/mood.py`: `MoodGenerator`, the LIFX app's mood recipes for `apply_mood()` and `animate_mood()`
    - `generators/canvas.py`: Internal `Canvas` rendering primitive
 
-8. **Utilities**
+8. **Onboarding Layer** (`src/lifx/onboard/`)
+
+   - Imported explicitly as `lifx.onboard`; nothing is exported from the top-level `lifx` namespace.
+     Standard library only
+   - `machine.py`: `onboard()`, the seven-phase SoftAP sequence (scan, join, wait, dial, configure,
+     rejoin, verify) with host recovery, and the timing defaults (`FIND_TIMEOUT` ... `VERIFY_POLL`)
+   - `bulk.py`: `bulk_onboard()`, the same sequence in a loop with verification interleaved through
+     one `DeviceWatcher`
+   - `softap.py`: `SoftApClient` Protocol, `SoftApConnection` (TLS client for `172.16.0.1:56700`,
+     certificate verification off, optional `legacy_tls`) and `build_access_point_message()`
+   - `protocols.py`: `Scanner`, `Joiner` and the optional `CurrentNetworkReporter`,
+     `NetworkForgetter` and `Disassociator`. lifx-async ships no implementation: host WiFi backends
+     and the CLI live out of tree (`.claude/adr/0002-onboarding-seam.md`)
+   - `models.py`, `events.py`, `result.py`, `errors.py`, `serials.py`, `verify.py`: `HomeNetwork`
+     and `SoftApNetwork`, events and the drop-oldest `OnboardEventQueue`, `Result`, the
+     `LifxOnboardError` hierarchy and `OnboardPhase`, serial and SoftAP-name helpers, and LAN
+     verification
+   - The password lives only in `HomeNetwork`; it never reaches a log, event, exception message or
+     `repr`. Library errors repeat only the type name of a caller-supplied backend's exception
+
+9. **Utilities**
 
    - `color.py`: `HSBK` class with RGB conversion, `Colors` presets
    - `const.py`: Critical constants (network settings, UUIDs, official URLs)
@@ -308,7 +328,11 @@ product ID and instantiates the appropriate device class.
 
 ### Exception Hierarchy
 
-All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceNotFoundError`, `LifxTimeoutError`, `LifxProtocolError`, `LifxConnectionError`, `LifxNetworkError`, `LifxUnsupportedCommandError`.
+All exceptions inherit from `LifxError` (`src/lifx/exceptions.py`): `LifxDeviceNotFoundError`, `LifxTimeoutError`, `LifxProtocolError`, `LifxConnectionError`, `LifxNetworkError`, `LifxUnsupportedCommandError`, and `LifxOnboardError` with its phase-typed subclasses in
+`src/lifx/onboard/errors.py` (`SoftApNotFoundError`, `SoftApJoinError`, `SoftApWaitTimeoutError`,
+`HostLeftSoftApError`, `SoftApUnreachableError`, `SoftApDialError`, `SoftApSendError`,
+`HostRejoinError`, `VerifyTimeoutError`, `InvalidSoftApTargetError`, `MissingCredentialsError`,
+`LegacyTlsUnavailableError`).
 
 ### Key Design Patterns
 
@@ -426,6 +450,7 @@ tests/
 ├── test_theme/             # Theme, canvas, generators, library
 ├── test_animation/         # Animator, framebuffer, packets, orientation
 ├── test_color.py           # Color utilities and RGB roundtrip
+├── test_onboard/           # SoftAP onboarding: machine, bulk, TLS client, verification, guide examples
 ├── test_products/          # Product registry
 └── test_utils.py           # General utilities
 ```
@@ -478,6 +503,14 @@ Local generator quirks:
   `SensorStateAmbientLight` 402) and the Thread packets (`ThreadGetInfo` 1200, `ThreadStateInfo`
   1201) were once injected locally but are now defined upstream in `protocol.yml`, so they are
   generated like any other packet. The generator contains no injection code for either
+- **wifi access point packet**: `WifiSetAccessPoint` (305, 98-byte payload) and the `WifiInterface`
+  and `WifiSecurity` enums are not in upstream `protocol.yml`, so `apply_wifi_access_point_quirk()`
+  injects them, each only while absent, so an upstream definition would win unchanged. It is the
+  only locally injected packet. The layout comes from two third-party sources, lifxjs `Protocol.md`
+  and tserong's `onboard.py`. The fields are bytes, as `label` is on other packets, and the
+  validator checks that the field sizes sum to the declared 98 bytes.
+  The `Password` field carries `"sensitive": True`, so it is excluded from the dataclass repr and
+  redacted in the `Packet.unpack()` debug log
 
 Run `uv run python -m lifx.protocol.generator` to regenerate Python code.
 
