@@ -212,9 +212,11 @@ The contract the library relies on:
   repeats or chains it. Put detail you want kept in your own logs.
 - A backend failure never leaves the host on the SoftAP: recovery runs after any
   failure from the first join attempt onward. Every backend call is bounded:
-  `scan()` and `join()` by what is left of `find_timeout`, `forget()`,
-  `disassociate()`, `rejoin()` and reporter polls by `rejoin_timeout`, with a
-  rejoin target's retries sharing one `rejoin_timeout`. A backend that never
+  `scan()` and `join()` by what is left of `find_timeout` (a bulk scan by
+  `find_timeout` or the remaining idle window), the wait phase's reporter polls
+  and probes by `wait_timeout`, `forget()`, `disassociate()`, `rejoin()` and
+  other reporter polls by `rejoin_timeout`, with a rejoin target's retries
+  sharing one `rejoin_timeout`. A backend that never
   returns therefore fails its phase instead of hanging the run, and cannot
   starve the next rejoin target or the recovery pass of its budget.
 

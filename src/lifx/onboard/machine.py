@@ -21,7 +21,7 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
-from lifx.onboard._aio import bounded
+from lifx.onboard._aio import BoundedTimeoutError, bounded
 from lifx.onboard.errors import (
     HostLeftSoftApError,
     HostRejoinError,
@@ -399,10 +399,14 @@ class _Run:
                     ),
                     remaining,
                 )
+            except BoundedTimeoutError:
+                last_error = "the last scan did not return in time"
+                _LOGGER.warning("scan on %s did not return", self._scanner.interface)
+                break
             except Exception as error:
-                last_error = _name(error)
+                last_error = f"the last scan raised {_name(error)}"
                 _LOGGER.warning(
-                    "scan on %s failed: %s", self._scanner.interface, last_error
+                    "scan on %s failed: %s", self._scanner.interface, _name(error)
                 )
             else:
                 completed += 1
@@ -427,7 +431,7 @@ class _Run:
         if completed and not saw_networks:
             message = f"{message}. {_MACOS_HINT}"
         if last_error is not None:
-            message = f"{message} (the last scan raised {last_error})"
+            message = f"{message} ({last_error})"
         raise SoftApNotFoundError(message) from None
 
     async def _join_phase(self) -> None:
@@ -450,6 +454,11 @@ class _Run:
             failed: str | None = None
             try:
                 await bounded(self._joiner.join(network), remaining)
+            except BoundedTimeoutError:
+                raise SoftApJoinError(
+                    f"Could not join {network.ssid!r} within "
+                    f"{self._find_timeout}s: join() did not return in time"
+                ) from None
             except Exception as error:
                 failed = _name(error)
             if failed is None:
@@ -484,27 +493,42 @@ class _Run:
         started = time.monotonic()
         deadline = started + self._wait_timeout
         last_error: SoftApUnreachableError | None = None
+        timed_out = SoftApWaitTimeoutError(
+            f"SoftAP at {address} did not accept a connection within "
+            f"{self._wait_timeout}s"
+        )
         while True:
-            current = await self._current_ssid(OnboardPhase.WAIT)
+            # The reporter poll and the probe both draw on wait_timeout, and
+            # a probe that only succeeds once the budget is gone counts for
+            # nothing: the phase ends where its deadline says.
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise timed_out from last_error
+            current = await self._current_ssid(OnboardPhase.WAIT, timeout=remaining)
             if current is not None and current != self._softap_ssid:
                 raise HostLeftSoftApError(
                     f"Host left {self._softap_ssid!r} for {current!r} while waiting "
                     f"for the SoftAP at {address}"
                 )
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise timed_out from last_error
             attempt = time.monotonic()
             try:
-                await self._softap.probe(timeout=self._wait_poll)
+                await self._softap.probe(timeout=min(self._wait_poll, remaining))
             except SoftApUnreachableError as error:
                 last_error = error
             else:
+                if time.monotonic() >= deadline:
+                    raise timed_out from last_error
                 break
-            if time.monotonic() >= deadline:
-                raise SoftApWaitTimeoutError(
-                    f"SoftAP at {address} did not accept a connection within "
-                    f"{self._wait_timeout}s"
-                ) from last_error
+            # The sleep is capped by the deadline; the next iteration's budget
+            # check ends the phase.
             await asyncio.sleep(
-                max(0.0, self._wait_poll - (time.monotonic() - attempt))
+                min(
+                    max(0.0, self._wait_poll - (time.monotonic() - attempt)),
+                    max(0.0, deadline - time.monotonic()),
+                )
             )
         self._sink.emit(
             OnboardEventType.ON_SOFTAP,
@@ -661,20 +685,32 @@ class _Run:
             # The Joiner was handed the password, so its error is never
             # logged, chained or kept alive across an await: only its type is.
             failed = ""
+            budget_spent = False
             try:
                 await bounded(
                     self._joiner.rejoin(target.ssid, target.password), remaining
                 )
+            except BoundedTimeoutError:
+                failed = "rejoin() did not return in time"
+                budget_spent = True
             except Exception as error:
                 failed = _name(error)
             if not failed:
                 return target.ssid
-            remaining = max(deadline - time.monotonic(), 0.0)
-            current = await self._current_ssid(OnboardPhase.REJOIN, timeout=remaining)
-            if current == target.ssid:
-                _LOGGER.debug("already on %r despite %s", target.ssid, failed)
-                return target.ssid
+            if not budget_spent:
+                remaining = max(deadline - time.monotonic(), 0.0)
+                current = await self._current_ssid(
+                    OnboardPhase.REJOIN, timeout=remaining
+                )
+                if current == target.ssid:
+                    _LOGGER.debug("already on %r despite %s", target.ssid, failed)
+                    return target.ssid
             _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
+            if budget_spent:
+                raise HostRejoinError(
+                    f"Could not rejoin {target.ssid!r} within "
+                    f"{self._rejoin_timeout}s: {failed}"
+                )
             await asyncio.sleep(
                 min(self._rejoin_poll, max(deadline - time.monotonic(), 0.0))
             )

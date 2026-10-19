@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator, Iterable
 from dataclasses import replace
 from typing import Any
 
+from lifx.onboard._aio import bounded
 from lifx.onboard.errors import (
     InvalidSoftApTargetError,
     OnboardPhase,
@@ -151,11 +152,24 @@ class _BulkRun:
             return False
         return not self._wanted or serial in self._wanted
 
+    def _scan_bound(self) -> float:
+        """How long one scan may take: ``find_timeout``, or less when the idle
+        window would close sooner, so a stalled backend never keeps the loop
+        from checking whether it should stop or yielding finished results."""
+        bound = float(self._run_kwargs["find_timeout"])
+        if self._stop_when_idle_for is not None:
+            idle_left = self._stop_when_idle_for - (time.monotonic() - self._idle_since)
+            bound = min(bound, max(idle_left, 0.0))
+        return bound
+
     async def _scan_round(self) -> SoftApNetwork | None:
         """One scan; the first LIFX SoftAP not yet attempted, if any."""
         try:
-            networks = await self._scanner.scan(
-                min_rssi=self._min_rssi, include_non_lifx=self._include_non_lifx
+            networks = await bounded(
+                self._scanner.scan(
+                    min_rssi=self._min_rssi, include_non_lifx=self._include_non_lifx
+                ),
+                self._scan_bound(),
             )
         except Exception as error:
             _LOGGER.warning(
@@ -440,7 +454,7 @@ async def bulk_onboard(
         legacy_tls: Pin TLS 1.0 for pre-2020 firmware.
         softap_address: Where each device's SoftAP listens.
         softap_port: The port it listens on.
-        find_timeout: Budget for each join.
+        find_timeout: Budget for each join, and the most one scan may take.
         find_poll: Interval between join attempts.
         wait_timeout: Budget for the SoftAP to accept a probe.
         wait_poll: Interval between probes; each probe is bounded by it.

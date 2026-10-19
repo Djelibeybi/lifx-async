@@ -335,7 +335,7 @@ def make_joiner(
 
 
 def make_scanner(
-    *results: Any, reporter: list[str | None] | None = None
+    *results: Any, reporter: list[str | None] | None = None, hangs: bool = False
 ) -> FakeScanner:
     """Build a ``FakeScanner``.
 
@@ -343,7 +343,7 @@ def make_scanner(
     answering each poll with the next entry; the last entry repeats.
     """
     if reporter is None:
-        return FakeScanner(*results)
+        return FakeScanner(*results, hangs=hangs)
     answers = deque(reporter)
 
     class ReportingScanner(FakeScanner):
@@ -363,6 +363,7 @@ class FakeSoftApClient:
         *,
         probe_failures: int = 0,
         probe_takes: float = 0.0,
+        probe_success_takes: float = 0.0,
         open_takes: float = 0.0,
         open_error: BaseException | None = None,
         send_error: BaseException | None = None,
@@ -371,6 +372,7 @@ class FakeSoftApClient:
     ) -> None:
         self.probe_failures = probe_failures
         self.probe_takes = probe_takes
+        self.probe_success_takes = probe_success_takes
         self.open_takes = open_takes
         self.open_error = open_error
         self.send_error = send_error
@@ -395,6 +397,9 @@ class FakeSoftApClient:
             self.probe_failures -= 1
             await asyncio.sleep(self.probe_takes)
             raise SoftApUnreachableError(f"nothing at {self._address}:{self._port}")
+        if self.probe_success_takes:
+            # A client that ignores the probe timeout and answers late.
+            await asyncio.sleep(self.probe_success_takes)
 
     async def open(self) -> None:
         self.opened += 1

@@ -24,6 +24,7 @@ from lifx.onboard import (
     bulk_onboard,
 )
 from lifx.protocol.models import Serial
+from tests.conftest import HANG_GUARD_TIMEOUT
 from tests.test_onboard.conftest import (
     HOME_PASSWORD,
     HOME_SSID,
@@ -52,6 +53,29 @@ async def _collect(home_network: HomeNetwork, **overrides: Any) -> list:
     """Run bulk_onboard() with fakes to completion, returning the results."""
     kwargs = {**BULK, **overrides}
     return [result async for result in bulk_onboard(home_network, **kwargs)]
+
+
+class TestScanBudget:
+    async def test_a_hanging_scan_does_not_keep_the_run_from_stopping(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # Each scan is bounded by find_timeout, or by what is left of the idle
+        # window, so a stalled backend still lets the loop check whether to
+        # stop and yield any finished results.
+        joiner = make_joiner(current=ORIGINAL_SSID, reporter=True)
+        results = await asyncio.wait_for(
+            _collect(
+                home_network,
+                scanner=make_scanner(hangs=True),
+                joiner=joiner,
+                softap=FakeSoftApClient(),
+                verify=False,
+                stop_when_idle_for=0.02,
+            ),
+            HANG_GUARD_TIMEOUT,
+        )
+        assert results == []
+        assert "join" not in joiner.calls
 
 
 class TestSerialAttempts:

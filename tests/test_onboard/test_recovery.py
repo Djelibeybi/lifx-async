@@ -633,8 +633,41 @@ class TestPhaseBudgets:
                 HANG_GUARD_TIMEOUT,
             )
         assert info.value.phase is OnboardPhase.SCAN
-        assert "TimeoutError" in str(info.value)
+        assert "did not return in time" in str(info.value)
         assert "join" not in joiner.calls
+
+    async def test_a_slow_reporter_during_wait_cannot_outlive_wait_timeout(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # The reporter poll draws on wait_timeout; a probe that would succeed
+        # once the budget is gone counts for nothing, so credentials are never
+        # sent after the phase deadline.
+        joiner = _full_joiner(report_takes=0.1)
+        softap = FakeSoftApClient()
+        with pytest.raises(SoftApWaitTimeoutError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, wait_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.WAIT
+        assert softap.sent == []
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+    async def test_a_probe_that_succeeds_after_the_deadline_counts_for_nothing(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # A SoftApClient that ignores its probe timeout and answers once the
+        # wait budget is gone must not let the run proceed to send credentials.
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(probe_success_takes=0.1)
+        with pytest.raises(SoftApWaitTimeoutError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, wait_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.WAIT
+        assert softap.sent == []
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
 
     async def test_a_hanging_join_fails_the_phase_and_recovers_the_host(
         self, home_network: HomeNetwork
@@ -647,7 +680,7 @@ class TestPhaseBudgets:
                 _run(home_network, joiner, find_timeout=0.05), HANG_GUARD_TIMEOUT
             )
         assert info.value.phase is OnboardPhase.JOIN
-        assert "TimeoutError" in str(info.value)
+        assert "did not return in time" in str(info.value)
         after_join = joiner.calls[joiner.calls.index("join") + 1 :]
         assert "forget" in after_join
         assert "disassociate" in after_join
@@ -708,7 +741,7 @@ class TestRejoinBudget:
     ) -> None:
         # Every attempt fails slowly. The first takes most of the target's
         # budget; the retry is granted only what is left, so it is cut off
-        # with TimeoutError instead of running its full course to OSError,
+        # as out of time instead of running its full course to OSError,
         # and no target hands a retry a fresh budget.
         joiner = _full_joiner(rejoin_failures=10, rejoin_fail_takes=0.3)
         joiner.after_disassociate = [None] * 1000
@@ -725,23 +758,27 @@ class TestRejoinBudget:
                     ),
                     HANG_GUARD_TIMEOUT,
                 )
-        assert f"rejoining {OVERRIDE_SSID!r} failed: TimeoutError" in caplog.text
-        assert f"rejoining {HOME_SSID!r} failed: TimeoutError" in caplog.text
+        cut_off = "failed: rejoin() did not return in time"
+        assert f"rejoining {OVERRIDE_SSID!r} {cut_off}" in caplog.text
+        assert f"rejoining {HOME_SSID!r} {cut_off}" in caplog.text
         # Two phase targets at rejoin_timeout each, then the recovery budget.
         assert time.monotonic() - started < 0.4 * 2 + (0.4 * 2 + 0.01) + 1.5
 
-    async def test_a_slow_reporter_reads_as_unknown_and_never_hangs_the_run(
+    async def test_a_stalled_reporter_reads_as_unknown_and_never_hangs_the_run(
         self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
     ) -> None:
+        # Every poll is cut off and logged by type. The original network is
+        # unknown, the wait phase spends its budget on the stalled poll and
+        # fails, and recovery brings the host to the only target left.
         joiner = _full_joiner(report_takes=HANG_GUARD_TIMEOUT)
         with caplog.at_level(logging.WARNING, logger="lifx.onboard"):
-            result, _ = await asyncio.wait_for(
-                _run(home_network, joiner, rejoin_timeout=0.05), HANG_GUARD_TIMEOUT
-            )
-        # The original network could not be read, so only the home network
-        # was a target; every stalled poll was cut off and logged by type.
-        assert result.host_network == HOME_SSID
-        assert "current network unknown during rejoin: TimeoutError" in caplog.text
+            with pytest.raises(SoftApWaitTimeoutError):
+                await asyncio.wait_for(
+                    _run(home_network, joiner, rejoin_timeout=0.05),
+                    HANG_GUARD_TIMEOUT,
+                )
+        assert "current network unknown during wait: BoundedTimeoutError" in caplog.text
+        assert joiner.rejoins == [(HOME_SSID, home_network.password)]
 
     async def test_recovery_with_no_rejoin_budget_exhausts_every_target(
         self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture

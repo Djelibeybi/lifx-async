@@ -16,11 +16,21 @@ from typing import Any, TypeVar
 _T = TypeVar("_T")
 
 
+class BoundedTimeoutError(asyncio.TimeoutError):
+    """``bounded()`` ran out of time.
+
+    A subclass so callers can tell their own budget expiring apart from a
+    ``TimeoutError`` the awaited backend raised itself: the former ends the
+    budget for good, however early the loop's timer fired, while the latter
+    is one more failed attempt to retry.
+    """
+
+
 async def bounded(coro: Coroutine[Any, Any, _T], timeout: float) -> _T:
     """Await ``coro`` for at most ``timeout`` seconds.
 
     Raises:
-        asyncio.TimeoutError: If ``coro`` has not finished in time. The inner
+        BoundedTimeoutError: If ``coro`` has not finished in time. The inner
             task is cancelled and reaped first, and an exception it raised
             meanwhile is marked retrieved so asyncio never logs it (a backend
             error may carry the password).
@@ -41,4 +51,4 @@ async def bounded(coro: Coroutine[Any, Any, _T], timeout: float) -> _T:
         task.exception()
     if cancellation is not None:
         raise cancellation
-    raise asyncio.TimeoutError
+    raise BoundedTimeoutError
