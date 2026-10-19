@@ -696,8 +696,10 @@ class TestCancellation:
 
         assert consumer.results == []
         # Cancelled while waiting on auto-join; the bounded recovery then
-        # forced a rejoin, which hung until recovery's budget ran out.
-        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+        # forced a rejoin. Each hung rejoin() costs one rejoin_timeout and
+        # fails the target over until recovery's budget runs out.
+        assert joiner.rejoins[0] == (ORIGINAL_SSID, "")
+        assert len(joiner.rejoins) <= 2
         assert fake_watchers.watcher.listener_count == 0
         assert fake_watchers.watcher.exited == 1
 

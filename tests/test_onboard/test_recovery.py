@@ -503,10 +503,37 @@ class TestFailuresAfterJoin:
                     auto_join_wait=0.01,
                 )
         assert "gave up" in caplog.text
-        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+        # Each hung rejoin() costs one rejoin_timeout and fails the target
+        # over, so the budget admits at most one attempt per target.
+        assert joiner.rejoins[0] == (ORIGINAL_SSID, "")
+        assert len(joiner.rejoins) <= 2
 
 
 class TestCancellation:
+    async def test_cancel_inside_join_after_the_association_changed_recovers(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # A backend may associate with the SoftAP and then wait for DHCP or a
+        # subprocess; a Ctrl-C at that moment must still bring the host home.
+        joiner = _full_joiner(join_hangs=True)
+        joining = asyncio.Event()
+
+        def on_event(event: OnboardEvent) -> None:
+            if event.type is OnboardEventType.JOINING:
+                joining.set()
+
+        task = asyncio.ensure_future(_run(home_network, joiner, on_event=on_event))
+        await asyncio.wait_for(joining.wait(), HANG_GUARD_TIMEOUT)
+        while joiner.on_softap is None:
+            await asyncio.sleep(0.001)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, HANG_GUARD_TIMEOUT)
+        after_join = joiner.calls[joiner.calls.index("join") + 1 :]
+        assert "forget" in after_join
+        assert "disassociate" in after_join
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
     async def _cancel_during_wait(
         self, home_network: HomeNetwork, joiner: FakeJoiner, *, cancel_twice: bool
     ) -> asyncio.Task:
@@ -578,6 +605,24 @@ class TestCancellation:
         assert info.value.__cause__ is None
         assert not isinstance(info.value.__context__, Exception)
         assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+
+class TestRejoinBudget:
+    async def test_a_hanging_rejoin_is_bounded_by_rejoin_timeout(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # A backend that never returns from rejoin() must not hang the run:
+        # each target gets rejoin_timeout, then the next one is tried, and the
+        # phase fails once every target has had its budget.
+        joiner = _full_joiner(rejoin_hangs=True)
+        joiner.after_disassociate = [None] * 1000
+        with pytest.raises(HostRejoinError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, rejoin_timeout=0.05),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.REJOIN
+        assert [ssid for ssid, _ in joiner.rejoins[:2]] == [ORIGINAL_SSID, HOME_SSID]
 
 
 class TestNoPasswordInTracebacks:

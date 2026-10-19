@@ -123,8 +123,10 @@ so leave them alone unless you have measured a reason not to.
 
 ### Returning the host to its network
 
-From the moment the host joins the SoftAP until it is back on its own network,
-any failure or cancellation runs *host recovery*. It is shielded from the
+From the first attempt to join the SoftAP until the host is back on its own
+network, any failure or cancellation runs *host recovery*. It starts that early
+because a backend can change the association and then keep waiting on DHCP or a
+subprocess, so even a cancelled `join()` may have moved the host. It is shielded from the
 caller's cancellation, bounded in time, best effort, and logs rather than
 raises. A cancelled `onboard()` therefore never leaves the machine stranded on
 the device's network; `asyncio.CancelledError` propagates once recovery has
@@ -209,7 +211,9 @@ The contract the library relies on:
   arguments, password included, into its error text, so the library never
   repeats or chains it. Put detail you want kept in your own logs.
 - A backend failure never leaves the host on the SoftAP: recovery runs after any
-  failure past the join.
+  failure from the first join attempt onward, and every `rejoin()` call and
+  reporter poll is bounded by `rejoin_timeout`, so a backend that never returns
+  cannot hang the run.
 
 ## Legacy TLS
 

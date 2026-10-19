@@ -4,9 +4,9 @@
 the target, scan, join, wait for the control socket, dial, configure, return
 the host to its own network and verify the device on the LAN.
 Each phase emits events, every failure is a typed ``LifxOnboardError`` whose
-``result`` describes the run, and from the moment the host joins the SoftAP
-until it has rejoined its own network, any failure or cancellation runs host
-recovery so the machine is never left on the device's network.
+``result`` describes the run, and from the first attempt to join the SoftAP
+until the host has rejoined its own network, any failure or cancellation runs
+host recovery so the machine is never left on the device's network.
 
 The timing defaults are unchanged from the reference tool they were tuned
 in, on hardware. The password is never logged; SSIDs and phases are.
@@ -227,16 +227,19 @@ class _Run:
     async def _current_ssid(self, phase: OnboardPhase | None) -> str | None:
         """Ask the reporter which network the host is on; ``None`` is unknown.
 
-        Every poll of the reporter goes through here. A reporter backend may
-        put the password into an error message, so a failing poll is logged
-        by type only, with the phase it happened in (``None`` before the
-        first phase), and reads as unknown.
+        Every poll of the reporter goes through here, bounded by
+        ``rejoin_timeout`` so a stalled backend cannot hang a phase. A reporter
+        backend may put the password into an error message, so a failing poll
+        is logged by type only, with the phase it happened in (``None`` before
+        the first phase), and reads as unknown.
         """
         if self._reporter is None:
             return None
         failed: str | None = None
         try:
-            return await self._reporter.current_ssid()
+            return await asyncio.wait_for(
+                self._reporter.current_ssid(), self._rejoin_timeout
+            )
         except Exception as error:
             failed = _name(error)
         _LOGGER.warning(
@@ -306,7 +309,7 @@ class _Run:
             return result
 
     async def _execute(self) -> Result:
-        joined = False
+        join_started = False
         rejoined = False
         verified = False
         # Nothing is awaited inside the handler: an exception raised while
@@ -316,8 +319,11 @@ class _Run:
             if self._softap_network is None:
                 self._softap_network = await self._scan_phase()
                 self._serial = self._softap_network.serial
+            # A backend can change the host's association and then keep
+            # waiting (DHCP, a subprocess), so recovery is owed from the
+            # moment the first join attempt starts, not once join() returns.
+            join_started = True
             await self._join_phase()
-            joined = True
             await self._wait_phase()
             await self._dial_phase()
             await self._configure_phase()
@@ -331,7 +337,7 @@ class _Run:
         cancellation = None
         # Once the rejoin has succeeded the host is home; a verify failure or
         # a cancellation during verification leaves nothing to recover.
-        if joined and not rejoined:
+        if join_started and not rejoined:
             cancellation = await _await_shielded(self._recover_host())
         if isinstance(failure, LifxOnboardError):
             failure.result = self._result(phase=failure.phase, error=failure)
@@ -605,6 +611,10 @@ class _Run:
     async def _rejoin_target(self, target: _RejoinTarget) -> str:
         """Return the host to ``target``, returning the SSID it landed on.
 
+        The retry loop checks ``rejoin_timeout`` between attempts and every
+        ``rejoin()`` call is itself bounded by it, so a backend that never
+        returns costs one attempt's budget and the target then fails over.
+
         Raises:
             HostRejoinError: If the rejoin budget runs out.
         """
@@ -618,7 +628,10 @@ class _Run:
             # logged, chained or kept alive across an await: only its type is.
             failed: str | None = None
             try:
-                await self._joiner.rejoin(target.ssid, target.password)
+                await asyncio.wait_for(
+                    self._joiner.rejoin(target.ssid, target.password),
+                    self._rejoin_timeout,
+                )
             except Exception as error:
                 failed = _name(error)
             if failed is None:

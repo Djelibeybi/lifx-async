@@ -309,9 +309,13 @@ class TestJoin:
         assert joiner.calls.count("join") == 3
         assert len(joiner.joins) == 1
 
-    async def test_join_failure_raises_and_does_not_recover(
+    async def test_join_failure_raises_and_recovery_finds_the_host_at_home(
         self, home_network: HomeNetwork
     ) -> None:
+        # Recovery runs from the first join attempt because a backend may have
+        # changed the association before failing. Here the reporter says the
+        # host never left its original network, so recovery forgets the SoftAP
+        # and finds the host already home: no disassociate, no rejoin.
         joiner = make_joiner(
             current=ORIGINAL_SSID,
             reporter=True,
@@ -326,11 +330,11 @@ class TestJoin:
         assert info.value.__cause__ is None
         assert "OSError" in str(info.value)
         assert joiner.calls.count("join") >= 2
-        assert "forget" not in joiner.calls
+        assert "forget" in joiner.calls
         assert "disassociate" not in joiner.calls
         assert joiner.rejoins == []
         assert info.value.result is not None
-        assert info.value.result.host_network is None
+        assert info.value.result.host_network == ORIGINAL_SSID
 
 
 class TestWait:

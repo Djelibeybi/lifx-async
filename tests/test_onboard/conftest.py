@@ -204,6 +204,7 @@ class FakeJoiner:
         rejoin_failures_for: str | None = None,
         rejoin_error_lands_anyway: bool = False,
         rejoin_hangs: bool = False,
+        join_hangs: bool = False,
         forget_error: BaseException | None = None,
         disassociate_error: BaseException | None = None,
         rejoin_error_echoes_password: bool = False,
@@ -217,6 +218,7 @@ class FakeJoiner:
         self.rejoin_failures_for = rejoin_failures_for
         self.rejoin_error_lands_anyway = rejoin_error_lands_anyway
         self.rejoin_hangs = rejoin_hangs
+        self.join_hangs = join_hangs
         self.calls: list[str] = []
         self.joins: list[SoftApNetwork] = []
         self.rejoins: list[tuple[str, str]] = []
@@ -239,6 +241,10 @@ class FakeJoiner:
         self.on_softap = network
         self.current = network.ssid
         self.ssid_sequence.extend(self.after_join)
+        if self.join_hangs:
+            # The association has changed but the backend has not returned
+            # yet: it is still waiting on DHCP or a subprocess.
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
 
     async def rejoin(self, ssid: str, password: str = "") -> None:
         self.calls.append("rejoin")
