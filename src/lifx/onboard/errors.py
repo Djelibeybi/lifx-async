@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING
 
 from lifx.exceptions import LifxError
+
+if TYPE_CHECKING:
+    from lifx.onboard.result import Result
+
+
+def _name(error: BaseException) -> str:
+    """The only part of a caller-supplied exception the library repeats.
+
+    A Scanner or Joiner backend may put the password into an error message
+    or traceback (a subprocess echoing its argv, for example), so neither is
+    ever logged or chained; the type name is.
+    """
+    return type(error).__name__
 
 
 class OnboardPhase(Enum):
@@ -35,7 +48,7 @@ class LifxOnboardError(LifxError):
         message: str,
         *,
         phase: OnboardPhase | None = None,
-        result: Any = None,
+        result: Result | None = None,
     ) -> None:
         super().__init__(message)
         self.phase = phase
@@ -56,7 +69,7 @@ class _PhasedOnboardError(LifxOnboardError):
         message: str,
         *,
         phase: OnboardPhase | None = None,
-        result: Any = None,
+        result: Result | None = None,
     ) -> None:
         super().__init__(
             message,

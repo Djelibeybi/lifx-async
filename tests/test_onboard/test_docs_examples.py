@@ -93,9 +93,8 @@ def guide_namespace(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(lifx, "DeviceWatcher", GuideWatcher)
     for module in (machine, bulk_module):
         monkeypatch.setattr(module, "DeviceWatcher", GuideWatcher)
-        monkeypatch.setattr(
-            module, "SoftApConnection", lambda *a, **k: FakeSoftApClient()
-        )
+    # Both entry points build their default control channel in machine.py.
+    monkeypatch.setattr(machine, "SoftApConnection", lambda *a, **k: FakeSoftApClient())
     joiner = make_joiner(
         current=ORIGINAL_SSID, reporter=True, forgetter=True, disassociator=True
     )

@@ -8,8 +8,8 @@ Each phase emits events, every failure is a typed ``LifxOnboardError`` whose
 until it has rejoined its own network, any failure or cancellation runs host
 recovery so the machine is never left on the device's network.
 
-The timing defaults are lifx-onboard's, tuned on hardware. The password is
-never logged; SSIDs and phases are.
+The timing defaults are unchanged from the reference tool they were tuned
+in, on hardware. The password is never logged; SSIDs and phases are.
 """
 
 from __future__ import annotations
@@ -32,8 +32,14 @@ from lifx.onboard.errors import (
     SoftApNotFoundError,
     SoftApUnreachableError,
     SoftApWaitTimeoutError,
+    _name,
 )
-from lifx.onboard.events import OnboardEvent, OnboardEventQueue, OnboardEventType
+from lifx.onboard.events import (
+    EventCallback,
+    OnboardEventQueue,
+    OnboardEventType,
+    _EventSink,
+)
 from lifx.onboard.models import HomeNetwork, SoftApNetwork
 from lifx.onboard.protocols import (
     CurrentNetworkReporter,
@@ -51,7 +57,7 @@ from lifx.onboard.softap import (
     SoftApConnection,
 )
 from lifx.onboard.verify import LanVerification
-from lifx.protocol.models import Serial
+from lifx.protocol.models import _SOFTAP_PREFIX, Serial
 from lifx.watcher import DeviceWatcher
 
 __all__ = [
@@ -99,8 +105,6 @@ _MACOS_HINT = (
 _T = TypeVar("_T")
 _Capability = TypeVar("_Capability")
 
-EventCallback = Callable[[OnboardEvent], None]
-
 
 @dataclass(frozen=True)
 class _RejoinTarget:
@@ -111,14 +115,13 @@ class _RejoinTarget:
     auto_join: bool = False
 
 
-def _name(error: BaseException) -> str:
-    """The only part of a caller-supplied exception the library repeats.
-
-    A Scanner or Joiner backend may put the password into an error message
-    or traceback (a subprocess echoing its argv, for example), so neither is
-    ever logged or chained; the type name is.
-    """
-    return type(error).__name__
+def _default_softap(
+    address: str, port: int, *, dial_timeout: float, legacy_tls: bool
+) -> SoftApConnection:
+    """The control channel both entry points build when the caller gives none."""
+    return SoftApConnection(
+        address, port, dial_timeout=dial_timeout, legacy_tls=legacy_tls
+    )
 
 
 def _is_softap_name(ssid: str) -> bool:
@@ -182,8 +185,7 @@ class _Run:
         self._joiner = joiner
         self._softap = softap
         self._verify = verify
-        self._on_event = on_event
-        self._events = events
+        self._sink = _EventSink(on_event, events, logger=_LOGGER, label="onboarding")
         self._rejoin_ssid = rejoin_ssid
         self._rejoin_password = rejoin_password
         self._min_rssi = min_rssi
@@ -219,28 +221,6 @@ class _Run:
                 return candidate
         return None
 
-    def _emit(
-        self,
-        event_type: OnboardEventType,
-        phase: OnboardPhase | None,
-        **fields: Any,
-    ) -> None:
-        event = OnboardEvent(type=event_type, phase=phase, **fields)
-        _LOGGER.debug(
-            "onboarding %s in phase %s (ssid=%s)", event_type.value, phase, event.ssid
-        )
-        if self._events is not None:
-            self._events.put(event)
-        if self._on_event is not None:
-            try:
-                self._on_event(event)
-            except Exception as error:
-                _LOGGER.error(
-                    "onboarding event callback failed for %s: %s",
-                    event_type.value,
-                    _name(error),
-                )
-
     def _elapsed(self) -> float:
         return time.monotonic() - self._started
 
@@ -275,7 +255,7 @@ class _Run:
 
     def _resolve_target(self, target: str | Serial | None) -> None:
         """Set the serial and, for a full SoftAP name, the network to join."""
-        if isinstance(target, str) and target.startswith("LIFX"):
+        if isinstance(target, str) and target.startswith(_SOFTAP_PREFIX):
             try:
                 self._softap_network = SoftApNetwork.from_ssid(target)
             except ValueError as error:
@@ -355,7 +335,7 @@ class _Run:
             cancellation = await _await_shielded(self._recover_host())
         if isinstance(failure, LifxOnboardError):
             failure.result = self._result(phase=failure.phase, error=failure)
-            self._emit(
+            self._sink.emit(
                 OnboardEventType.FAILED,
                 failure.phase,
                 serial=self._serial,
@@ -389,7 +369,7 @@ class _Run:
 
     async def _scan_phase(self) -> SoftApNetwork:
         assert self._scanner is not None
-        self._emit(
+        self._sink.emit(
             OnboardEventType.SCANNING,
             OnboardPhase.SCAN,
             serial=self._serial,
@@ -414,7 +394,7 @@ class _Run:
                 saw_networks = saw_networks or bool(networks)
                 for network in networks:
                     if self._matches(network):
-                        self._emit(
+                        self._sink.emit(
                             OnboardEventType.DISCOVERED,
                             OnboardPhase.SCAN,
                             serial=network.serial,
@@ -436,7 +416,7 @@ class _Run:
     async def _join_phase(self) -> None:
         network = self._softap_network
         assert network is not None
-        self._emit(
+        self._sink.emit(
             OnboardEventType.JOINING,
             OnboardPhase.JOIN,
             serial=self._serial,
@@ -460,7 +440,7 @@ class _Run:
                     f"{self._find_timeout}s: {failed}"
                 )
             await asyncio.sleep(self._find_poll)
-        self._emit(
+        self._sink.emit(
             OnboardEventType.JOINED,
             OnboardPhase.JOIN,
             serial=self._serial,
@@ -470,7 +450,7 @@ class _Run:
 
     async def _wait_phase(self) -> None:
         address = self._softap.address
-        self._emit(
+        self._sink.emit(
             OnboardEventType.WAITING_FOR_SOFTAP,
             OnboardPhase.WAIT,
             serial=self._serial,
@@ -503,7 +483,7 @@ class _Run:
             await asyncio.sleep(
                 max(0.0, self._wait_poll - (time.monotonic() - attempt))
             )
-        self._emit(
+        self._sink.emit(
             OnboardEventType.ON_SOFTAP,
             OnboardPhase.WAIT,
             serial=self._serial,
@@ -514,7 +494,7 @@ class _Run:
 
     async def _dial_phase(self) -> None:
         address = self._softap.address
-        self._emit(
+        self._sink.emit(
             OnboardEventType.DIALING,
             OnboardPhase.DIAL,
             serial=self._serial,
@@ -537,7 +517,7 @@ class _Run:
             await self._softap.close()
         if self._on_configured is not None:
             self._on_configured()
-        self._emit(
+        self._sink.emit(
             OnboardEventType.CONFIGURED,
             OnboardPhase.CONFIGURE,
             serial=self._serial,
@@ -597,7 +577,7 @@ class _Run:
         await self._leave_softap()
         started = time.monotonic()
         for target in targets:
-            self._emit(
+            self._sink.emit(
                 OnboardEventType.REJOINING,
                 OnboardPhase.REJOIN,
                 serial=self._serial,
@@ -609,7 +589,7 @@ class _Run:
             except Exception as error:
                 _LOGGER.warning("could not rejoin %r: %s", target.ssid, _name(error))
                 continue
-            self._emit(
+            self._sink.emit(
                 OnboardEventType.REJOINED,
                 OnboardPhase.REJOIN,
                 serial=self._serial,
@@ -729,14 +709,14 @@ class _Run:
         verification = LanVerification(
             watcher, self._serial, softap_address=self._softap.address
         )
-        self._emit(
+        self._sink.emit(
             OnboardEventType.VERIFYING,
             OnboardPhase.VERIFY,
             serial=self._serial,
             timeout=self._verify_timeout,
         )
         sighting = await verification.wait(self._verify_timeout, open_watcher=owned)
-        self._emit(
+        self._sink.emit(
             OnboardEventType.VERIFIED,
             OnboardPhase.VERIFY,
             serial=self._serial,
@@ -830,7 +810,7 @@ async def onboard(
         asyncio.CancelledError: After host recovery, when cancelled.
     """
     if softap is None:
-        softap = SoftApConnection(
+        softap = _default_softap(
             softap_address,
             softap_port,
             dial_timeout=dial_timeout,

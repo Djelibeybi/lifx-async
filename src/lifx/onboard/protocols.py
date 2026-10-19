@@ -1,7 +1,7 @@
-"""The host Wi-Fi interface a caller supplies to the onboarding state machine.
+"""The host WiFi interface a caller supplies to the onboarding state machine.
 
 lifx-async ships no implementation of these protocols: scanning and joining
-Wi-Fi networks needs subprocesses, ``ctypes`` or an app bundle, none of which
+WiFi networks needs subprocesses, ``ctypes`` or an app bundle, none of which
 belongs in a zero-dependency library. A caller supplies a :class:`Scanner` and
 a :class:`Joiner`; the three optional capabilities are discovered at runtime
 with ``isinstance``, the ``Joiner`` being consulted before the ``Scanner``
@@ -24,7 +24,7 @@ __all__ = [
 
 
 class Scanner(Protocol):
-    """Lists the Wi-Fi networks the host can see."""
+    """Lists the WiFi networks the host can see."""
 
     @property
     def interface(self) -> str:
@@ -43,7 +43,7 @@ class Scanner(Protocol):
 
 
 class Joiner(Protocol):
-    """Joins the host to a Wi-Fi network."""
+    """Joins the host to a WiFi network."""
 
     async def join(self, network: SoftApNetwork) -> None:
         """Join ``network``; a no-op when already joined."""

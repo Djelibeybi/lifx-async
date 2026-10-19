@@ -24,8 +24,14 @@ from lifx.onboard.errors import (
     OnboardPhase,
     SoftApNotFoundError,
     VerifyTimeoutError,
+    _name,
 )
-from lifx.onboard.events import OnboardEvent, OnboardEventQueue, OnboardEventType
+from lifx.onboard.events import (
+    EventCallback,
+    OnboardEventQueue,
+    OnboardEventType,
+    _EventSink,
+)
 from lifx.onboard.machine import (
     AUTO_JOIN_WAIT,
     DIAL_TIMEOUT,
@@ -37,20 +43,14 @@ from lifx.onboard.machine import (
     VERIFY_TIMEOUT,
     WAIT_POLL,
     WAIT_TIMEOUT,
-    EventCallback,
-    _name,
+    _default_softap,
     _Run,
 )
 from lifx.onboard.models import HomeNetwork, SoftApNetwork
 from lifx.onboard.protocols import Joiner, Scanner
 from lifx.onboard.result import Result
 from lifx.onboard.serials import parse_serial
-from lifx.onboard.softap import (
-    SOFTAP_ADDRESS,
-    SOFTAP_PORT,
-    SoftApClient,
-    SoftApConnection,
-)
+from lifx.onboard.softap import SOFTAP_ADDRESS, SOFTAP_PORT, SoftApClient
 from lifx.onboard.verify import LanVerification, VerificationWatcher
 from lifx.protocol.models import Serial
 from lifx.watcher import DeviceWatcher
@@ -109,6 +109,9 @@ class _BulkRun:
         self._softap = softap
         self._on_event = on_event
         self._events = events
+        self._sink = _EventSink(
+            on_event, events, logger=_LOGGER, label="bulk onboarding"
+        )
         self._min_rssi = min_rssi
         self._include_non_lifx = include_non_lifx
         self._verify_timeout = verify_timeout
@@ -129,28 +132,6 @@ class _BulkRun:
         self._attempts = 0
         # Creation order, so verifications finishing together yield in order.
         self._pending: list[asyncio.Task[Result]] = []
-
-    # ---- events --------------------------------------------------------------
-
-    def _emit(
-        self,
-        event_type: OnboardEventType,
-        phase: OnboardPhase | None,
-        **fields: Any,
-    ) -> None:
-        event = OnboardEvent(type=event_type, phase=phase, **fields)
-        _LOGGER.debug("bulk onboarding %s in phase %s", event_type.value, phase)
-        if self._events is not None:
-            self._events.put(event)
-        if self._on_event is not None:
-            try:
-                self._on_event(event)
-            except Exception as error:
-                _LOGGER.error(
-                    "onboarding event callback failed for %s: %s",
-                    event_type.value,
-                    _name(error),
-                )
 
     # ---- the loop ------------------------------------------------------------
 
@@ -183,7 +164,7 @@ class _BulkRun:
             return None
         for network in networks:
             if self._wants(network):
-                self._emit(
+                self._sink.emit(
                     OnboardEventType.DISCOVERED,
                     OnboardPhase.SCAN,
                     serial=network.serial,
@@ -261,7 +242,7 @@ class _BulkRun:
             # appear, but the run is a failure and is reported as one.
             verification.close()
             return result
-        self._emit(
+        self._sink.emit(
             OnboardEventType.VERIFYING,
             OnboardPhase.VERIFY,
             serial=serial,
@@ -286,11 +267,11 @@ class _BulkRun:
                 error=error,
             )
             error.result = failed
-            self._emit(
+            self._sink.emit(
                 OnboardEventType.FAILED, OnboardPhase.VERIFY, serial=serial, error=error
             )
             return failed
-        self._emit(
+        self._sink.emit(
             OnboardEventType.VERIFIED,
             OnboardPhase.VERIFY,
             serial=serial,
@@ -309,7 +290,7 @@ class _BulkRun:
             error=error,
         )
         error.result = result
-        self._emit(
+        self._sink.emit(
             OnboardEventType.FAILED, OnboardPhase.SCAN, serial=serial, error=error
         )
         return result
@@ -317,7 +298,7 @@ class _BulkRun:
     async def results(self) -> AsyncIterator[Result]:
         try:
             while True:
-                self._emit(
+                self._sink.emit(
                     OnboardEventType.SCANNING,
                     OnboardPhase.SCAN,
                     timeout=self._stop_when_idle_for,
@@ -480,7 +461,7 @@ async def bulk_onboard(
         asyncio.CancelledError: After host recovery, when cancelled.
     """
     if softap is None:
-        softap = SoftApConnection(
+        softap = _default_softap(
             softap_address,
             softap_port,
             dial_timeout=dial_timeout,

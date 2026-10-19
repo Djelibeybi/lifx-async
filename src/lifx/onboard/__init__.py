@@ -1,4 +1,4 @@
-"""Onboarding of LIFX devices onto a Wi-Fi network.
+"""Onboarding of LIFX devices onto a WiFi network.
 
 Import explicitly: ``import lifx.onboard``. Nothing here is exported from the
 top-level ``lifx`` namespace. Standard library only.
