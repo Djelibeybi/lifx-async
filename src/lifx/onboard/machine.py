@@ -209,6 +209,7 @@ class _Run:
         self._disassociator = self._capability(Disassociator)
 
         self._started = time.monotonic()
+        self._reporter_timed_out = False
         self._serial: Serial | None = None
         self._softap_network: SoftApNetwork | None = None
         self._original_ssid: str | None = None
@@ -238,6 +239,7 @@ class _Run:
         only, with the phase it happened in (``None`` before the first
         phase), and reads as unknown.
         """
+        self._reporter_timed_out = False
         if self._reporter is None:
             return None
         if timeout is None:
@@ -245,6 +247,11 @@ class _Run:
         failed: str | None = None
         try:
             return await bounded(self._reporter.current_ssid(), timeout)
+        except BoundedTimeoutError as error:
+            # The caller's budget is spent; it reads the flag rather than the
+            # clock, which on some platforms ticks more coarsely than a bound.
+            self._reporter_timed_out = True
+            failed = _name(error)
         except Exception as error:
             failed = _name(error)
         _LOGGER.warning(
@@ -506,14 +513,16 @@ class _Run:
             if remaining <= 0:
                 raise timed_out from last_error
             current = await self._current_ssid(OnboardPhase.WAIT, timeout=remaining)
+            if self._reporter_timed_out:
+                raise timed_out from last_error
             if current is not None and current != self._softap_ssid:
                 raise HostLeftSoftApError(
                     f"Host left {self._softap_ssid!r} for {current!r} while waiting "
                     f"for the SoftAP at {address}"
                 )
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise timed_out from last_error
+            # A poll that returned in time leaves some budget for the probe;
+            # one that did not has already ended the phase above.
+            remaining = max(deadline - time.monotonic(), 0.0)
             attempt = time.monotonic()
             probe_timeout = min(self._wait_poll, remaining)
             try:
@@ -524,11 +533,9 @@ class _Run:
                 last_error = SoftApUnreachableError(
                     f"probe of {address} did not return within {probe_timeout:.3g}s"
                 )
-            except SoftApUnreachableError as error:
-                last_error = error
             except Exception as error:
-                # A client outside the library's own may raise anything; it
-                # is one more unreachable attempt, named by type only.
+                # The client was handed the password, so whatever it raised,
+                # library-typed or not, is reduced to its type and never kept.
                 last_error = SoftApUnreachableError(
                     f"probe of {address} failed: {_name(error)}"
                 )
@@ -564,16 +571,14 @@ class _Run:
         )
         try:
             await bounded(self._softap.open(), self._dial_timeout)
-        except asyncio.TimeoutError as error:
+        except BoundedTimeoutError:
             raise SoftApDialError(
                 f"Dialing the SoftAP at {address} took longer than "
                 f"{self._dial_timeout}s"
-            ) from error
-        except LifxOnboardError:
-            raise
+            ) from None
         except Exception as error:
-            # A client outside the library's own may raise anything; only
-            # its type is repeated.
+            # A foreign client may raise anything: whatever it raised,
+            # library-typed or not, is reduced to its type and never chained.
             raise SoftApDialError(
                 f"Dialing the SoftAP at {address} failed: {_name(error)}"
             ) from None
@@ -592,11 +597,9 @@ class _Run:
                     f"Sending the credentials to {address} took longer than "
                     f"{self._dial_timeout}s"
                 ) from None
-            except LifxOnboardError:
-                raise
             except Exception as error:
-                # A client outside the library's own may raise anything, and
-                # it was handed the password: only the type is repeated.
+                # The client was handed the password, so whatever it raised,
+                # library-typed or not, is reduced to its type and never kept.
                 raise SoftApSendError(
                     f"Sending the credentials to {address} failed: {_name(error)}"
                 ) from None
@@ -748,6 +751,7 @@ class _Run:
                 if current == target.ssid:
                     _LOGGER.debug("already on %r despite %s", target.ssid, failed)
                     return target.ssid
+                budget_spent = self._reporter_timed_out
             _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
             if budget_spent:
                 raise HostRejoinError(
@@ -774,6 +778,8 @@ class _Run:
             if remaining <= 0:
                 return None
             current = await self._current_ssid(OnboardPhase.REJOIN, timeout=remaining)
+            if self._reporter_timed_out:
+                return None
             if current is not None and current != softap_ssid:
                 _LOGGER.debug("auto-join landed on %r", current)
                 return current

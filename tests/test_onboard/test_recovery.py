@@ -20,6 +20,7 @@ from lifx.onboard import (
     SoftApJoinError,
     SoftApNotFoundError,
     SoftApSendError,
+    SoftApUnreachableError,
     SoftApWaitTimeoutError,
     onboard,
 )
@@ -443,7 +444,8 @@ class TestFailuresAfterJoin:
         with pytest.raises(SoftApDialError) as info:
             await _run(home_network, joiner, softap=softap, dial_timeout=0.01)
         assert info.value.phase is OnboardPhase.DIAL
-        assert isinstance(info.value.__cause__, asyncio.TimeoutError)
+        assert "took longer than" in str(info.value)
+        assert info.value.__cause__ is None
         self._assert_recovered(joiner)
 
     async def test_configure_error_still_closes_the_client(
@@ -740,6 +742,47 @@ class TestPhaseBudgets:
         assert result.phase is None
         assert len(softap.sent) == 1
         assert "closing the SoftAP connection: BoundedTimeoutError" in caplog.text
+
+    async def test_library_typed_client_errors_are_reduced_to_their_type_too(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # A conforming client may raise the documented error types with
+        # diagnostic text of its own; that text is never kept either.
+        password = home_network.password
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(
+            send_error=SoftApSendError(f"write failed: {password}")
+        )
+        seen: list[OnboardEvent] = []
+        with pytest.raises(SoftApSendError) as info:
+            await _run(home_network, joiner, softap=softap, on_event=seen.append)
+        rendered = "".join(
+            traceback.format_exception(
+                type(info.value), info.value, info.value.__traceback__
+            )
+        )
+        assert password not in rendered
+        assert info.value.result is not None
+        assert password not in repr(info.value.result)
+        failed = [e for e in seen if e.type is OnboardEventType.FAILED]
+        assert len(failed) == 1 and password not in repr(failed[0])
+
+        softap = FakeSoftApClient(probe_error=SoftApUnreachableError(f"no {password}"))
+        with pytest.raises(SoftApWaitTimeoutError) as info:
+            await _run(home_network, _full_joiner(), softap=softap, wait_timeout=0.02)
+        rendered = "".join(
+            traceback.format_exception(
+                type(info.value), info.value, info.value.__traceback__
+            )
+        )
+        assert password not in rendered
+
+        softap = FakeSoftApClient(open_error=TimeoutError(f"handshake {password}"))
+        with pytest.raises(SoftApDialError) as info:
+            await _run(home_network, _full_joiner(), softap=softap)
+        assert info.value.__cause__ is None
+        assert "TimeoutError" in str(info.value)
+        assert password not in str(info.value)
 
     async def test_a_foreign_send_error_is_reduced_to_its_type(
         self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
