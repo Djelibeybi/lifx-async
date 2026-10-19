@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import traceback
 
 import pytest
@@ -356,6 +357,8 @@ class TestAutoJoin:
     async def test_never_leaving_the_softap_is_bounded_by_rejoin_timeout(
         self, home_network: HomeNetwork
     ) -> None:
+        # The auto-join wait gives up after rejoin_timeout when the host never
+        # leaves the SoftAP; the forced rejoin to the original then runs.
         joiner = _full_joiner()
         joiner.after_disassociate = [SOFTAP_SSID] * 100_000
         result, _ = await _run(home_network, joiner, rejoin_timeout=0.05)
@@ -608,6 +611,82 @@ class TestCancellation:
 
 
 class TestRejoinBudget:
+    async def test_a_hanging_forget_does_not_block_the_rejoin(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner(forget_hangs=True)
+        joiner.after_disassociate = [None, ORIGINAL_SSID]
+        result, _ = await asyncio.wait_for(
+            _run(home_network, joiner, rejoin_timeout=0.05), HANG_GUARD_TIMEOUT
+        )
+        assert "forget" in joiner.calls
+        assert "disassociate" in joiner.calls
+        assert result.host_network == ORIGINAL_SSID
+
+    async def test_a_hanging_disassociate_does_not_block_the_rejoin(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner(disassociate_hangs=True)
+        result, _ = await asyncio.wait_for(
+            _run(home_network, joiner, rejoin_timeout=0.05), HANG_GUARD_TIMEOUT
+        )
+        assert "disassociate" in joiner.calls
+        assert result.host_network == ORIGINAL_SSID
+
+    async def test_a_slow_failure_leaves_only_the_remaining_budget_to_the_retry(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Every attempt fails slowly. The first takes most of the target's
+        # budget; the retry is granted only what is left, so it is cut off
+        # with TimeoutError instead of running its full course to OSError,
+        # and no target hands a retry a fresh budget.
+        joiner = _full_joiner(rejoin_failures=10, rejoin_fail_takes=0.3)
+        joiner.after_disassociate = [None] * 1000
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger="lifx.onboard"):
+            with pytest.raises(HostRejoinError):
+                await asyncio.wait_for(
+                    _run(
+                        home_network,
+                        joiner,
+                        rejoin_timeout=0.4,
+                        auto_join_wait=0.01,
+                        rejoin_ssid=OVERRIDE_SSID,
+                    ),
+                    HANG_GUARD_TIMEOUT,
+                )
+        assert f"rejoining {OVERRIDE_SSID!r} failed: TimeoutError" in caplog.text
+        assert f"rejoining {HOME_SSID!r} failed: TimeoutError" in caplog.text
+        # Two phase targets at rejoin_timeout each, then the recovery budget.
+        assert time.monotonic() - started < 0.4 * 2 + (0.4 * 2 + 0.01) + 1.5
+
+    async def test_a_slow_reporter_reads_as_unknown_and_never_hangs_the_run(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        joiner = _full_joiner(report_takes=HANG_GUARD_TIMEOUT)
+        with caplog.at_level(logging.WARNING, logger="lifx.onboard"):
+            result, _ = await asyncio.wait_for(
+                _run(home_network, joiner, rejoin_timeout=0.05), HANG_GUARD_TIMEOUT
+            )
+        # The original network could not be read, so only the home network
+        # was a target; every stalled poll was cut off and logged by type.
+        assert result.host_network == HOME_SSID
+        assert "current network unknown during rejoin: TimeoutError" in caplog.text
+
+    async def test_recovery_with_no_rejoin_budget_exhausts_every_target(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Without a reporter the home network is the only target; a zero
+        # budget fails it at once, so recovery runs out of targets well
+        # inside its own budget instead of being cut off by it.
+        joiner = make_joiner(forgetter=True, disassociator=True)
+        softap = FakeSoftApClient(probe_failures=100_000)
+        with caplog.at_level(logging.WARNING, logger="lifx.onboard"):
+            with pytest.raises(SoftApWaitTimeoutError):
+                await _run(home_network, joiner, softap=softap, rejoin_timeout=0.0)
+        assert "host recovery exhausted every target" in caplog.text
+        assert "gave up" not in caplog.text
+
     async def test_a_hanging_rejoin_is_bounded_by_rejoin_timeout(
         self, home_network: HomeNetwork
     ) -> None:

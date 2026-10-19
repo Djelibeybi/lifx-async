@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import Protocol
 
+from lifx.onboard._aio import bounded
 from lifx.onboard.errors import VerifyTimeoutError
 from lifx.protocol.models import Serial
 from lifx.watcher import DeviceEvent, DeviceEventType, EventListener
@@ -162,7 +163,7 @@ class LanVerification:
         deadline = time.monotonic() + timeout
         try:
             try:
-                await asyncio.wait_for(self._watcher.__aenter__(), timeout)
+                await bounded(self._watcher.__aenter__(), timeout)
             except asyncio.TimeoutError:
                 raise VerifyTimeoutError(_timed_out(self._serial, timeout)) from None
             return await self._wait(max(0.0, deadline - time.monotonic()))
@@ -172,7 +173,7 @@ class LanVerification:
 
     async def _wait(self, timeout: float) -> LanSighting:
         try:
-            await asyncio.wait_for(self._seen.wait(), timeout)
+            await bounded(self._seen.wait(), timeout)
         except asyncio.TimeoutError:
             raise VerifyTimeoutError(_timed_out(self._serial, timeout)) from None
         finally:

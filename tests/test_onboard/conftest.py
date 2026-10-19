@@ -205,6 +205,10 @@ class FakeJoiner:
         rejoin_error_lands_anyway: bool = False,
         rejoin_hangs: bool = False,
         join_hangs: bool = False,
+        forget_hangs: bool = False,
+        disassociate_hangs: bool = False,
+        rejoin_fail_takes: float = 0.0,
+        report_takes: float = 0.0,
         forget_error: BaseException | None = None,
         disassociate_error: BaseException | None = None,
         rejoin_error_echoes_password: bool = False,
@@ -219,6 +223,10 @@ class FakeJoiner:
         self.rejoin_error_lands_anyway = rejoin_error_lands_anyway
         self.rejoin_hangs = rejoin_hangs
         self.join_hangs = join_hangs
+        self.forget_hangs = forget_hangs
+        self.disassociate_hangs = disassociate_hangs
+        self.rejoin_fail_takes = rejoin_fail_takes
+        self.report_takes = report_takes
         self.calls: list[str] = []
         self.joins: list[SoftApNetwork] = []
         self.rejoins: list[tuple[str, str]] = []
@@ -255,6 +263,9 @@ class FakeJoiner:
         applies = self.rejoin_failures_for is None or self.rejoin_failures_for == ssid
         if applies and self.rejoin_failures > 0:
             self.rejoin_failures -= 1
+            if self.rejoin_fail_takes:
+                # A backend that fails slowly, the way a stuck OS command does.
+                await asyncio.sleep(self.rejoin_fail_takes)
             if self.rejoin_error_lands_anyway:
                 self.current = ssid
                 self.ssid_sequence.clear()
@@ -268,6 +279,8 @@ class FakeJoiner:
 class _Reports:
     async def current_ssid(self: Any) -> str | None:
         self.calls.append("current_ssid")
+        if self.report_takes:
+            await asyncio.sleep(self.report_takes)
         if self.ssid_sequence:
             item = self.ssid_sequence.popleft()
             if isinstance(item, BaseException):
@@ -279,6 +292,8 @@ class _Reports:
 class _Forgets:
     async def forget(self: Any, ssid: str) -> None:
         self.calls.append("forget")
+        if self.forget_hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
         if self.forget_error is not None:
             raise self.forget_error
         self.forgotten.append(ssid)
@@ -287,6 +302,8 @@ class _Forgets:
 class _Disassociates:
     async def disassociate(self: Any) -> None:
         self.calls.append("disassociate")
+        if self.disassociate_hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
         if self.disassociate_error is not None:
             raise self.disassociate_error
         self.current = None

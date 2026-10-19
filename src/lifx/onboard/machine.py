@@ -21,6 +21,7 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
+from lifx.onboard._aio import bounded
 from lifx.onboard.errors import (
     HostLeftSoftApError,
     HostRejoinError,
@@ -224,22 +225,25 @@ class _Run:
     def _elapsed(self) -> float:
         return time.monotonic() - self._started
 
-    async def _current_ssid(self, phase: OnboardPhase | None) -> str | None:
+    async def _current_ssid(
+        self, phase: OnboardPhase | None, *, timeout: float | None = None
+    ) -> str | None:
         """Ask the reporter which network the host is on; ``None`` is unknown.
 
-        Every poll of the reporter goes through here, bounded by
-        ``rejoin_timeout`` so a stalled backend cannot hang a phase. A reporter
-        backend may put the password into an error message, so a failing poll
-        is logged by type only, with the phase it happened in (``None`` before
-        the first phase), and reads as unknown.
+        Every poll of the reporter goes through here, bounded by ``timeout``
+        (the remaining budget of the step that asks) or ``rejoin_timeout``, so
+        a stalled backend cannot hang a phase. A reporter backend may put the
+        password into an error message, so a failing poll is logged by type
+        only, with the phase it happened in (``None`` before the first
+        phase), and reads as unknown.
         """
         if self._reporter is None:
             return None
+        if timeout is None:
+            timeout = self._rejoin_timeout
         failed: str | None = None
         try:
-            return await asyncio.wait_for(
-                self._reporter.current_ssid(), self._rejoin_timeout
-            )
+            return await bounded(self._reporter.current_ssid(), timeout)
         except Exception as error:
             failed = _name(error)
         _LOGGER.warning(
@@ -508,7 +512,7 @@ class _Run:
             timeout=self._dial_timeout,
         )
         try:
-            await asyncio.wait_for(self._softap.open(), self._dial_timeout)
+            await bounded(self._softap.open(), self._dial_timeout)
         except asyncio.TimeoutError as error:
             raise SoftApDialError(
                 f"Dialing the SoftAP at {address} took longer than "
@@ -560,11 +564,13 @@ class _Run:
         SoftAP. A reporter that names another network, or no network at all
         (the host already left, or the reporter failed) means there is
         nothing to leave; without a reporter the host is assumed still on it.
+        Both calls are best effort and bounded by ``rejoin_timeout``, so a
+        stalled backend never keeps the rejoin from starting.
         """
         ssid = self._softap_ssid
         if self._forgetter is not None:
             try:
-                await self._forgetter.forget(ssid)
+                await bounded(self._forgetter.forget(ssid), self._rejoin_timeout)
             except Exception as error:
                 _LOGGER.warning("forgetting %r failed: %s", ssid, _name(error))
         if self._disassociator is None:
@@ -574,7 +580,7 @@ class _Run:
                 _LOGGER.debug("not disassociating: host is no longer on %r", ssid)
                 return
         try:
-            await self._disassociator.disassociate()
+            await bounded(self._disassociator.disassociate(), self._rejoin_timeout)
         except Exception as error:
             _LOGGER.warning("leaving %r failed: %s", ssid, _name(error))
 
@@ -591,7 +597,9 @@ class _Run:
                 timeout=self._rejoin_timeout,
             )
             try:
-                landed = await self._rejoin_target(target)
+                landed = await self._rejoin_target(
+                    target, auto_join_bound=self._rejoin_timeout
+                )
             except Exception as error:
                 _LOGGER.warning("could not rejoin %r: %s", target.ssid, _name(error))
                 continue
@@ -608,44 +616,55 @@ class _Run:
             + ", ".join(repr(target.ssid) for target in targets)
         )
 
-    async def _rejoin_target(self, target: _RejoinTarget) -> str:
+    async def _rejoin_target(
+        self, target: _RejoinTarget, *, auto_join_bound: float
+    ) -> str:
         """Return the host to ``target``, returning the SSID it landed on.
 
-        The retry loop checks ``rejoin_timeout`` between attempts and every
-        ``rejoin()`` call is itself bounded by it, so a backend that never
-        returns costs one attempt's budget and the target then fails over.
+        For the original network the OS auto-join is awaited first, for at
+        most ``auto_join_bound`` seconds in case the host never leaves the
+        SoftAP. The forced ``rejoin()`` retries that follow then get exactly
+        ``rejoin_timeout``: every ``rejoin()`` call, every reporter poll and
+        the sleeps between attempts draw on that one remaining budget, so a
+        backend that never returns costs this target's budget and no more
+        before the next target is tried.
 
         Raises:
             HostRejoinError: If the rejoin budget runs out.
         """
-        deadline = time.monotonic() + self._rejoin_timeout
         if target.auto_join:
-            landed = await self._await_auto_join(deadline)
+            landed = await self._await_auto_join(time.monotonic() + auto_join_bound)
             if landed is not None:
                 return landed
+        deadline = time.monotonic() + self._rejoin_timeout
+        failed = "auto-join did not land"
         while True:
-            # The Joiner was handed the password, so its error is never
-            # logged, chained or kept alive across an await: only its type is.
-            failed: str | None = None
-            try:
-                await asyncio.wait_for(
-                    self._joiner.rejoin(target.ssid, target.password),
-                    self._rejoin_timeout,
-                )
-            except Exception as error:
-                failed = _name(error)
-            if failed is None:
-                return target.ssid
-            if await self._current_ssid(OnboardPhase.REJOIN) == target.ssid:
-                _LOGGER.debug("already on %r despite %s", target.ssid, failed)
-                return target.ssid
-            _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
-            if time.monotonic() >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 raise HostRejoinError(
                     f"Could not rejoin {target.ssid!r} within "
                     f"{self._rejoin_timeout}s: {failed}"
                 )
-            await asyncio.sleep(self._rejoin_poll)
+            # The Joiner was handed the password, so its error is never
+            # logged, chained or kept alive across an await: only its type is.
+            failed = ""
+            try:
+                await bounded(
+                    self._joiner.rejoin(target.ssid, target.password), remaining
+                )
+            except Exception as error:
+                failed = _name(error)
+            if not failed:
+                return target.ssid
+            remaining = max(deadline - time.monotonic(), 0.0)
+            current = await self._current_ssid(OnboardPhase.REJOIN, timeout=remaining)
+            if current == target.ssid:
+                _LOGGER.debug("already on %r despite %s", target.ssid, failed)
+                return target.ssid
+            _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
+            await asyncio.sleep(
+                min(self._rejoin_poll, max(deadline - time.monotonic(), 0.0))
+            )
 
     async def _await_auto_join(self, deadline: float) -> str | None:
         """Give the OS auto-join a chance before forcing a join.
@@ -659,7 +678,10 @@ class _Run:
         softap_ssid = self._softap_ssid
         auto_join_deadline: float | None = None
         while True:
-            current = await self._current_ssid(OnboardPhase.REJOIN)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            current = await self._current_ssid(OnboardPhase.REJOIN, timeout=remaining)
             if current is not None and current != softap_ssid:
                 _LOGGER.debug("auto-join landed on %r", current)
                 return current
@@ -670,15 +692,20 @@ class _Run:
                 auto_join_deadline is not None and now >= auto_join_deadline
             ):
                 return None
-            await asyncio.sleep(self._rejoin_poll)
+            await asyncio.sleep(min(self._rejoin_poll, max(deadline - now, 0.0)))
 
     async def _recover_host(self) -> None:
-        """Return the host to a network after a failure, best effort."""
+        """Return the host to a network after a failure, best effort.
+
+        The budget allots ``rejoin_timeout`` per target plus one
+        ``auto_join_wait``, so the auto-join wait is bounded by the latter
+        here and every fallback target still receives its attempt.
+        """
         targets = self._rejoin_targets()
         budget = self._rejoin_timeout * len(targets) + self._auto_join_wait
         _LOGGER.info("recovering host network within %.1fs", budget)
         try:
-            await asyncio.wait_for(self._recover_targets(targets), budget)
+            await bounded(self._recover_targets(targets), budget)
         except asyncio.TimeoutError:
             _LOGGER.warning("host recovery gave up after %.1fs", budget)
 
@@ -686,7 +713,9 @@ class _Run:
         await self._leave_softap()
         for target in targets:
             try:
-                self._host_network = await self._rejoin_target(target)
+                self._host_network = await self._rejoin_target(
+                    target, auto_join_bound=self._auto_join_wait
+                )
             except Exception as error:
                 _LOGGER.warning(
                     "recovery could not rejoin %r: %s", target.ssid, _name(error)

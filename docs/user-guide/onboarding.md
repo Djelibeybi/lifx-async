@@ -211,9 +211,10 @@ The contract the library relies on:
   arguments, password included, into its error text, so the library never
   repeats or chains it. Put detail you want kept in your own logs.
 - A backend failure never leaves the host on the SoftAP: recovery runs after any
-  failure from the first join attempt onward, and every `rejoin()` call and
-  reporter poll is bounded by `rejoin_timeout`, so a backend that never returns
-  cannot hang the run.
+  failure from the first join attempt onward. Every `forget()`, `disassociate()`,
+  `rejoin()` call and reporter poll is bounded, and a rejoin target's retries
+  share one `rejoin_timeout`, so a backend that never returns cannot hang the
+  run or starve the next target of its budget.
 
 ## Legacy TLS
 
