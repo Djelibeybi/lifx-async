@@ -31,6 +31,7 @@ from lifx.onboard.errors import (
     SoftApDialError,
     SoftApJoinError,
     SoftApNotFoundError,
+    SoftApSendError,
     SoftApUnreachableError,
     SoftApWaitTimeoutError,
     _name,
@@ -514,13 +515,26 @@ class _Run:
             if remaining <= 0:
                 raise timed_out from last_error
             attempt = time.monotonic()
+            probe_timeout = min(self._wait_poll, remaining)
             try:
-                await self._softap.probe(timeout=min(self._wait_poll, remaining))
+                # The timeout argument is advisory to a caller-supplied client;
+                # the bound around the await is what ends a stalled probe.
+                await bounded(self._softap.probe(timeout=probe_timeout), probe_timeout)
+            except BoundedTimeoutError:
+                last_error = SoftApUnreachableError(
+                    f"probe of {address} did not return within {probe_timeout:.3g}s"
+                )
             except SoftApUnreachableError as error:
                 last_error = error
+            except Exception as error:
+                # A client outside the library's own may raise anything; it
+                # is one more unreachable attempt, named by type only.
+                last_error = SoftApUnreachableError(
+                    f"probe of {address} failed: {_name(error)}"
+                )
             else:
-                if time.monotonic() >= deadline:
-                    raise timed_out from last_error
+                # The bound above means a success cannot arrive after the
+                # deadline, short of the loop's own timer slack.
                 break
             # The sleep is capped by the deadline; the next iteration's budget
             # check ends the phase.
@@ -555,13 +569,42 @@ class _Run:
                 f"Dialing the SoftAP at {address} took longer than "
                 f"{self._dial_timeout}s"
             ) from error
+        except LifxOnboardError:
+            raise
+        except Exception as error:
+            # A client outside the library's own may raise anything; only
+            # its type is repeated.
+            raise SoftApDialError(
+                f"Dialing the SoftAP at {address} failed: {_name(error)}"
+            ) from None
 
     async def _configure_phase(self) -> None:
         assert self._serial is not None
+        address = self._softap.address
         try:
-            await self._softap.send_access_point(self._serial, self._network)
+            try:
+                await bounded(
+                    self._softap.send_access_point(self._serial, self._network),
+                    self._dial_timeout,
+                )
+            except BoundedTimeoutError:
+                raise SoftApSendError(
+                    f"Sending the credentials to {address} took longer than "
+                    f"{self._dial_timeout}s"
+                ) from None
+            except LifxOnboardError:
+                raise
+            except Exception as error:
+                # A client outside the library's own may raise anything, and
+                # it was handed the password: only the type is repeated.
+                raise SoftApSendError(
+                    f"Sending the credentials to {address} failed: {_name(error)}"
+                ) from None
         finally:
-            await self._softap.close()
+            try:
+                await bounded(self._softap.close(), self._dial_timeout)
+            except Exception as error:
+                _LOGGER.warning("closing the SoftAP connection: %s", _name(error))
         if self._on_configured is not None:
             self._on_configured()
         self._sink.emit(

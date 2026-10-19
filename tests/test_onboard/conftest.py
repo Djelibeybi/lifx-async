@@ -364,6 +364,10 @@ class FakeSoftApClient:
         probe_failures: int = 0,
         probe_takes: float = 0.0,
         probe_success_takes: float = 0.0,
+        probe_hangs: bool = False,
+        probe_error: BaseException | None = None,
+        send_hangs: bool = False,
+        close_hangs: bool = False,
         open_takes: float = 0.0,
         open_error: BaseException | None = None,
         send_error: BaseException | None = None,
@@ -373,6 +377,10 @@ class FakeSoftApClient:
         self.probe_failures = probe_failures
         self.probe_takes = probe_takes
         self.probe_success_takes = probe_success_takes
+        self.probe_hangs = probe_hangs
+        self.probe_error = probe_error
+        self.send_hangs = send_hangs
+        self.close_hangs = close_hangs
         self.open_takes = open_takes
         self.open_error = open_error
         self.send_error = send_error
@@ -393,6 +401,11 @@ class FakeSoftApClient:
 
     async def probe(self, *, timeout: float | None = None) -> None:
         self.probes.append(timeout)
+        if self.probe_hangs:
+            # A client that ignores the probe timeout and never returns.
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
+        if self.probe_error is not None:
+            raise self.probe_error
         if self.probe_failures > 0:
             self.probe_failures -= 1
             await asyncio.sleep(self.probe_takes)
@@ -408,12 +421,16 @@ class FakeSoftApClient:
             raise self.open_error
 
     async def send_access_point(self, target: Serial, network: HomeNetwork) -> None:
+        if self.send_hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
         if self.send_error is not None:
             raise self.send_error
         self.sent.append((target, network))
 
     async def close(self) -> None:
         self.closed += 1
+        if self.close_hangs:
+            await asyncio.sleep(HANG_GUARD_TIMEOUT)
 
 
 # ---- LAN verification: the emulator and a scriptable watcher ---------------

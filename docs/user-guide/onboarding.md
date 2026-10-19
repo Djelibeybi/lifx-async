@@ -214,7 +214,8 @@ The contract the library relies on:
   failure from the first join attempt onward. Every backend call is bounded:
   `scan()` and `join()` by what is left of `find_timeout` (a bulk scan by
   `find_timeout` or the remaining idle window), the wait phase's reporter polls
-  and probes by `wait_timeout`, `forget()`, `disassociate()`, `rejoin()` and
+  and probes by `wait_timeout`, the SoftAP client's dial, send and close by
+  `dial_timeout`, `forget()`, `disassociate()`, `rejoin()` and
   other reporter polls by `rejoin_timeout`, with a rejoin target's retries
   sharing one `rejoin_timeout`. A backend that never
   returns therefore fails its phase instead of hanging the run, and cannot

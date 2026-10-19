@@ -669,6 +669,96 @@ class TestPhaseBudgets:
         assert softap.sent == []
         assert joiner.rejoins == [(ORIGINAL_SSID, "")]
 
+    async def test_a_stalled_probe_fails_the_wait_phase_and_recovers_the_host(
+        self, home_network: HomeNetwork
+    ) -> None:
+        # The probe timeout argument is advisory to a caller-supplied client;
+        # the phase must end on its own budget and start recovery regardless.
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(probe_hangs=True)
+        with pytest.raises(SoftApWaitTimeoutError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, wait_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.WAIT
+        assert "did not return" in str(info.value.__cause__)
+        assert softap.sent == []
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+    async def test_a_foreign_open_error_is_reduced_to_its_type(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(open_error=RuntimeError("tls handshake exploded"))
+        with pytest.raises(SoftApDialError) as info:
+            await _run(home_network, joiner, softap=softap)
+        assert info.value.phase is OnboardPhase.DIAL
+        assert "RuntimeError" in str(info.value)
+        assert info.value.__cause__ is None
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+    async def test_a_foreign_probe_error_counts_as_one_unreachable_attempt(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(probe_error=RuntimeError("socket module exploded"))
+        with pytest.raises(SoftApWaitTimeoutError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, wait_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.WAIT
+        assert "RuntimeError" in str(info.value.__cause__)
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+    async def test_a_stalled_send_fails_configure_and_recovers_the_host(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(send_hangs=True)
+        with pytest.raises(SoftApSendError) as info:
+            await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, dial_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert info.value.phase is OnboardPhase.CONFIGURE
+        assert "took longer than" in str(info.value)
+        assert softap.closed == 1
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+
+    async def test_a_stalled_close_is_logged_and_does_not_block_the_rejoin(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(close_hangs=True)
+        with caplog.at_level(logging.WARNING, logger="lifx.onboard"):
+            result, _ = await asyncio.wait_for(
+                _run(home_network, joiner, softap=softap, dial_timeout=0.02),
+                HANG_GUARD_TIMEOUT,
+            )
+        assert result.phase is None
+        assert len(softap.sent) == 1
+        assert "closing the SoftAP connection: BoundedTimeoutError" in caplog.text
+
+    async def test_a_foreign_send_error_is_reduced_to_its_type(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # A client outside the library may echo what it was given; only the
+        # error type reaches the exception text or the log.
+        joiner = _full_joiner()
+        softap = FakeSoftApClient(
+            send_error=RuntimeError(f"write failed for {home_network.password}")
+        )
+        with caplog.at_level(logging.DEBUG, logger="lifx.onboard"):
+            with pytest.raises(SoftApSendError) as info:
+                await _run(home_network, joiner, softap=softap)
+        assert info.value.phase is OnboardPhase.CONFIGURE
+        assert "RuntimeError" in str(info.value)
+        assert info.value.__cause__ is None
+        assert home_network.password not in str(info.value)
+        assert home_network.password not in caplog.text
+
     async def test_a_hanging_join_fails_the_phase_and_recovers_the_host(
         self, home_network: HomeNetwork
     ) -> None:
