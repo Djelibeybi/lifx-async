@@ -114,7 +114,7 @@ each failure is a typed exception that records its phase.
 | `WAIT` | Probes `172.16.0.1:56700` with a plain TCP connection. Reachability of that address is what counts as joined, never the SSID the operating system reports. | A probe to connect, up to `WAIT_TIMEOUT`, every `WAIT_POLL` |
 | `DIAL` | Opens the TLS connection to the SoftAP. | The handshake, up to `DIAL_TIMEOUT` |
 | `CONFIGURE` | Writes one packet 305 (`Wifi.SetAccessPoint`) message carrying the home network, then closes. Nothing is read back. | The write to flush |
-| `REJOIN` | Returns the host to its own network (see below). | The host to land on a target network, up to `REJOIN_TIMEOUT` per target |
+| `REJOIN` | Returns the host to its own network (see below). | The host to land on one of the networks it may be returned to, up to `REJOIN_TIMEOUT` for each |
 | `VERIFY` | Waits for the device to show up on the LAN through a `DeviceWatcher`. | A sighting, up to `VERIFY_TIMEOUT` |
 
 The values are constants in `lifx.onboard`; see the [API
@@ -161,8 +161,9 @@ implementation of either. All their methods are `async`.
 - `Joiner.join(network)` joins a SoftAP and must be idempotent.
   `Joiner.rejoin(ssid, password="")` joins the named network.
 
-Build the networks a scanner returns with `SoftApNetwork.from_ssid()`, so the
-serial is derived in one place.
+Build the networks a scanner returns with `SoftApNetwork.from_ssid()`. It
+derives the serial through `Serial.from_softap_ssid()`, so the derivation lives
+in one place.
 
 ```python
 from lifx.onboard import SoftApNetwork
@@ -193,7 +194,7 @@ protocol that the library tests for with `isinstance`:
 
 | Capability | Method | Used for |
 |------------|--------|----------|
-| `CurrentNetworkReporter` | `async current_ssid() -> str \| None` | Noticing the host left the SoftAP early, recording the original network, reporting `Result.host_network` |
+| `CurrentNetworkReporter` | `async current_ssid() -> str \| None` | Noticing the host left the SoftAP early, recording the original network, letting auto-join count as a rejoin, and naming the network it landed on in `Result.host_network` |
 | `NetworkForgetter` | `async forget(ssid)` | Removing the SoftAP from saved networks before rejoining |
 | `Disassociator` | `async disassociate()` | Dropping the SoftAP association before the operating system picks a network |
 
@@ -280,7 +281,7 @@ serve several runs.
 | `took` | Seconds the run took |
 | `phase` | The phase that failed; `None` on success |
 | `error` | The failure; `None` on success |
-| `host_network` | The network the host ended on, when a `CurrentNetworkReporter` could say |
+| `host_network` | The network the host ended on: the SSID a successful `joiner.rejoin()` targeted, or the network a `CurrentNetworkReporter` saw the host land on through auto-join. `None` only when the host never got back |
 
 It raises on failure, and the exception carries the same `Result` as its
 `result` attribute, so you can choose either style.
@@ -450,7 +451,8 @@ Its contract with this library is exactly the one on this page:
 
 - It implements `Scanner` and `Joiner` per platform, and as many of the three
   capabilities as the platform allows.
-- It builds `SoftApNetwork` values with `SoftApNetwork.from_ssid()`.
+- It builds `SoftApNetwork` values with `SoftApNetwork.from_ssid()`, which
+  derives the serial through `Serial.from_softap_ssid()`.
 - It calls `onboard()` or iterates `bulk_onboard()` with a `HomeNetwork` built
   from a password it read from standard input, the environment or a no-echo
   prompt, never from `argv`.

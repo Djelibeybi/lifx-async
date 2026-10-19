@@ -14,7 +14,7 @@ _MAX_PASSWORD_BYTES = 64
 
 @dataclass(frozen=True)
 class SoftApNetwork:
-    """A Wi-Fi network seen while scanning, usually a LIFX SoftAP.
+    """A WiFi network seen while scanning, usually a LIFX SoftAP.
 
     Attributes:
         ssid: Network name.

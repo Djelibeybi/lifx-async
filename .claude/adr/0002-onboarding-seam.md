@@ -42,14 +42,16 @@ lifx-async alone.
   password on a command line.
 - **A private hook instead of a public `SoftApClient` protocol.** Rejected: the
   control channel is the one seam a test must replace, and a public protocol keeps
-  that honest and lets a different provisioning path (BLE or serial) supply its own
-  channel without touching the state machine.
+  that honest and lets a different onboarding channel (BLE or serial) supply its
+  own control channel without touching the state machine.
 
 ## Consequences
 
 - The sibling project's contract is exactly the protocols and capabilities above,
-  `SoftApNetwork.from_ssid()` for building networks, and `onboard()` or
-  `bulk_onboard()` for driving them. Anything beyond that is a change to lifx-async.
+  `SoftApNetwork.from_ssid()` for building networks (it derives the serial through
+  `Serial.from_softap_ssid()`, so the derivation lives in one place), and
+  `onboard()` or `bulk_onboard()` for driving them. Anything beyond that is a
+  change to lifx-async.
 - The password appears only as a `HomeNetwork` field. It never reaches a log, an
   event, an exception message or a `repr`, and library errors repeat only the type
   name of a backend's exception, because a backend that shells out may echo it.

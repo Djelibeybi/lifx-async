@@ -23,7 +23,10 @@ class Result:
         took: Seconds the run took.
         phase: The phase that failed; ``None`` on success.
         error: The failure; ``None`` on success.
-        host_network: The network the host ended on, when known.
+        host_network: The network the host ended on: the SSID a successful
+            ``rejoin()`` targeted, or the network a ``CurrentNetworkReporter``
+            saw the host land on through auto-join. ``None`` when the host
+            never got back.
     """
 
     serial: Serial | None

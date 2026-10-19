@@ -138,8 +138,12 @@ _Avoid_: target network, destination network.
 **Host network**:
 The network the machine running the onboarding is on. The host leaves it to join
 a SoftAP and must be returned to it afterwards, so it is recorded first when the
-host can report it. It is usually, but not necessarily, the home network.
-_Avoid_: original network, local network (as a synonym for the home network).
+host can report it. It is usually, but not necessarily, the home network. The
+_original network_ is the host network as it was before onboarding began; the
+network the host ended on is `Result.host_network`, and the two differ when a
+`rejoin_ssid` override or the operating system's auto-join took the host
+somewhere else.
+_Avoid_: local network (as a synonym for the home network).
 
 **Handoff**:
 The moment during onboarding when the host sends the credential message

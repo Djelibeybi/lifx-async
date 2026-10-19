@@ -11,15 +11,18 @@ An event never carries the home network password; there is no field for it.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
-from lifx.onboard.errors import OnboardPhase
+from lifx.onboard.errors import OnboardPhase, _name
 from lifx.onboard.models import SoftApNetwork
 from lifx.protocol.models import Serial
 
-__all__ = ["OnboardEvent", "OnboardEventQueue", "OnboardEventType"]
+__all__ = ["EventCallback", "OnboardEvent", "OnboardEventQueue", "OnboardEventType"]
 
 
 class OnboardEventType(Enum):
@@ -66,6 +69,59 @@ class OnboardEvent:
     timeout: float | None = None
     took: float | None = None
     error: BaseException | None = None
+
+
+EventCallback = Callable[["OnboardEvent"], None]
+
+
+class _EventSink:
+    """Where the state machines hand each event: a callback and a queue.
+
+    Both are optional. The callback runs synchronously and its exceptions are
+    logged by type only, since it is caller code that may have the password
+    in reach; the queue never blocks. ``logger`` and ``label`` keep the debug
+    trail attributed to the sequence that emitted the event.
+    """
+
+    def __init__(
+        self,
+        on_event: EventCallback | None,
+        queue: OnboardEventQueue | None,
+        *,
+        logger: logging.Logger,
+        label: str,
+    ) -> None:
+        self._on_event = on_event
+        self._queue = queue
+        self._logger = logger
+        self._label = label
+
+    def emit(
+        self,
+        event_type: OnboardEventType,
+        phase: OnboardPhase | None,
+        **fields: Any,
+    ) -> None:
+        """Build the event and deliver it to the queue, then the callback."""
+        event = OnboardEvent(type=event_type, phase=phase, **fields)
+        self._logger.debug(
+            "%s %s in phase %s (ssid=%s)",
+            self._label,
+            event_type.value,
+            phase,
+            event.ssid,
+        )
+        if self._queue is not None:
+            self._queue.put(event)
+        if self._on_event is not None:
+            try:
+                self._on_event(event)
+            except Exception as error:
+                self._logger.error(
+                    "onboarding event callback failed for %s: %s",
+                    event_type.value,
+                    _name(error),
+                )
 
 
 class OnboardEventQueue:
