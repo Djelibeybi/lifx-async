@@ -17,6 +17,17 @@ lifx/
 │   ├── framebuffer.py       # Multi-tile canvas mapping and orientation
 │   ├── packets.py           # Prebaked packet templates
 │   └── orientation.py       # Tile orientation remapping
+├── onboard/                  # SoftAP onboarding (import lifx.onboard explicitly)
+│   ├── machine.py           # onboard() and the timing defaults
+│   ├── bulk.py              # bulk_onboard()
+│   ├── softap.py            # SoftApClient and the TLS SoftApConnection
+│   ├── protocols.py         # Scanner, Joiner and the optional capabilities
+│   ├── models.py            # HomeNetwork and SoftApNetwork
+│   ├── events.py            # OnboardEvent and OnboardEventQueue
+│   ├── errors.py            # OnboardPhase and the exception hierarchy
+│   ├── result.py            # Result
+│   ├── serials.py           # parse_serial() and SoftAP name helpers
+│   └── verify.py            # LAN verification through DeviceWatcher
 ├── devices/                  # Device classes
 │   ├── base.py              # Base Device class
 │   ├── light.py             # Light device (color control)
@@ -60,6 +71,14 @@ Main entry points for most users:
 - [`find_by_label()`](high-level.md#lifx.api.find_by_label) - Find devices by label (exact or substring)
 - [`find_by_ip()`](high-level.md#lifx.api.find_by_ip) - Find device by IP address
 - [`DeviceGroup`](high-level.md#lifx.api.DeviceGroup) - Batch operations
+
+### Onboarding
+
+Put a device in setup mode on your network (see the [onboarding guide](../user-guide/onboarding.md)):
+
+- [`onboard()`](onboarding.md#lifx.onboard.onboard) - Onboard one device from its SoftAP
+- [`bulk_onboard()`](onboarding.md#lifx.onboard.bulk_onboard) - Onboard every device in setup mode
+- [`HomeNetwork`](onboarding.md#lifx.onboard.HomeNetwork) - The network to hand the device
 
 ### Device Classes
 
