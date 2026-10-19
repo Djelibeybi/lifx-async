@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v7.13.0 (2026-10-19)
+
+### Features
+
+- Add SoftAP onboarding (lifx.onboard) ([#336](https://github.com/Djelibeybi/lifx-async/pull/336),
+  [`f66b547`](https://github.com/Djelibeybi/lifx-async/commit/f66b5478d5cfeecfbd620dd71ecb32ac85740ac6))
+
+
 ## v7.12.2 (2026-10-18)
 
 ### Bug Fixes
