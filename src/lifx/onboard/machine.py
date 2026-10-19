@@ -244,10 +244,27 @@ class _Run:
     def _elapsed(self) -> float:
         return time.monotonic() - self._started
 
-    async def _current_ssid(self) -> str | None:
+    async def _current_ssid(self, phase: OnboardPhase | None) -> str | None:
+        """Ask the reporter which network the host is on; ``None`` is unknown.
+
+        Every poll of the reporter goes through here. A reporter backend may
+        put the password into an error message, so a failing poll is logged
+        by type only, with the phase it happened in (``None`` before the
+        first phase), and reads as unknown.
+        """
         if self._reporter is None:
             return None
-        return await self._reporter.current_ssid()
+        failed: str | None = None
+        try:
+            return await self._reporter.current_ssid()
+        except Exception as error:
+            failed = _name(error)
+        _LOGGER.warning(
+            "current network unknown %s: %s",
+            "before onboarding" if phase is None else f"during {phase.value}",
+            failed,
+        )
+        return None
 
     @property
     def _softap_ssid(self) -> str:
@@ -278,7 +295,7 @@ class _Run:
 
     async def _record_original_network(self) -> None:
         """Remember the host's own network, if a reporter can name it."""
-        original = await self._current_ssid()
+        original = await self._current_ssid(None)
         if original is not None and not _is_softap_name(original):
             self._original_ssid = original
         _LOGGER.debug("onboarding starts on host network %r", self._original_ssid)
@@ -465,7 +482,7 @@ class _Run:
         deadline = started + self._wait_timeout
         last_error: SoftApUnreachableError | None = None
         while True:
-            current = await self._current_ssid()
+            current = await self._current_ssid(OnboardPhase.WAIT)
             if current is not None and current != self._softap_ssid:
                 raise HostLeftSoftApError(
                     f"Host left {self._softap_ssid!r} for {current!r} while waiting "
@@ -551,20 +568,29 @@ class _Run:
         return targets
 
     async def _leave_softap(self) -> None:
-        """Forget the SoftAP and drop the association so auto-join moves on."""
+        """Forget the SoftAP and drop the association so auto-join moves on.
+
+        The association is dropped only while the host is still on the
+        SoftAP. A reporter that names another network, or no network at all
+        (the host already left, or the reporter failed) means there is
+        nothing to leave; without a reporter the host is assumed still on it.
+        """
         ssid = self._softap_ssid
         if self._forgetter is not None:
             try:
                 await self._forgetter.forget(ssid)
             except Exception as error:
                 _LOGGER.warning("forgetting %r failed: %s", ssid, _name(error))
-        if self._disassociator is not None:
-            try:
-                current = await self._current_ssid()
-                if current is None or current == ssid:
-                    await self._disassociator.disassociate()
-            except Exception as error:
-                _LOGGER.warning("leaving %r failed: %s", ssid, _name(error))
+        if self._disassociator is None:
+            return
+        if self._reporter is not None:
+            if await self._current_ssid(OnboardPhase.REJOIN) != ssid:
+                _LOGGER.debug("not disassociating: host is no longer on %r", ssid)
+                return
+        try:
+            await self._disassociator.disassociate()
+        except Exception as error:
+            _LOGGER.warning("leaving %r failed: %s", ssid, _name(error))
 
     async def _rejoin_phase(self) -> str:
         targets = self._rejoin_targets()
@@ -617,7 +643,7 @@ class _Run:
                 failed = _name(error)
             if failed is None:
                 return target.ssid
-            if await self._current_ssid() == target.ssid:
+            if await self._current_ssid(OnboardPhase.REJOIN) == target.ssid:
                 _LOGGER.debug("already on %r despite %s", target.ssid, failed)
                 return target.ssid
             _LOGGER.warning("rejoining %r failed: %s", target.ssid, failed)
@@ -640,7 +666,7 @@ class _Run:
         softap_ssid = self._softap_ssid
         auto_join_deadline: float | None = None
         while True:
-            current = await self._reporter.current_ssid()
+            current = await self._current_ssid(OnboardPhase.REJOIN)
             if current is not None and current != softap_ssid:
                 _LOGGER.debug("auto-join landed on %r", current)
                 return current

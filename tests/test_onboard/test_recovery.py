@@ -32,7 +32,7 @@ from tests.test_onboard.conftest import (
     make_scanner,
     softap_network,
 )
-from tests.test_onboard.test_onboard import FAST
+from tests.test_onboard.test_onboard import FAST, HAPPY_PATH_EVENTS
 
 OVERRIDE_SSID = "Guest-Network"
 OVERRIDE_PASSWORD = "guest-pass-word"
@@ -188,6 +188,30 @@ class TestLeavingTheSoftAp:
         assert result.host_network == CAFE_SSID
         assert joiner.rejoins == []
 
+    async def test_disassociate_is_skipped_when_the_reporter_sees_no_network(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = _full_joiner()
+
+        def drop_on_configured(event: OnboardEvent) -> None:
+            if event.type is OnboardEventType.CONFIGURED:
+                joiner.current = None
+
+        result, _ = await _run(home_network, joiner, on_event=drop_on_configured)
+        assert "disassociate" not in joiner.calls
+        assert joiner.forgotten == [SOFTAP_SSID]
+        # Off every network, auto-join gets its budget and then the join is forced.
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+        assert result.host_network == ORIGINAL_SSID
+
+    async def test_without_a_reporter_disassociate_is_always_called(
+        self, home_network: HomeNetwork
+    ) -> None:
+        joiner = make_joiner(forgetter=True, disassociator=True)
+        result, _ = await _run(home_network, joiner)
+        assert joiner.calls == ["join", "forget", "disassociate", "rejoin"]
+        assert result.host_network == HOME_SSID
+
     async def test_without_capabilities_rejoin_is_forced(
         self, home_network: HomeNetwork
     ) -> None:
@@ -209,6 +233,72 @@ class TestLeavingTheSoftAp:
         assert "forgetting" in caplog.text
         assert "leaving" in caplog.text
         assert joiner.rejoins
+
+
+class TestReporterErrors:
+    """A failing ``current_ssid()`` means "unknown", and leaves no trace."""
+
+    def _error(self) -> RuntimeError:
+        # A subprocess backend echoing its argv would do this.
+        return RuntimeError(
+            f"nmcli dev wifi connect {HOME_SSID} password {HOME_PASSWORD}"
+        )
+
+    async def test_error_during_wait_is_logged_by_type_and_the_run_completes(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        joiner = _full_joiner()
+        joiner.after_join = [self._error()]
+        with caplog.at_level(logging.DEBUG, logger="lifx.onboard"):
+            result, seen = await _run(home_network, joiner)
+        assert result.phase is None
+        assert [event.type for event in seen] == HAPPY_PATH_EVENTS
+        assert "RuntimeError" in caplog.text
+        assert "wait" in caplog.text
+        assert HOME_PASSWORD not in caplog.text
+        assert "nmcli" not in caplog.text
+        assert all(HOME_PASSWORD not in str(event.error) for event in seen)
+        # The reporter recovered and still saw the SoftAP, so the host left it.
+        assert "disassociate" in joiner.calls
+        assert result.host_network == ORIGINAL_SSID
+
+    async def test_error_on_every_poll_still_raises_the_wait_error(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        joiner = _full_joiner()
+        joiner.after_join = [self._error() for _ in range(100_000)]
+        softap = FakeSoftApClient(probe_failures=100_000)
+        with caplog.at_level(logging.DEBUG, logger="lifx.onboard"):
+            with pytest.raises(SoftApWaitTimeoutError) as info:
+                await _run(home_network, joiner, softap=softap)
+        error = info.value
+        assert error.phase is OnboardPhase.WAIT
+        rendered = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        assert HOME_PASSWORD not in rendered
+        assert "nmcli" not in rendered
+        assert HOME_PASSWORD not in caplog.text
+        # With the host's network unknown, nothing is disassociated; the
+        # original network is still known from before the join, and is
+        # rejoined once the auto-join budget runs out.
+        assert "disassociate" not in joiner.calls
+        assert joiner.rejoins == [(ORIGINAL_SSID, "")]
+        assert error.result is not None
+        assert error.result.host_network == ORIGINAL_SSID
+
+    async def test_error_recording_the_original_leaves_it_unknown(
+        self, home_network: HomeNetwork, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        joiner = _full_joiner()
+        joiner.ssid_sequence.append(self._error())
+        with caplog.at_level(logging.DEBUG, logger="lifx.onboard"):
+            result, _ = await _run(home_network, joiner)
+        assert result.phase is None
+        assert _rejoin_ssids(joiner) == [HOME_SSID]
+        assert result.host_network == HOME_SSID
+        assert "RuntimeError" in caplog.text
+        assert HOME_PASSWORD not in caplog.text
 
 
 class TestAutoJoin:

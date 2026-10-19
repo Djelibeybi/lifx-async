@@ -185,9 +185,10 @@ class FakeJoiner:
     sequence. ``current`` is the network the fake believes the host is on;
     ``join()``, ``rejoin()`` and ``disassociate()`` update it, and each
     ``current_ssid()`` poll first pops the next entry of ``ssid_sequence``
-    into it, which is how a test scripts what the OS reports over time. The
-    ``after_join`` and ``after_disassociate`` lists are appended to
-    ``ssid_sequence`` when those calls succeed.
+    into it, which is how a test scripts what the OS reports over time; an
+    exception in the sequence is raised by that poll instead, the way a
+    reporter backend fails. The ``after_join`` and ``after_disassociate``
+    lists are appended to ``ssid_sequence`` when those calls succeed.
 
     The host has one WiFi interface, so a ``join()`` while a previous
     ``join()`` has not been followed by a ``rejoin()`` is a test failure:
@@ -220,9 +221,9 @@ class FakeJoiner:
         self.joins: list[SoftApNetwork] = []
         self.rejoins: list[tuple[str, str]] = []
         self.forgotten: list[str] = []
-        self.ssid_sequence: deque[str | None] = deque()
-        self.after_join: list[str | None] = []
-        self.after_disassociate: list[str | None] = []
+        self.ssid_sequence: deque[str | None | BaseException] = deque()
+        self.after_join: list[str | None | BaseException] = []
+        self.after_disassociate: list[str | None | BaseException] = []
         self.on_softap: SoftApNetwork | None = None
 
     async def join(self, network: SoftApNetwork) -> None:
@@ -262,7 +263,10 @@ class _Reports:
     async def current_ssid(self: Any) -> str | None:
         self.calls.append("current_ssid")
         if self.ssid_sequence:
-            self.current = self.ssid_sequence.popleft()
+            item = self.ssid_sequence.popleft()
+            if isinstance(item, BaseException):
+                raise item
+            self.current = item
         return self.current
 
 
