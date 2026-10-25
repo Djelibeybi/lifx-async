@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v7.13.1 (2026-10-25)
+
+### Bug Fixes
+
+- Preserve cache error class names in save-cache bundle
+  ([#339](https://github.com/Djelibeybi/lifx-async/pull/339),
+  [`598a605`](https://github.com/Djelibeybi/lifx-async/commit/598a605991df5f2fc4c908b3c6ddfa21154e294b))
+
+### Documentation
+
+- Cache-dependency-glob matches relative to the working directory
+  ([#339](https://github.com/Djelibeybi/lifx-async/pull/339),
+  [`598a605`](https://github.com/Djelibeybi/lifx-async/commit/598a605991df5f2fc4c908b3c6ddfa21154e294b))
+
+- Update version references to v10.3.1 ([#339](https://github.com/Djelibeybi/lifx-async/pull/339),
+  [`598a605`](https://github.com/Djelibeybi/lifx-async/commit/598a605991df5f2fc4c908b3c6ddfa21154e294b))
+
+
 ## v7.13.0 (2026-10-19)
 
 ### Features
