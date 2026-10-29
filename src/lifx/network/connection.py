@@ -1340,7 +1340,8 @@ class DeviceConnection:
         # "timeout" observation was already emitted at the break point above
         # (before "cleanup", which is the more useful causal order).
         raise LifxTimeoutError(
-            f"No {timeout_noun} from {self.ip} after {tx_count} attempts"
+            f"No {timeout_noun} to {type(request).__name__} from {self.ip} "
+            f"after {tx_count} attempts"
         )
 
     async def _request_stream_impl(
@@ -1664,7 +1665,7 @@ class DeviceConnection:
         """
         async for response in self.request_stream(packet, timeout):
             return response
-        raise LifxTimeoutError(f"No response from {self.ip}")
+        raise LifxTimeoutError(f"No response to {type(packet).__name__} from {self.ip}")
 
     async def echo(self, payload: bytes) -> bytes:
         """Send an echo request and wait for the response carrying ``payload``.

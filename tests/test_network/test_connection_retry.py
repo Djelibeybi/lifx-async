@@ -352,6 +352,34 @@ class TestRetransmitSchedule:
             await conn.close()
         assert len(send_times) == 1
 
+    @pytest.mark.parametrize(
+        ("packet", "message"),
+        [
+            pytest.param(
+                Device.GetPower(),
+                f"No response to GetPower from {_OFFLINE_IP} after 1 attempts",
+                id="get",
+            ),
+            pytest.param(
+                Device.SetPower(level=65535),
+                f"No acknowledgement to SetPower from {_OFFLINE_IP} after 1 attempts",
+                id="set",
+            ),
+        ],
+    )
+    async def test_timeout_names_the_unanswered_packet(
+        self, packet: Any, message: str
+    ) -> None:
+        """A device answering some requests but not others is diagnosable."""
+        conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP)
+        try:
+            await conn.open()
+            with pytest.raises(LifxTimeoutError) as exc_info:
+                await conn.request(packet, timeout=0.1)
+        finally:
+            await conn.close()
+        assert str(exc_info.value) == message
+
 
 class TestListenDuringBackoff:
     """Retransmit-while-listening, no blind sleeps."""

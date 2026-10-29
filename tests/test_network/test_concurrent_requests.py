@@ -368,6 +368,6 @@ class TestRetryTimeoutBudget:
         assert "after 3 attempts" in str(exc_info.value)
 
         error_msg = str(exc_info.value)
-        assert "No response from" in error_msg
+        assert "No response to GetPower from" in error_msg
 
         await conn.close()
