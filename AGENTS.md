@@ -9,7 +9,8 @@ A modern, type-safe, async Python library for controlling LIFX smart devices ove
 Built with Python's built-in `asyncio` for async/await patterns and features auto-generated protocol
 structures from a YAML specification. Published on PyPI as `lifx-async` (`pip install lifx-async`).
 
-**Python Versions**: 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI)
+**Python Versions**: 3.11, 3.12, 3.13, 3.14 (tested on all versions via CI). CI also runs 3.15
+as a non-blocking cell (`continue-on-error`) ahead of declaring support
 **Runtime Dependencies**: Zero - completely dependency-free!
 **Async Framework**: Python's built-in `asyncio` (no external async library required)
 **Test Isolation**: lifx-emulator-core runs embedded in-process for fast, cross-platform testing

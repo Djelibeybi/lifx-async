@@ -173,11 +173,15 @@ jobs:
     permissions:
       contents: read
       statuses: read
+    # Python 3.15 is tested but not yet supported: its cells may fail without
+    # failing the job, so needs.test.result stays 'success' for the release
+    # gate. Drop this key once 3.15 joins the supported versions.
+    continue-on-error: ${{ matrix.python-version == '3.15' }}
     strategy:
       fail-fast: false
       matrix:
         os: ${{ needs.changes.outputs.source == 'true' && github.event_name == 'pull_request' && fromJSON('["ubuntu-latest","macos-latest","windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
-        python-version: ['3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.11', '3.12', '3.13', '3.14', '3.15']
     steps:
     # Only the designated ubuntu-latest + Python 3.11 cell needs full
     # history: the vacuous-gate guard computes its own merge base there.
