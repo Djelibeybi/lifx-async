@@ -885,6 +885,85 @@ class TestSocketFamilySelection:
         await transport.close()
 
 
+class TestEphemeralPortIsExclusive:
+    """A port-0 endpoint never shares its port with another socket.
+
+    On Linux, a port-0 bind with ``SO_REUSEPORT`` can return a port another
+    reuse-port socket already holds. The kernel then delivers each peer's
+    replies to only one of those sockets, so the other connection's requests
+    time out although the device answered every retransmission.
+    """
+
+    _FAKE_SO_REUSEPORT = 15
+
+    @pytest.mark.skipif(
+        getattr(socket, "SO_REUSEPORT", None) is None,
+        reason="platform has no SO_REUSEPORT",
+    )
+    async def test_ephemeral_ipv4_socket_does_not_set_reuse_port(self) -> None:
+        """The real kernel socket behind a port-0 bind is exclusive."""
+        async with UdpTransport(ip_address="127.0.0.1", port=0) as transport:
+            assert transport._transport is not None
+            sock = transport._transport.get_extra_info("socket")
+            assert sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT) == 0
+
+    @pytest.mark.parametrize(
+        ("port", "reuse_port"),
+        [
+            pytest.param(0, False, id="ephemeral"),
+            pytest.param(56700, True, id="fixed"),
+        ],
+    )
+    async def test_ipv4_reuse_port_only_for_a_fixed_port(
+        self, port: int, reuse_port: bool
+    ) -> None:
+        """Only an explicitly chosen port asks the loop for ``reuse_port``."""
+        transport = UdpTransport(ip_address="0.0.0.0", port=port)
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = ("0.0.0.0", 49152)
+
+        with (
+            patch("lifx.network.transport._SO_REUSEPORT", self._FAKE_SO_REUSEPORT),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            create_endpoint = AsyncMock(return_value=(datagram_transport, MagicMock()))
+            mock_loop.return_value.create_datagram_endpoint = create_endpoint
+            await transport.open()
+
+        assert create_endpoint.await_args_list[0].kwargs["reuse_port"] is reuse_port
+        await transport.close()
+
+    @pytest.mark.parametrize(
+        ("port", "reuse_port"),
+        [
+            pytest.param(0, False, id="ephemeral"),
+            pytest.param(56700, True, id="fixed"),
+        ],
+    )
+    async def test_ipv6_reuse_port_only_for_a_fixed_port(
+        self, port: int, reuse_port: bool
+    ) -> None:
+        """Only an explicitly chosen port sets ``SO_REUSEPORT`` on the socket."""
+        transport = UdpTransport(ip_address="::", port=port)
+        raw_socket = MagicMock()
+        datagram_transport = MagicMock()
+        datagram_transport.get_extra_info.return_value = ("::", 49152, 0, 0)
+
+        with (
+            patch("lifx.network.transport._SO_REUSEPORT", self._FAKE_SO_REUSEPORT),
+            patch("lifx.network.transport._socket_factory", return_value=raw_socket),
+            patch("asyncio.get_running_loop") as mock_loop,
+        ):
+            mock_loop.return_value.create_datagram_endpoint = AsyncMock(
+                return_value=(datagram_transport, MagicMock())
+            )
+            await transport.open()
+
+        reuse_call = call.setsockopt(socket.SOL_SOCKET, self._FAKE_SO_REUSEPORT, 1)
+        assert (reuse_call in raw_socket.method_calls) is reuse_port
+        await transport.close()
+
+
 class TestSendFamilyAssertion:
     """A destination of the wrong family must fail loudly, not silently.
 
