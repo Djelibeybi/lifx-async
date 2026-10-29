@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v7.13.2 (2026-10-29)
+
+### Bug Fixes
+
+- **network**: Name the unanswered packet in timeout errors
+  ([`f316919`](https://github.com/Djelibeybi/lifx-async/commit/f3169199fc0b19ba15a697b21ea3fadcba840aa8))
+
+- **network**: Stop port-0 sockets sharing a port
+  ([`e86e0f5`](https://github.com/Djelibeybi/lifx-async/commit/e86e0f512f998d133becb39953a5e3699882a248))
+
+
 ## v7.13.1 (2026-10-25)
 
 ### Bug Fixes
