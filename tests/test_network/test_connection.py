@@ -1143,7 +1143,10 @@ class TestDeviceConnectionRequestStream:
         ):
             get_packet = Device.GetLabel()
 
-            with pytest.raises(LifxTimeoutError, match="No response from"):
+            with pytest.raises(
+                LifxTimeoutError,
+                match=r"^No response to GetLabel from 192\.168\.1\.100$",
+            ):
                 await conn.request(get_packet)
 
 
