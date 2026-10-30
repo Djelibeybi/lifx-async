@@ -8,9 +8,9 @@ This module tests error scenarios for batch operations:
 - Empty group edge cases
 - Partial failures and error propagation
 
-Note: With asyncio.gather() (used for Python 3.10 compatibility), the first
-exception is raised immediately rather than collecting all exceptions into
-an ExceptionGroup like TaskGroup does. Tests reflect this behavior.
+Note: DeviceGroup uses asyncio.gather(), so the first exception is raised
+immediately rather than collecting all exceptions into an ExceptionGroup
+like TaskGroup does. Tests reflect this behavior.
 """
 
 from __future__ import annotations

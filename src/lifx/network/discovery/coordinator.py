@@ -563,7 +563,7 @@ async def subscribe_udp_sweep(
                 timeout=remaining,
             )
             registered = True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             registration.add_done_callback(
                 lambda _future: _detach_abandoned_subscription(key, token)
             )
@@ -580,7 +580,7 @@ async def subscribe_udp_sweep(
                 return
             try:
                 event = await asyncio.wait_for(queue.get(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return
 
             if isinstance(event, _TerminalEvent):

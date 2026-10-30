@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = ["rich>=15.0.0", "lifx-async"]
 #
 # [tool.uv.sources]
@@ -34,7 +34,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from rich.columns import Columns
 from rich.console import Console, Group, RenderableType
@@ -113,7 +113,7 @@ def _firmware(major: int, minor: int, build: int) -> str:
     if build <= 0:
         return f"{major}.{minor}"
 
-    built = datetime.fromtimestamp(build / 1_000_000_000, tz=timezone.utc)
+    built = datetime.fromtimestamp(build / 1_000_000_000, tz=UTC)
     return f"{major}.{minor} ({built:%Y-%m-%d})"
 
 

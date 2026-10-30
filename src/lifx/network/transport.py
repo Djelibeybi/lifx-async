@@ -14,7 +14,6 @@ from lifx.const import (
     DEFAULT_IP_ADDRESS,
     MAX_PACKET_SIZE,
     MIN_PACKET_SIZE,
-    TIMEOUT_ERRORS,
 )
 from lifx.exceptions import LifxNetworkError, LifxProtocolError, LifxTimeoutError
 from lifx.network.address import (
@@ -554,7 +553,7 @@ class UdpTransport:
             data, addr = await asyncio.wait_for(
                 self._protocol.queue.get(), timeout=timeout
             )
-        except TIMEOUT_ERRORS:
+        except TimeoutError:
             # An idle socket is expected; asyncio's TimeoutError adds nothing
             # but a second traceback.
             raise LifxTimeoutError(f"No data received within {timeout}s") from None

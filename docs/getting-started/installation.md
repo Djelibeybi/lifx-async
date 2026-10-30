@@ -2,7 +2,7 @@
 
 ## System Requirements
 
-- **Python**: 3.10 or higher
+- **Python**: 3.11 or higher
 - **Network**: Local network access to LIFX devices
 - **OS**: Linux, macOS, Windows
 

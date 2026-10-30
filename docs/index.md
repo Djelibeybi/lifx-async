@@ -103,7 +103,7 @@ uv sync
 - **Async For** and **Async With**: extensive use of asynchronous generators and context managers
 - **Async/Await**: Native asyncio support for concurrent operations
 - **Type Hints**: Full type annotations for better IDE support
-- **Python 3.10+**: Modern language features and performance
+- **Python 3.11+**: Modern language features and performance
 
 ### Reliable
 
