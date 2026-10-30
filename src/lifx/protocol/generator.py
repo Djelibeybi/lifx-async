@@ -8,7 +8,6 @@ only parsed and converted into protocol classes.
 from __future__ import annotations
 
 import copy
-import os
 import re
 import subprocess  # nosec B404
 import sys
@@ -668,7 +667,14 @@ def shared_enum_prefix(enum_name: str, member_names: list[str]) -> str:
         return expected_prefix
     if len(member_names) < 2:
         return ""
-    common = os.path.commonprefix(member_names)
+    # The lexically smallest and largest names bound the prefix every name
+    # shares. os.path.commonprefix() did this but is deprecated from 3.15.
+    first, last = min(member_names), max(member_names)
+    shared = next(
+        (i for i, (a, b) in enumerate(zip(first, last)) if a != b),
+        min(len(first), len(last)),
+    )
+    common = first[:shared]
     common = common[: common.rfind("_") + 1]
     if common and all(len(name) > len(common) for name in member_names):
         return common
