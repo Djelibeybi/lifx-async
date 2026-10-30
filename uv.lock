@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 
 [[package]]
@@ -220,7 +220,7 @@ wheels = [
 
 [[package]]
 name = "lifx-async"
-version = "7.13.2"
+version = "8.0.0"
 source = { editable = "." }
 
 [package.dev-dependencies]

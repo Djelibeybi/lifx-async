@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v8.0.0 (2026-10-30)
+
+### Bug Fixes
+
+- **protocol**: Stop using os.path.commonprefix in the generator
+  ([`d95bfb8`](https://github.com/Djelibeybi/lifx-async/commit/d95bfb8d717912d286ea07afe4072d18ccf945cb))
+
+### Build System
+
+- Require Python 3.11 or later
+  ([`d06c363`](https://github.com/Djelibeybi/lifx-async/commit/d06c363f3cf0b1254b0ccb55e28ceaa9c8d50a75))
+
+- **deps**: Bump pydantic-core to 2.50.2 for Python 3.15 wheels
+  ([`f673c1d`](https://github.com/Djelibeybi/lifx-async/commit/f673c1d65f8b83801498df3fdf8e3534a225be95))
+
+
 ## v7.13.2 (2026-10-29)
 
 ### Bug Fixes
