@@ -315,6 +315,9 @@ class UdpTransport:
                 bind_address = sockaddr_for(
                     (self._ip_address, self._port), require_routable=False
                 )
+                # On Linux a port-0 bind with SO_REUSEPORT can land on a port
+                # another reuse-port socket holds, splitting its replies.
+                reuse_port = _SO_REUSEPORT if self._port != 0 else None
                 if family is socket.AF_INET6:
                     raw_socket = _socket_factory(socket.AF_INET6, socket.SOCK_DGRAM)
                     raw_socket.setsockopt(
@@ -322,10 +325,10 @@ class UdpTransport:
                         socket.IPV6_V6ONLY,
                         1,
                     )
-                    if _SO_REUSEPORT is not None:
+                    if reuse_port is not None:
                         raw_socket.setsockopt(
                             socket.SOL_SOCKET,
-                            _SO_REUSEPORT,
+                            reuse_port,
                             1,
                         )
                     raw_socket.bind(bind_address)
@@ -340,7 +343,7 @@ class UdpTransport:
                     datagram_transport, _ = await loop.create_datagram_endpoint(
                         lambda: protocol,
                         local_addr=bind_address,
-                        reuse_port=_SO_REUSEPORT is not None,
+                        reuse_port=reuse_port is not None,
                         family=family,
                     )
 
