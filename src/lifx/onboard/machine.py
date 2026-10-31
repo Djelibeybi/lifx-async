@@ -808,7 +808,7 @@ class _Run:
         _LOGGER.info("recovering host network within %.1fs", budget)
         try:
             await bounded(self._recover_targets(targets), budget)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _LOGGER.warning("host recovery gave up after %.1fs", budget)
 
     async def _recover_targets(self, targets: list[_RejoinTarget]) -> None:

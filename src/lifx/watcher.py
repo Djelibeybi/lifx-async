@@ -13,9 +13,9 @@ from collections import deque
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import aclosing
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from types import MappingProxyType, TracebackType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from lifx.api import _follow_known_device, _index_known_devices, discover_udp
 from lifx.const import (
@@ -34,8 +34,6 @@ from lifx.network.discovery.mdns.discovery import _discover_verified_devices_mdn
 from lifx.protocol.models import Serial
 
 if TYPE_CHECKING:
-    from typing_extensions import Self
-
     from lifx.devices.base import Device
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,7 +73,7 @@ _TRACKED_FIELDS = (
 _POLLED_FIELDS = ("color", "power", "zones", "tiles")
 
 
-class DeviceEventType(str, Enum):
+class DeviceEventType(StrEnum):
     """What happened to a device."""
 
     ADDED = "added"
