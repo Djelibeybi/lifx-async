@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v8.0.1 (2026-11-14)
+
+### Bug Fixes
+
+- **devices**: Trust pending power and tile in component refresh_state()
+  ([`dfda48f`](https://github.com/Djelibeybi/lifx-async/commit/dfda48f036ca8e7f6e72bde7c7537a314d4e2e4b))
+
+### Build System
+
+- **deps**: Bump soupsieve to 4.1 to clear Dependabot alerts
+  ([`804d16e`](https://github.com/Djelibeybi/lifx-async/commit/804d16e9502ffe053c565503ee09e3626fa77ac4))
+
+
 ## v8.0.0 (2026-10-30)
 
 ### Bug Fixes
