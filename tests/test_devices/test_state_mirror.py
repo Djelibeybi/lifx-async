@@ -12,7 +12,7 @@ import pytest
 from lifx.color import HSBK
 from lifx.devices.base import CollectionInfo, DeviceCapabilities, FirmwareInfo
 from lifx.devices.light import Light
-from lifx.devices.matrix import MatrixLightState
+from lifx.devices.matrix import MatrixLight, MatrixLightState
 from lifx.devices.mirror import MirrorLight, MirrorLightState, _gather
 from lifx.exceptions import LifxError
 from lifx.products import get_mirror_layout
@@ -277,7 +277,7 @@ class TestMirrorLightLifecycle:
         async def _parent_refresh(_self) -> None:
             mirror._state.tile_colors = _buffer(refreshed_front, refreshed_back)
 
-        with patch.object(MirrorLight.__mro__[1], "refresh_state", _parent_refresh):
+        with patch.object(MatrixLight, "refresh_state", _parent_refresh):
             await mirror.refresh_state()
 
         assert mirror.state.front_colors == refreshed_front

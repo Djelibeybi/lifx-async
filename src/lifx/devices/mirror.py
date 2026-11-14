@@ -416,36 +416,6 @@ class MirrorLight(ComponentMatrixLight):
 
         return mirror_state
 
-    async def refresh_state(self) -> None:
-        """Refresh mirror light state from hardware.
-
-        Fetches color, tiles, tile colors, effect, and mirror component state.
-
-        Raises:
-            RuntimeError: If state has not been initialized
-            LifxTimeoutError: If device does not respond
-            LifxDeviceNotFoundError: If device cannot be reached
-        """
-        await super().refresh_state()
-
-        # Extract mirror component colors from already-fetched tile_colors
-        # (parent refresh_state already called get_all_tile_colors)
-        tile_colors = self._state.tile_colors
-        front_colors = _gather(tile_colors, self.front_positions)
-        back_colors = _gather(tile_colors, self.back_positions)
-
-        state = cast(MirrorLightState, self._state)
-        state.front_colors = list(front_colors)
-        state.back_colors = list(back_colors)
-        state.last_front_colors = list(front_colors)
-        state.last_back_colors = list(back_colors)
-        state.front_is_on = bool(
-            state.power > 0 and any(c.brightness > 0 for c in front_colors)
-        )
-        state.back_is_on = bool(
-            state.power > 0 and any(c.brightness > 0 for c in back_colors)
-        )
-
     @classmethod
     async def from_ip(
         cls,
