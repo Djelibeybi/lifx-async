@@ -1,0 +1,129 @@
+name: Update product registry
+
+on:
+  schedule:
+  - cron: '23 * * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+    - .github/update_products.py
+    - .github/workflows/update-products.yml
+    - tests/test_ci/test_update_products.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-products-${{ github.event_name == 'pull_request' && github.event.number || 'scheduled' }}
+  cancel-in-progress: false
+
+jobs:
+  monitor-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: '3.14'
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        version: '0.12.21'
+    - run: uv sync --frozen --all-packages
+    - run: uv run --frozen pytest --tooling tests/test_ci/test_update_products.py --no-cov
+    - run: uv run --frozen ruff check .github/update_products.py tests/test_ci/test_update_products.py
+    - run: uv run --frozen ruff format --check .github/update_products.py tests/test_ci/test_update_products.py
+
+  update:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: monitor-tests
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changes.outputs.changed }}
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: main
+        persist-credentials: false
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: '3.14'
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      with:
+        version: '0.12.21'
+    - run: uv sync --frozen --all-packages
+    - name: Check and regenerate from the upstream file revision
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: uv run --frozen python .github/update_products.py .github/products-source.json lifx.products.generator
+    - name: Detect generated changes
+      id: changes
+      run: |
+        if ! git diff --quiet -- .github/products-source.json src/lifx/products/registry.py; then
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+        fi
+    - name: Validate regenerated registry
+      if: steps.changes.outputs.changed == 'true'
+      run: |
+        uv run --frozen ruff check src/lifx/products/registry.py
+        uv run --frozen ruff format --check src/lifx/products/registry.py
+        uv run --frozen pyright
+        uv run --frozen pytest tests/test_products
+    - name: Upload validated changes
+      if: steps.changes.outputs.changed == 'true'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: product-update
+        include-hidden-files: true
+        path: |
+          .github/products-source.json
+          src/lifx/products/registry.py
+
+  publish:
+    needs: update
+    if: needs.update.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        ref: main
+        persist-credentials: false
+    - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        name: product-update
+        path: .
+    # Never execute generated code on this credential-bearing runner.
+    - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+      id: app
+      with:
+        client-id: ${{ secrets.GADLING_APP_CLIENT_ID }}
+        private-key: ${{ secrets.GADLING_APP_PRIVATE_KEY }}
+        repositories: ${{ github.event.repository.name }}
+        permission-contents: write
+        permission-pull-requests: write
+    - name: Open or update the registry PR
+      uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8
+      with:
+        token: ${{ steps.app.outputs.token }}
+        branch: automation/update-products
+        base: main
+        title: 'fix: update upstream product registry'
+        commit-message: 'fix: update upstream product registry'
+        signoff: true
+        sign-commits: true
+        draft: false
+        maintainer-can-modify: true
+        add-paths: |
+          .github/products-source.json
+          src/lifx/products/registry.py
+        body: |
+          ## Summary
+          - Regenerate the product registry from the immutable LIFX/products revision in `.github/products-source.json`.
+          - Only changes to upstream `products.json` trigger this update; unrelated commits are ignored.
+          - The source marker advances on merge. This branch is reused until reviewed; no auto-merge is enabled.
+
+          ## Validation
+          Registry tests, Ruff and Pyright passed before this PR was created or updated.
+          Normal pull-request CI is triggered using the Gadling App token.

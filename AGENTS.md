@@ -122,7 +122,9 @@ uv run --frozen pytest --tooling tests/test_ci
 uv run --frozen pytest --benchmark
 ```
 
-No CI job runs either flag; both are run by hand. A default run still imports the tooling test
+The product-update workflow runs `--tooling` only for its monitor regression test;
+the main CI suite runs neither flag. Both categories can also be run by hand.
+A default run still imports the tooling test
 modules before deselecting them, because `pytest_collection_modifyitems` runs after collection has
 already imported them: a tooling test that fails at import breaks the default run, and the
 deselected count reported in the summary is what makes the exclusion visible rather than silent.
