@@ -390,34 +390,6 @@ class CeilingLight(ComponentMatrixLight):
 
         return ceiling_state
 
-    async def refresh_state(self) -> None:
-        """Refresh ceiling light state from hardware.
-
-        Fetches color, tiles, tile colors, effect, and ceiling component state.
-
-        Raises:
-            LifxTimeoutError: If device does not respond
-            LifxDeviceNotFoundError: If device cannot be reached
-        """
-        await super().refresh_state()
-
-        # Extract ceiling component colors from already-fetched tile_colors
-        # (parent refresh_state already called get_all_tile_colors)
-        tile_colors = self._state.tile_colors
-        uplight_color = tile_colors[self.uplight_zone]
-        downlight_colors = list(tile_colors[self.downlight_zones])
-
-        # Update ceiling-specific state fields
-        state = cast(CeilingLightState, self._state)
-        state.uplight_color = uplight_color
-        state.downlight_colors = list(downlight_colors)
-        state.last_uplight_color = uplight_color
-        state.last_downlight_colors = list(downlight_colors)
-        state.uplight_is_on = bool(state.power > 0 and uplight_color.brightness > 0)
-        state.downlight_is_on = bool(
-            state.power > 0 and any(c.brightness > 0 for c in downlight_colors)
-        )
-
     @classmethod
     async def from_ip(
         cls,

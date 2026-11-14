@@ -569,6 +569,28 @@ class ComponentMatrixLight(MatrixLight):
             self._state.power = power
         return power
 
+    async def refresh_state(self) -> None:
+        """Refresh state from hardware, including both light components.
+
+        Fetches color, tiles, tile colors and effect, then derives each light
+        component's colours and on/off flag from them. GetPower and Get64 lag
+        an acknowledged write (see `Pending`), so while this light's own power
+        or tile write is still pending, its value is published instead of
+        the device's report. Otherwise a refresh straight after a component
+        write that powered the light on or off would show the component back
+        in its old state.
+
+        Raises:
+            LifxTimeoutError: If device does not respond
+            LifxDeviceNotFoundError: If device cannot be reached
+        """
+        await super().refresh_state()
+        power = self._pending_power.get()
+        if power is not None:
+            self._state.power = power
+        tile = self._pending_tile.get()
+        self._publish_tile(self._state.tile_colors if tile is None else tile)
+
     def _record_power(self, on: bool, duration: float) -> None:
         """Record successful power and update both sides even after partial work."""
         self._pending_power.record(

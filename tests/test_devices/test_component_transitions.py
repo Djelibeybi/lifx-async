@@ -24,6 +24,13 @@ from lifx.exceptions import LifxError, LifxTimeoutError
 from lifx.products import get_mirror_layout
 from lifx.protocol import packets
 from lifx.protocol.base import Packet
+from lifx.protocol.protocol_types import (
+    FirmwareEffect,
+    LightHsbk,
+    TileEffectParameter,
+    TileEffectSettings,
+    TileEffectSkyType,
+)
 
 RED = HSBK(0, 1, 0.7, 3500)
 BLUE = HSBK(240, 1, 0.4, 3500)
@@ -67,6 +74,23 @@ class Wire:
             )
         if isinstance(packet, packets.Light.GetPower):
             return packets.Light.StatePower(level=self.power)
+        if isinstance(packet, packets.Tile.GetEffect):
+            return packets.Tile.StateEffect(
+                settings=TileEffectSettings(
+                    instanceid=0,
+                    effect_type=FirmwareEffect.OFF,
+                    speed=0,
+                    duration=0,
+                    parameter=TileEffectParameter(
+                        sky_type=TileEffectSkyType.SUNRISE,
+                        cloud_saturation_min=0,
+                        cloud_saturation_max=0,
+                    ),
+                    palette_count=0,
+                    palette=[LightHsbk(hue=0, saturation=0, brightness=0, kelvin=0)]
+                    * 16,
+                )
+            )
         if isinstance(packet, packets.Light.GetColor):
             return packets.Light.StateColor(
                 color=self.colours[0].to_protocol(), power=self.power, label=b""
@@ -700,3 +724,71 @@ def test_component_writes_contend_safely_in_a_later_event_loop(rig: Rig):
     assert [rig.wire.colours[p] for p in rig.positions[1]] == [BLUE] * len(
         rig.positions[1]
     )
+
+
+def is_on(rig: Rig, side: int) -> bool:
+    return getattr(rig.light.state, f"{rig.names[side]}_is_on")
+
+
+@pytest.mark.parametrize("side", [0, 1])
+async def test_refresh_after_powering_on_from_off_trusts_pending_power(
+    rig: Rig, side: int
+):
+    await rig.off(1 - side)
+    await rig.off(side)
+    rig.settle()
+    await rig.on(side)
+    rig.wire.power = 0  # Firmware still reports the old power level.
+
+    await rig.light.refresh_state()
+
+    assert rig.light.state.power == 65535
+    assert is_on(rig, side) is True
+    assert is_on(rig, 1 - side) is False
+
+    rig.settle()
+    await rig.light.refresh_state()
+
+    assert rig.light.state.power == 0
+    assert is_on(rig, side) is False
+
+
+@pytest.mark.parametrize("side", [0, 1])
+async def test_refresh_during_power_off_fade_trusts_pending_power(rig: Rig, side: int):
+    await rig.off(1 - side)
+    await rig.off(side, duration=10)
+    rig.wire.power = 65535  # Firmware reports the old power during the fade.
+
+    await rig.light.refresh_state()
+
+    assert rig.light.state.power == 0
+    assert is_on(rig, 0) is False
+    assert is_on(rig, 1) is False
+
+    rig.clock[0] += 9
+    await rig.light.refresh_state()
+    assert is_on(rig, side) is False
+
+    rig.settle(1)
+    await rig.light.refresh_state()
+
+    assert rig.light.state.power == 65535
+    assert is_on(rig, side) is True
+
+
+@pytest.mark.parametrize("side", [0, 1])
+async def test_refresh_during_component_fade_publishes_pending_tile(
+    rig: Rig, side: int
+):
+    await rig.on(side, BLUE, duration=10)
+    rig.external(side, GREEN)  # Get64 reports an in-flight colour.
+
+    await rig.light.refresh_state()
+
+    assert rig.colours(side) == [BLUE] * len(rig.positions[side])
+    assert rig.colours(1 - side) == [RED] * len(rig.positions[1 - side])
+
+    rig.settle(10)
+    await rig.light.refresh_state()
+
+    assert rig.colours(side) == [GREEN] * len(rig.positions[side])
