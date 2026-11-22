@@ -2,6 +2,35 @@
 
 <!-- version list -->
 
+## v8.0.2 (2026-11-22)
+
+### Bug Fixes
+
+- Preserve cache error class names in save-cache bundle
+  ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+- Resolve partial PEP 440 specifiers with PEP 440 semantics
+  ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+### Documentation
+
+- Cache-dependency-glob matches relative to the working directory
+  ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+- Update version references to v10.3.1 ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+- Update version references to v10.3.3 ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+- Use JSDoc for compatible release specifier comment
+  ([#354](https://github.com/Djelibeybi/lifx-async/pull/354),
+  [`369f857`](https://github.com/Djelibeybi/lifx-async/commit/369f8573417cfdd034ffbdba9fc780ec4a32a8dc))
+
+
 ## v8.0.1 (2026-11-14)
 
 ### Bug Fixes
