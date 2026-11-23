@@ -35,7 +35,7 @@ class HevLightState(LightState):
     hev_result: LightLastHevCycleResult
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return HevLightState as dict.
 
         ``hev_cycle`` and ``hev_config`` are plain dataclasses, so

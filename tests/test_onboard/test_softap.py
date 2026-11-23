@@ -96,7 +96,10 @@ class TestProbe:
             address=fake_access_point.address, port=fake_access_point.port
         )
 
-        await connection.probe(timeout=1.0)
+        # The probe returns as soon as the loopback connect completes, so a
+        # generous bound costs nothing when it passes. One second was not
+        # enough on a loaded Windows runner (Python 3.15 cell, PR #357).
+        await connection.probe(timeout=10.0)
 
         assert fake_access_point.messages == []
 

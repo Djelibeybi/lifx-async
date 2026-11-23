@@ -88,7 +88,7 @@ class CeilingLightState(MatrixLightState):
     last_downlight_colors: list[HSBK] | None = field(default=None)
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return CeilingLightState as dict.
 
         ``downlight_zones`` is expanded from a :class:`slice` into a
@@ -265,7 +265,7 @@ class CeilingLight(ComponentMatrixLight):
         fetch_thread_info: bool = False,
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
-    ):
+    ) -> None:
         """Initialize CeilingLight.
 
         ``state_file`` keeps its original position: inserting a parameter ahead
