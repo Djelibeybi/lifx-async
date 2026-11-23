@@ -125,7 +125,7 @@ class MirrorLightState(MatrixLightState):
     last_back_colors: list[HSBK] | None = field(default=None)
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return MirrorLightState as dict.
 
         The buffer position tuples are expanded into lists so the result is
@@ -261,7 +261,7 @@ class MirrorLight(ComponentMatrixLight):
         fetch_radio_info: bool = False,
         fetch_ambient_light: bool = False,
         ring_origin: RingOrigin | int = "top",
-    ):
+    ) -> None:
         """Initialize MirrorLight.
 
         ``state_file`` keeps its original position: inserting a parameter ahead

@@ -7,7 +7,7 @@ state class expands them via HSBK.as_dict so the result survives json.dumps.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -18,11 +18,12 @@ from lifx.devices.base import (
     FirmwareInfo,
     WifiInfo,
 )
-from lifx.devices.ceiling import CeilingLightState
+from lifx.devices.ceiling import CeilingLight, CeilingLightState
 from lifx.devices.hev import HevLightState
 from lifx.devices.infrared import InfraredLightState
 from lifx.devices.light import LightState
 from lifx.devices.matrix import MatrixLightState, TileInfo
+from lifx.devices.mirror import MirrorLight, MirrorLightState
 from lifx.devices.multizone import MultiZoneLightState
 from lifx.protocol.models import HevConfig, HevCycleState
 from lifx.protocol.protocol_types import FirmwareEffect, LightLastHevCycleResult
@@ -319,3 +320,28 @@ class TestStateSerialisation:
         # Not == to the original, whose step is None, but indexes identically.
         assert rebuilt.indices(64) == original.indices(64)
         assert list(range(64))[rebuilt] == list(range(64))[original]
+
+
+@pytest.mark.parametrize(
+    "owner",
+    [
+        LightState,
+        HevLightState,
+        InfraredLightState,
+        MultiZoneLightState,
+        MatrixLightState,
+        TileInfo,
+        CeilingLightState,
+        MirrorLightState,
+    ],
+)
+def test_as_dict_is_annotated_as_a_string_keyed_dict(owner: type) -> None:
+    """Strict callers get a dict back, not Any (#355)."""
+    hints = get_type_hints(owner.as_dict.fget)
+    assert hints["return"] == dict[str, Any]
+
+
+@pytest.mark.parametrize("device_class", [CeilingLight, MirrorLight])
+def test_component_light_init_is_annotated_to_return_none(device_class: type) -> None:
+    """Every public constructor carries an explicit ``-> None`` (#355)."""
+    assert get_type_hints(device_class.__init__)["return"] is type(None)

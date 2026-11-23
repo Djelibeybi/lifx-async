@@ -9,7 +9,7 @@ from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
 from dataclasses import dataclass, field
 from itertools import accumulate
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from lifx.const import (
     DEFAULT_IP_ADDRESS,
@@ -45,6 +45,9 @@ from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device as DevicePackets
 from lifx.protocol.packets import get_packet_class
 from lifx.protocol.protocol_types import DeviceService
+
+if TYPE_CHECKING:
+    from lifx.devices.light import Light
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_SEQUENCE_START: int = 0
@@ -114,21 +117,24 @@ class DiscoveredDevice:
         compare=False,
     )
 
-    # Pyright infers the concrete device union from the local factory imports.
-    # A module-level Device import would create a devices.base -> network cycle.
-    async def create_device(self):
+    # ``Light`` is imported only under TYPE_CHECKING: a runtime module-level
+    # import of the device layer would create a devices.base -> network cycle.
+    async def create_device(self) -> Light | None:
         """Create appropriate device instance based on product capabilities.
 
         Queries the device for its product ID and uses the product registry
-        to instantiate the appropriate device class (Device, Light, HevLight,
-        InfraredLight, MultiZoneLight, MatrixLight, or CeilingLight) based on
-        the product capabilities.
+        to instantiate the appropriate device class (Light, HevLight,
+        InfraredLight, MultiZoneLight, MatrixLight, CeilingLight, or
+        MirrorLight) based on the product capabilities.
 
         This is the single source of truth for device type detection and
         instantiation across the library.
 
         Returns:
-            Device instance of the appropriate type
+            A ``Light`` subclass instance of the appropriate type, or ``None``
+            when the address is invalid, capability detection fails, the
+            device reports no capabilities or version, or the product is a
+            relay or button-only device with no light to control.
 
         Raises:
             TypeError: If a concrete device constructor no longer accepts the

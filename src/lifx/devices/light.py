@@ -64,7 +64,7 @@ class LightState(DeviceState):
     ambient_light: float | None = field(kw_only=True, default=None)
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return LightState as a dict.
 
         Extends :attr:`DeviceState.as_dict` so the curated capability and

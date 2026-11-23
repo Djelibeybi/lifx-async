@@ -25,7 +25,7 @@ class InfraredLightState(LightState):
     infrared: float
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return InfraredLightState as dict."""
         state = super().as_dict
         state["infrared"] = self.infrared

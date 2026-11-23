@@ -311,7 +311,7 @@ class MultiZoneLightState(LightState):
     effect: FirmwareEffect
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return MultiZoneLightState as dict."""
         state = super().as_dict
         state["zones"] = [zone.as_dict for zone in self.zones]

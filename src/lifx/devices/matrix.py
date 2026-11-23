@@ -147,7 +147,7 @@ class TileInfo:
         )
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return TileInfo as dictionary."""
         return asdict(self)
 
@@ -386,7 +386,7 @@ class MatrixLightState(LightState):
     effect: FirmwareEffect
 
     @property
-    def as_dict(self) -> Any:
+    def as_dict(self) -> dict[str, Any]:
         """Return MatrixLightState as dict.
 
         ``tile_orientations`` is keyed by tile index. JSON object keys are

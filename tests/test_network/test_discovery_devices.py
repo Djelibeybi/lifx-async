@@ -12,6 +12,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import get_type_hints
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,6 +33,16 @@ from lifx.network.discovery import (
 )
 from lifx.products.registry import ProductCapability, ProductInfo
 from tests.conftest import HANG_GUARD_TIMEOUT
+
+
+def test_create_device_is_annotated_to_return_a_light_or_none() -> None:
+    """Strict callers get ``Light | None`` instead of an untyped call (#355).
+
+    ``Light`` is imported only for type checking in the discovery module, so
+    the hint is resolved with it supplied explicitly.
+    """
+    hints = get_type_hints(DiscoveredDevice.create_device, localns={"Light": Light})
+    assert hints["return"] == Light | None
 
 
 def test_discovered_device_identity_uses_serial() -> None:
