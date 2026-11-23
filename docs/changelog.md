@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v8.0.3 (2026-11-23)
+
+### Bug Fixes
+
+- **api**: Close return-type gaps on the public device API
+  ([`f284592`](https://github.com/Djelibeybi/lifx-async/commit/f2845920863b05806532beb8e79a683784339739))
+
+
 ## v8.0.2 (2026-11-22)
 
 ### Bug Fixes
