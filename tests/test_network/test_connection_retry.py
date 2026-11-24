@@ -92,6 +92,31 @@ def _header(
     )
 
 
+# Heartbeat interval and the gap between beats that counts as a loop stall.
+_HEARTBEAT_TICK = 0.005
+_STALL_THRESHOLD = 0.05
+
+
+async def _heartbeat(beats: list[float]) -> None:
+    """Record ``time.monotonic()`` every few milliseconds until cancelled.
+
+    A gap between beats much longer than the tick means the event loop was
+    stalled and no task, including a request's retransmit loop, could run.
+    """
+    while True:
+        beats.append(time.monotonic())
+        await asyncio.sleep(_HEARTBEAT_TICK)
+
+
+def _stalled(beats: list[float], start: float, end: float) -> float:
+    """Return how much of ``[start, end]`` the heartbeat saw the loop stalled."""
+    total = 0.0
+    for earlier, later in zip(beats, beats[1:], strict=False):
+        if later - earlier > _STALL_THRESHOLD:
+            total += max(0.0, min(later, end) - max(earlier, start))
+    return total
+
+
 async def _wait_for_keys(
     conn: DeviceConnection, count: int, deadline: float = 2.0
 ) -> None:
@@ -241,9 +266,20 @@ class TestRetransmitSchedule:
     async def test_default_retransmits_until_deadline(self) -> None:
         """With no max_retries the schedule runs to the wall deadline, so the
         last transmission lands within one final gap of it rather than the
-        request sitting out the end of its budget in silence."""
+        request sitting out the end of its budget in silence.
+
+        A loaded runner can stall the event loop for a few hundred
+        milliseconds, which cuts the raw send count without the schedule
+        stopping. A heartbeat task measures those stalls so the assertions
+        hold the loop to the property that matters: whenever it was free to
+        run, no silence between sends, or between the last send and the end
+        of the request, lasted longer than one gap plus timer slack."""
+        gap = 0.02
+        slack = 0.05
         conn = DeviceConnection(serial=_OFFLINE_SERIAL, ip=_OFFLINE_IP, timeout=0.5)
         send_times: list[float] = []
+        beats: list[float] = []
+        heartbeat = asyncio.create_task(_heartbeat(beats))
         try:
             await conn.open()
             start = time.monotonic()
@@ -251,14 +287,25 @@ class TestRetransmitSchedule:
                 patch.object(
                     conn, "send_packet", side_effect=_send_spy(conn, send_times)
                 ),
-                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (0.02,)),
+                patch("lifx.network.connection.REQUEST_RETRANSMIT_GAPS", (gap,)),
                 pytest.raises(LifxTimeoutError),
             ):
                 await conn.request(Device.GetPower(), timeout=0.5)
+            end = time.monotonic()
+            # Close the heartbeat record at the end, so a stall that outlasted
+            # the request is still counted.
+            beats.append(end)
         finally:
+            heartbeat.cancel()
             await conn.close()
-        assert len(send_times) > 10
-        assert send_times[-1] - start >= 0.4
+        assert end - start >= 0.5
+        assert len(send_times) >= 3, send_times
+        edges = [*send_times, end]
+        silences = [
+            (later - earlier) - _stalled(beats, earlier, later)
+            for earlier, later in zip(edges, edges[1:], strict=False)
+        ]
+        assert max(silences) <= gap + slack, (silences, send_times, beats)
 
     async def test_device_silent_past_early_schedule_still_answered(self) -> None:
         """A device that drops everything for longer than the early gaps, then
