@@ -15,7 +15,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
-from lifx.protocol.base import GetPacket, Packet, RequestPacket, SetPacket
+from lifx.protocol.base import (
+    CapabilityGetPacket,
+    GetPacket,
+    Packet,
+    RequestPacket,
+    SetPacket,
+)
 from lifx.protocol.protocol_types import (
     DeviceService,
     LightHsbk,
@@ -545,7 +551,7 @@ class Light(Packet):
         pass
 
     @dataclass
-    class GetHevCycle(GetPacket["Light.StateHevCycle"]):
+    class GetHevCycle(CapabilityGetPacket["Light.StateHevCycle"]):
         """Packet type 142."""
 
         PKT_TYPE: ClassVar[int] = 142
@@ -560,7 +566,9 @@ class Light(Packet):
         pass
 
     @dataclass
-    class GetHevCycleConfiguration(GetPacket["Light.StateHevCycleConfiguration"]):
+    class GetHevCycleConfiguration(
+        CapabilityGetPacket["Light.StateHevCycleConfiguration"]
+    ):
         """Packet type 145."""
 
         PKT_TYPE: ClassVar[int] = 145
@@ -575,7 +583,7 @@ class Light(Packet):
         pass
 
     @dataclass
-    class GetInfrared(GetPacket["Light.StateInfrared"]):
+    class GetInfrared(CapabilityGetPacket["Light.StateInfrared"]):
         """Packet type 120."""
 
         PKT_TYPE: ClassVar[int] = 120
@@ -590,7 +598,7 @@ class Light(Packet):
         pass
 
     @dataclass
-    class GetLastHevCycleResult(GetPacket["Light.StateLastHevCycleResult"]):
+    class GetLastHevCycleResult(CapabilityGetPacket["Light.StateLastHevCycleResult"]):
         """Packet type 148."""
 
         PKT_TYPE: ClassVar[int] = 148
@@ -883,7 +891,9 @@ class MultiZone(Packet):
     """MultiZone category packets."""
 
     @dataclass
-    class GetExtendedColorZones(GetPacket["MultiZone.StateExtendedColorZones"]):
+    class GetExtendedColorZones(
+        CapabilityGetPacket["MultiZone.StateExtendedColorZones"]
+    ):
         """Packet type 511."""
 
         PKT_TYPE: ClassVar[int] = 511
@@ -944,7 +954,9 @@ class MultiZone(Packet):
         colors: list[LightHsbk]
 
     @dataclass
-    class GetColorZones(GetPacket["MultiZone.StateMultiZone | MultiZone.StateZone"]):
+    class GetColorZones(
+        CapabilityGetPacket["MultiZone.StateMultiZone | MultiZone.StateZone"]
+    ):
         """Packet type 502."""
 
         PKT_TYPE: ClassVar[int] = 502
@@ -963,7 +975,7 @@ class MultiZone(Packet):
         end_index: int
 
     @dataclass
-    class GetEffect(GetPacket["MultiZone.StateEffect"]):
+    class GetEffect(CapabilityGetPacket["MultiZone.StateEffect"]):
         """Packet type 507."""
 
         PKT_TYPE: ClassVar[int] = 507
@@ -1078,7 +1090,7 @@ class Sensor(Packet):
     """Sensor category packets."""
 
     @dataclass
-    class GetAmbientLight(GetPacket["Sensor.StateAmbientLight"]):
+    class GetAmbientLight(CapabilityGetPacket["Sensor.StateAmbientLight"]):
         """Packet type 401."""
 
         PKT_TYPE: ClassVar[int] = 401
@@ -1113,7 +1125,7 @@ class Thread(Packet):
     """Thread category packets."""
 
     @dataclass
-    class GetInfo(GetPacket["Thread.StateInfo"]):
+    class GetInfo(CapabilityGetPacket["Thread.StateInfo"]):
         """Packet type 1200."""
 
         PKT_TYPE: ClassVar[int] = 1200
@@ -1195,7 +1207,7 @@ class Tile(Packet):
         duration: int
 
     @dataclass
-    class Get64(GetPacket["Tile.State64"]):
+    class Get64(CapabilityGetPacket["Tile.State64"]):
         """Packet type 707."""
 
         PKT_TYPE: ClassVar[int] = 707
@@ -1216,7 +1228,7 @@ class Tile(Packet):
         rect: TileBufferRect
 
     @dataclass
-    class GetDeviceChain(GetPacket["Tile.StateDeviceChain"]):
+    class GetDeviceChain(CapabilityGetPacket["Tile.StateDeviceChain"]):
         """Packet type 701."""
 
         PKT_TYPE: ClassVar[int] = 701
@@ -1231,7 +1243,7 @@ class Tile(Packet):
         pass
 
     @dataclass
-    class GetEffect(GetPacket["Tile.StateEffect"]):
+    class GetEffect(CapabilityGetPacket["Tile.StateEffect"]):
         """Packet type 718."""
 
         PKT_TYPE: ClassVar[int] = 718

@@ -6,7 +6,8 @@ import typing
 import pytest
 
 from lifx.protocol import packets as packets_module
-from lifx.protocol.base import GetPacket, RequestPacket, SetPacket
+from lifx.protocol.base import CapabilityGetPacket, GetPacket, RequestPacket, SetPacket
+from lifx.protocol.generator import CAPABILITY_GETS
 from lifx.protocol.packets import (
     PACKET_REGISTRY,
     Device,
@@ -378,7 +379,7 @@ def _response_types(packet_class: type) -> tuple[type, ...]:
     """Resolve the response classes named by a request packet's generic base."""
     for base in getattr(packet_class, "__orig_bases__", ()):
         origin = typing.get_origin(base)
-        if origin in (GetPacket, RequestPacket):
+        if origin in (CapabilityGetPacket, GetPacket, RequestPacket):
             (argument,) = typing.get_args(base)
             assert isinstance(argument, typing.ForwardRef)
             resolved = eval(argument.__forward_arg__, vars(packets_module))  # noqa: S307
@@ -395,8 +396,8 @@ class TestGeneratedResponseTypes:
         ids=lambda cls: cls.__qualname__,
     )
     def test_get_packet_base_names_its_state(self, packet_class: type) -> None:
-        """Every Get subclasses GetPacket with the State that STATE_TYPE names."""
-        assert issubclass(packet_class, GetPacket)
+        """Every Get has a Get base with the State that STATE_TYPE names."""
+        assert issubclass(packet_class, GetPacket | CapabilityGetPacket)
         response_types = _response_types(packet_class)
         assert response_types
         assert response_types[0].PKT_TYPE == packet_class.STATE_TYPE
@@ -409,7 +410,25 @@ class TestGeneratedResponseTypes:
     def test_set_packet_uses_set_base(self, packet_class: type) -> None:
         """Every Set, CopyFrameBuffer included, subclasses SetPacket."""
         assert issubclass(packet_class, SetPacket)
-        assert not issubclass(packet_class, GetPacket | RequestPacket)
+        assert not issubclass(
+            packet_class, GetPacket | CapabilityGetPacket | RequestPacket
+        )
+
+    def test_capability_gets_take_capability_base(self) -> None:
+        """Exactly the Gets in CAPABILITY_GETS may resolve to StateUnhandled."""
+        capability = {
+            tuple(cls.__qualname__.split("."))
+            for cls in PACKET_REGISTRY.values()
+            if issubclass(cls, CapabilityGetPacket)
+        }
+        assert capability == CAPABILITY_GETS
+        universal = [
+            cls
+            for cls in PACKET_REGISTRY.values()
+            if cls._packet_kind == "GET" and not issubclass(cls, CapabilityGetPacket)
+        ]
+        assert all(issubclass(cls, GetPacket) for cls in universal)
+        assert Device.GetLabel in universal
 
     def test_get_color_zones_resolves_to_both_zone_states(self) -> None:
         """A single-zone GetColorZones is answered with StateZone."""

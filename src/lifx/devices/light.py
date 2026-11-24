@@ -383,9 +383,7 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response and decodes labels
-        state = self._raise_if_unhandled(
-            await self.connection.request(packets.Light.GetColor())
-        )
+        state = await self.connection.request(packets.Light.GetColor())
 
         color, power, label = self._adopt_state_color(state)
 
@@ -677,9 +675,7 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response
-        state = self._raise_if_unhandled(
-            await self.connection.request(packets.Light.GetPower())
-        )
+        state = await self.connection.request(packets.Light.GetPower())
 
         # Power level is uint16 (0 or 65535)
         _LOGGER.debug(

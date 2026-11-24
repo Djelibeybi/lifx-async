@@ -1154,22 +1154,31 @@ class TestStateUnhandledResponses:
     """Test StateUnhandled responses from devices that don't support commands."""
 
     @pytest.mark.emulator
-    async def test_get_color_returns_state_unhandled_for_switch(
+    async def test_capability_get_returns_state_unhandled_for_switch(
         self, switch_device
     ) -> None:
-        """Test GetColor to a Switch device returns StateUnhandled packet.
+        """A capability Get the device lacks returns its StateUnhandled reply.
 
-        Switch devices don't support Light commands, so GetColor should
-        return a StateUnhandled packet instead of raising an exception.
+        GetInfrared is a CapabilityGetPacket: only some lights support it, so
+        the caller receives StateUnhandled rather than an exception.
         """
         async with switch_device:
-            # Send GetColor to a Switch - should return StateUnhandled
-            response = await switch_device.request(packets.Light.GetColor())
+            response = await switch_device.request(packets.Light.GetInfrared())
 
-            # Should return StateUnhandled packet, not raise an exception
             assert isinstance(response, packets.Device.StateUnhandled)
             # The unhandled_type field contains the packet type that wasn't handled
-            assert response.unhandled_type == packets.Light.GetColor.PKT_TYPE
+            assert response.unhandled_type == packets.Light.GetInfrared.PKT_TYPE
+
+    @pytest.mark.emulator
+    async def test_get_color_raises_for_switch(self, switch_device) -> None:
+        """A Get every light supports raises when answered StateUnhandled.
+
+        GetColor is typed to resolve to StateColor alone, so the connection
+        raises LifxUnsupportedCommandError instead of returning StateUnhandled.
+        """
+        async with switch_device:
+            with pytest.raises(LifxUnsupportedCommandError, match="GetColor"):
+                await switch_device.request(packets.Light.GetColor())
 
     @pytest.mark.emulator
     async def test_set_color_raises_for_switch(self, switch_device) -> None:

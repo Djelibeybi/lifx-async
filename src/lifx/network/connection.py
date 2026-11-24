@@ -36,7 +36,13 @@ from lifx.network.address import (
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
-from lifx.protocol.base import GetPacket, Packet, RequestPacket, SetPacket
+from lifx.protocol.base import (
+    CapabilityGetPacket,
+    GetPacket,
+    Packet,
+    RequestPacket,
+    SetPacket,
+)
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device, get_packet_class
@@ -1445,9 +1451,16 @@ class DeviceConnection:
     @overload
     def request_stream(
         self,
-        packet: GetPacket[_ResponseT],
+        packet: CapabilityGetPacket[_ResponseT],
         timeout: float | None = None,
     ) -> AsyncGenerator[_ResponseT | Device.StateUnhandled, None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: GetPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT, None]: ...
 
     @overload
     def request_stream(
@@ -1489,17 +1502,18 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Yields:
-            Unpacked response packet instances (including StateUnhandled if device
-            doesn't support the command)
+            Unpacked response packet instances (including StateUnhandled if the
+            device lacks the capability a CapabilityGetPacket asks about)
             For SET packets: yields True once the device acknowledges
 
             The yielded type follows the packet: a Get answered by ``R`` yields
-            ``R | Device.StateUnhandled``, a Set yields ``Literal[True]`` and
+            ``R``, a capability Get yields ``R | Device.StateUnhandled``, a Set
+            yields ``Literal[True]`` and
             ``Device.EchoRequest`` yields ``Device.EchoResponse``.
 
         Raises:
-            LifxUnsupportedCommandError: If the device answers a SET packet
-                with StateUnhandled
+            LifxUnsupportedCommandError: If the device answers a SET packet,
+                or a Get other than a CapabilityGetPacket, with StateUnhandled
             LifxTimeoutError: If request times out
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1553,6 +1567,16 @@ class DeviceConnection:
 
                 # Unpack (labels are automatically decoded by Packet.unpack())
                 response_packet = packet_class.unpack(payload)
+
+                # Only a CapabilityGetPacket is typed to resolve to
+                # StateUnhandled; every light supports any other Get.
+                if isinstance(
+                    response_packet, Device.StateUnhandled
+                ) and not isinstance(packet, CapabilityGetPacket):
+                    raise LifxUnsupportedCommandError(
+                        f"Device does not support {type(packet).__name__} "
+                        f"(packet type {response_packet.unhandled_type})"
+                    )
 
                 # Log the request/reply cycle (as_dict is costly — skip
                 # building it unless DEBUG logging is enabled)
@@ -1646,8 +1670,13 @@ class DeviceConnection:
 
     @overload
     async def request(
-        self, packet: GetPacket[_ResponseT], timeout: float | None = None
+        self, packet: CapabilityGetPacket[_ResponseT], timeout: float | None = None
     ) -> _ResponseT | Device.StateUnhandled: ...
+
+    @overload
+    async def request(
+        self, packet: GetPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT: ...
 
     @overload
     async def request(
@@ -1674,29 +1703,33 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Returns:
-            Single unpacked response packet (including StateUnhandled if device
-            doesn't support the command)
+            Single unpacked response packet (including StateUnhandled if the
+            device lacks the capability a CapabilityGetPacket asks about)
             For SET packets: True once the device acknowledges
 
             The return type follows the packet: a Get answered by ``R`` returns
-            ``R | Device.StateUnhandled``, a Set returns ``Literal[True]`` and
+            ``R``, a capability Get returns ``R | Device.StateUnhandled``, a Set
+            returns ``Literal[True]`` and
             ``Device.EchoRequest`` returns ``Device.EchoResponse``.
 
         Raises:
-            LifxUnsupportedCommandError: If the device answers a SET packet
-                with StateUnhandled
+            LifxUnsupportedCommandError: If the device answers a SET packet,
+                or a Get other than a CapabilityGetPacket, with StateUnhandled
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
 
         Example:
             ```python
-            # GET request returns unpacked packet (StateColor | StateUnhandled)
+            # GET request returns unpacked packet (StateColor)
             state = await conn.request(packets.Light.GetColor())
-            if isinstance(state, packets.Device.StateUnhandled):
-                raise LifxUnsupportedCommandError()
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
+
+            # A capability GET may be answered StateUnhandled instead
+            infrared = await conn.request(packets.Light.GetInfrared())
+            if isinstance(infrared, packets.Device.StateUnhandled):
+                raise LifxUnsupportedCommandError()
 
             # SET request returns True once acknowledged, and raises
             # LifxUnsupportedCommandError if the device returns StateUnhandled

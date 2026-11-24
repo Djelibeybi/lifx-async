@@ -347,14 +347,18 @@ packet = Light.SetColor(
 # Send via connection
 async with DeviceConnection(serial, ip) as conn:
     await conn.request(packet)  # True once acknowledged
-    state = await conn.request(Light.GetColor())  # StateColor | StateUnhandled
+    state = await conn.request(Light.GetColor())  # StateColor
+    infrared = await conn.request(Light.GetInfrared())  # StateInfrared | StateUnhandled
 ```
 
-`request()` is typed by the packet you send. A Get resolves to its State packet or
-`Device.StateUnhandled`, which a device sends when it does not support the request. Check for
-`StateUnhandled` with `isinstance()` before reading fields. A Set resolves to `True` once the
-device acknowledges it, and raises `LifxUnsupportedCommandError` if the device answers with
-`StateUnhandled`. `Device.EchoRequest` resolves to `Device.EchoResponse`.
+`request()` is typed by the packet you send. A Get that every LIFX light supports, such as
+`GetColor` or `Device.GetLabel`, resolves to its State packet. A Get for a capability only some
+lights have, such as infrared, HEV, multizone or matrix, resolves to its State packet or
+`Device.StateUnhandled`, which a device without the capability sends instead. Check for
+`StateUnhandled` with `isinstance()` before reading its fields. A Set resolves to `True` once the
+device acknowledges it. A Set, or a Get every light supports, raises `LifxUnsupportedCommandError`
+if the device answers with `StateUnhandled`. `Device.EchoRequest` resolves to
+`Device.EchoResponse`.
 
 ### How does connection management work?
 

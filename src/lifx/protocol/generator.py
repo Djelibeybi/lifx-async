@@ -259,6 +259,28 @@ RESPONSE_QUIRKS: dict[tuple[str, str], tuple[str, ...]] = {
 }
 
 
+# Gets only some LIFX lights support: a light without the capability answers
+# StateUnhandled. These subclass CapabilityGetPacket, so their result is typed
+# R | Device.StateUnhandled. Every other Get subclasses GetPacket and resolves
+# to R, and DeviceConnection raises if one is answered StateUnhandled anyway.
+CAPABILITY_GETS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("Light", "GetHevCycle"),
+        ("Light", "GetHevCycleConfiguration"),
+        ("Light", "GetLastHevCycleResult"),
+        ("Light", "GetInfrared"),
+        ("MultiZone", "GetColorZones"),
+        ("MultiZone", "GetExtendedColorZones"),
+        ("MultiZone", "GetEffect"),
+        ("Sensor", "GetAmbientLight"),
+        ("Thread", "GetInfo"),
+        ("Tile", "Get64"),
+        ("Tile", "GetDeviceChain"),
+        ("Tile", "GetEffect"),
+    }
+)
+
+
 def expected_response_names(category_class: str, short_name: str) -> tuple[str, ...]:
     """Return the nested names of the packets that answer a request.
 
@@ -1367,7 +1389,9 @@ def generate_nested_packet_code(
             response_type = " | ".join(
                 f"{category_class}.{name}" for name in response_names
             )
-            if packet_kind == "GET":
+            if packet_kind == "GET" and (category_class, short_name) in CAPABILITY_GETS:
+                base_class = f'CapabilityGetPacket["{response_type}"]'
+            elif packet_kind == "GET":
                 base_class = f'GetPacket["{response_type}"]'
             elif packet_kind == "SET":
                 base_class = "SetPacket"
@@ -1672,7 +1696,13 @@ from __future__ import annotations
 {dataclasses_import}
 from typing import Any, ClassVar
 
-from lifx.protocol.base import GetPacket, Packet, RequestPacket, SetPacket
+from lifx.protocol.base import (
+    CapabilityGetPacket,
+    GetPacket,
+    Packet,
+    RequestPacket,
+    SetPacket,
+)
 {imports}
 '''
 

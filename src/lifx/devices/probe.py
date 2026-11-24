@@ -31,7 +31,7 @@ from lifx.products.registry import (
     get_registry,
 )
 from lifx.protocol import packets
-from lifx.protocol.base import GetPacket, Packet
+from lifx.protocol.base import CapabilityGetPacket, Packet
 
 if TYPE_CHECKING:
     from lifx.network.connection import DeviceConnection
@@ -52,7 +52,7 @@ def is_known_product(product_id: int) -> bool:
 
 async def _answered(
     connection: DeviceConnection,
-    packet: GetPacket[_StateT],
+    packet: CapabilityGetPacket[_StateT],
     state_type: type[_StateT],
 ) -> bool:
     """Send a probe and report whether the device answered it with its state."""

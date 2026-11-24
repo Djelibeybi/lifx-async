@@ -23,7 +23,11 @@ async def request_types(conn: DeviceConnection) -> None:
     """request() resolves each packet kind to its response type."""
     assert_type(
         await conn.request(packets.Light.GetColor()),
-        packets.Light.StateColor | packets.Device.StateUnhandled,
+        packets.Light.StateColor,
+    )
+    assert_type(
+        await conn.request(packets.Light.GetInfrared()),
+        packets.Light.StateInfrared | packets.Device.StateUnhandled,
     )
     assert_type(
         await conn.request(packets.MultiZone.GetColorZones(start_index=0, end_index=0)),
@@ -67,7 +71,12 @@ async def request_types(conn: DeviceConnection) -> None:
 async def request_stream_types(conn: DeviceConnection) -> None:
     """request_stream() yields the same types request() returns."""
     async for state in conn.request_stream(packets.Device.GetLabel()):
-        assert_type(state, packets.Device.StateLabel | packets.Device.StateUnhandled)
+        assert_type(state, packets.Device.StateLabel)
+    async for zones in conn.request_stream(packets.MultiZone.GetExtendedColorZones()):
+        assert_type(
+            zones,
+            packets.MultiZone.StateExtendedColorZones | packets.Device.StateUnhandled,
+        )
     async for ack in conn.request_stream(packets.Device.SetLabel(label=b"")):
         assert_type(ack, Literal[True])
     async for echo in conn.request_stream(packets.Device.EchoRequest(payload=b"")):
@@ -75,9 +84,9 @@ async def request_stream_types(conn: DeviceConnection) -> None:
 
 
 async def raise_if_unhandled_types(conn: DeviceConnection) -> None:
-    """_raise_if_unhandled() narrows a Get result and rejects a Set's result."""
-    state = Device._raise_if_unhandled(await conn.request(packets.Light.GetPower()))
-    assert_type(state, packets.Light.StatePower)
+    """_raise_if_unhandled() narrows a capability Get result, rejects a Set's."""
+    state = Device._raise_if_unhandled(await conn.request(packets.Light.GetInfrared()))
+    assert_type(state, packets.Light.StateInfrared)
     # A Set raises from request() itself, so its result has nothing to check.
     Device._raise_if_unhandled(
         await conn.request(packets.Device.SetPower(level=0))  # pyright: ignore[reportArgumentType]

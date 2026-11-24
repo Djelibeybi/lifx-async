@@ -993,10 +993,34 @@ class TestResponseTypeBases:
         code = generate_nested_packet_code(packets)
         assert (
             "class GetColorZones("
-            'GetPacket["MultiZone.StateMultiZone | MultiZone.StateZone"]):'
+            'CapabilityGetPacket["MultiZone.StateMultiZone | MultiZone.StateZone"]):'
         ) in code
         # The runtime pairing still names the multi-zone reply.
         assert "STATE_TYPE: ClassVar[int] = 506" in code
+
+    def test_universal_get_uses_get_base(self):
+        """A Get every light supports subclasses GetPacket."""
+        packets = {
+            "device": {
+                "DeviceGetLabel": {"pkt_type": 23, "fields": []},
+                "DeviceStateLabel": {"pkt_type": 25, "fields": []},
+            }
+        }
+
+        code = generate_nested_packet_code(packets)
+        assert 'class GetLabel(GetPacket["Device.StateLabel"]):' in code
+
+    def test_capability_get_uses_capability_base(self):
+        """A Get in CAPABILITY_GETS subclasses CapabilityGetPacket."""
+        packets = {
+            "light": {
+                "LightGetInfrared": {"pkt_type": 120, "fields": []},
+                "LightStateInfrared": {"pkt_type": 121, "fields": []},
+            }
+        }
+
+        code = generate_nested_packet_code(packets)
+        assert 'class GetInfrared(CapabilityGetPacket["Light.StateInfrared"]):' in code
 
     def test_copy_frame_buffer_uses_set_base(self):
         """CopyFrameBuffer is a SET by quirk, so it takes the Set base."""
@@ -1045,8 +1069,13 @@ class TestResponseTypeBases:
             {},
         )
         assert (
-            "from lifx.protocol.base import GetPacket, Packet, RequestPacket, "
-            "SetPacket" in code
+            "from lifx.protocol.base import (\n"
+            "    CapabilityGetPacket,\n"
+            "    GetPacket,\n"
+            "    Packet,\n"
+            "    RequestPacket,\n"
+            "    SetPacket,\n"
+            ")" in code
         )
 
 
