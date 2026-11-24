@@ -1159,26 +1159,28 @@ class TestStateUnhandledResponses:
     ) -> None:
         """A capability Get the device lacks returns its StateUnhandled reply.
 
-        GetInfrared is a CapabilityGetPacket: only some lights support it, so
-        the caller receives StateUnhandled rather than an exception.
+        GetColor is a CapabilityGetPacket: a Switch answers it with
+        StateUnhandled, which is how a GetColor broadcast finds only lights,
+        so the caller receives the reply rather than an exception.
         """
         async with switch_device:
-            response = await switch_device.request(packets.Light.GetInfrared())
+            response = await switch_device.request(packets.Light.GetColor())
 
             assert isinstance(response, packets.Device.StateUnhandled)
             # The unhandled_type field contains the packet type that wasn't handled
-            assert response.unhandled_type == packets.Light.GetInfrared.PKT_TYPE
+            assert response.unhandled_type == packets.Light.GetColor.PKT_TYPE
 
     @pytest.mark.emulator
-    async def test_get_color_raises_for_switch(self, switch_device) -> None:
+    async def test_universal_get_raises_for_switch(self, switch_device) -> None:
         """A Get every light supports raises when answered StateUnhandled.
 
-        GetColor is typed to resolve to StateColor alone, so the connection
-        raises LifxUnsupportedCommandError instead of returning StateUnhandled.
+        Light.GetPower is typed to resolve to StatePower alone, so the
+        connection raises LifxUnsupportedCommandError instead of returning
+        StateUnhandled.
         """
         async with switch_device:
-            with pytest.raises(LifxUnsupportedCommandError, match="GetColor"):
-                await switch_device.request(packets.Light.GetColor())
+            with pytest.raises(LifxUnsupportedCommandError, match="GetPower"):
+                await switch_device.request(packets.Light.GetPower())
 
     @pytest.mark.emulator
     async def test_set_color_raises_for_switch(self, switch_device) -> None:

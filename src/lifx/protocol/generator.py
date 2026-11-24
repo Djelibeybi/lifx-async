@@ -259,12 +259,15 @@ RESPONSE_QUIRKS: dict[tuple[str, str], tuple[str, ...]] = {
 }
 
 
-# Gets only some LIFX lights support: a light without the capability answers
+# Gets only some LIFX devices support: a device without the capability answers
 # StateUnhandled. These subclass CapabilityGetPacket, so their result is typed
 # R | Device.StateUnhandled. Every other Get subclasses GetPacket and resolves
 # to R, and DeviceConnection raises if one is answered StateUnhandled anyway.
 CAPABILITY_GETS: frozenset[tuple[str, str]] = frozenset(
     {
+        # A LIFX Switch answers GetColor with StateUnhandled, which is how a
+        # GetColor broadcast finds only the lights.
+        ("Light", "GetColor"),
         ("Light", "GetHevCycle"),
         ("Light", "GetHevCycleConfiguration"),
         ("Light", "GetLastHevCycleResult"),

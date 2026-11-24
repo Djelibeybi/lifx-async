@@ -1569,7 +1569,7 @@ class DeviceConnection:
                 response_packet = packet_class.unpack(payload)
 
                 # Only a CapabilityGetPacket is typed to resolve to
-                # StateUnhandled; every light supports any other Get.
+                # StateUnhandled; every LIFX device supports any other Get.
                 if isinstance(
                     response_packet, Device.StateUnhandled
                 ) and not isinstance(packet, CapabilityGetPacket):
@@ -1721,15 +1721,16 @@ class DeviceConnection:
 
         Example:
             ```python
-            # GET request returns unpacked packet (StateColor)
+            # A capability GET returns StateColor | StateUnhandled, because a
+            # device without color (a LIFX Switch) answers StateUnhandled
             state = await conn.request(packets.Light.GetColor())
+            if isinstance(state, packets.Device.StateUnhandled):
+                raise LifxUnsupportedCommandError()
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 
-            # A capability GET may be answered StateUnhandled instead
-            infrared = await conn.request(packets.Light.GetInfrared())
-            if isinstance(infrared, packets.Device.StateUnhandled):
-                raise LifxUnsupportedCommandError()
+            # Any other GET returns its State packet
+            power = await conn.request(packets.Light.GetPower())
 
             # SET request returns True once acknowledged, and raises
             # LifxUnsupportedCommandError if the device returns StateUnhandled

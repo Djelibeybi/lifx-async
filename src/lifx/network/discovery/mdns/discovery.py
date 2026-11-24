@@ -1399,8 +1399,8 @@ async def _verify_mdns_candidate(
             timeout=remaining,
         )
 
-        # A device that answers GetColor with StateUnhandled makes request()
-        # raise LifxUnsupportedCommandError, which the caller reports.
+        if isinstance(response, packets.Device.StateUnhandled):
+            raise LifxUnsupportedCommandError()
         if connection.serial != record.serial:
             raise _MdnsCandidateIdentityError()
 

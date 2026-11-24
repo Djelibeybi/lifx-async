@@ -22,8 +22,12 @@ from lifx.protocol.protocol_types import LightHsbk
 async def request_types(conn: DeviceConnection) -> None:
     """request() resolves each packet kind to its response type."""
     assert_type(
+        await conn.request(packets.Device.GetVersion()),
+        packets.Device.StateVersion,
+    )
+    assert_type(
         await conn.request(packets.Light.GetColor()),
-        packets.Light.StateColor,
+        packets.Light.StateColor | packets.Device.StateUnhandled,
     )
     assert_type(
         await conn.request(packets.Light.GetInfrared()),

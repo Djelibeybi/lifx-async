@@ -383,7 +383,9 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response and decodes labels
-        state = await self.connection.request(packets.Light.GetColor())
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetColor())
+        )
 
         color, power, label = self._adopt_state_color(state)
 

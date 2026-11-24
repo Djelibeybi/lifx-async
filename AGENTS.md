@@ -480,15 +480,16 @@ The file structure:
 Local generator quirks:
 
 - **typed requests**: each Get subclasses `GetPacket["Category.StateXxx"]`, except the Gets in
-  `CAPABILITY_GETS` (HEV, infrared, multizone, matrix, sensor and Thread), which only some lights
-  support and which subclass `CapabilityGetPacket["Category.StateXxx"]`. Each Set (and
+  `CAPABILITY_GETS` (color, HEV, infrared, multizone, matrix, sensor and Thread), which only some
+  devices support and which subclass `CapabilityGetPacket["Category.StateXxx"]`. Each Set (and
   `CopyFrameBuffer`) subclasses `SetPacket`, and `EchoRequest` subclasses
   `RequestPacket["Device.EchoResponse"]` (all in `protocol/base.py`).
   `DeviceConnection.request()` and `request_stream()` overload on them, so a Get resolves to
   `StateXxx`, a capability Get to `StateXxx | Device.StateUnhandled`, a Set to `Literal[True]` and
   Echo to `EchoResponse`. A Set or a plain Get answered with `StateUnhandled` raises
   `LifxUnsupportedCommandError` instead of returning, so only capability Gets go through
-  `Device._raise_if_unhandled()`. The runtime pairing still uses `STATE_TYPE` and `_packet_kind`. `RESPONSE_QUIRKS` holds pairings that are not
+  `Device._raise_if_unhandled()`. `Light.GetColor` is a capability Get because a LIFX Switch
+  answers it with `StateUnhandled`, which is what lets a GetColor broadcast find only lights. The runtime pairing still uses `STATE_TYPE` and `_packet_kind`. `RESPONSE_QUIRKS` holds pairings that are not
   name-based: `GetColorZones` resolves to `StateMultiZone | StateZone`, because a one-zone request
   is answered with `StateZone`. The validator rejects any Get or Request without a response packet,
   so a new mapping that only works by name fails at generation time.

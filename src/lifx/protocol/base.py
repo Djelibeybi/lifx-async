@@ -412,7 +412,7 @@ _ResponseT_co = TypeVar("_ResponseT_co", bound=Packet, covariant=True)
 
 @dataclass
 class GetPacket(Packet, Generic[_ResponseT_co]):
-    """Base class for Get packets every LIFX light supports.
+    """Base class for Get packets every LIFX device supports.
 
     ``DeviceConnection.request()`` resolves a Get answered by ``R`` to ``R``,
     and raises ``LifxUnsupportedCommandError`` if the device answers
@@ -423,7 +423,7 @@ class GetPacket(Packet, Generic[_ResponseT_co]):
 
 @dataclass
 class CapabilityGetPacket(Packet, Generic[_ResponseT_co]):
-    """Base class for Get packets only some LIFX lights support.
+    """Base class for Get packets only some LIFX devices support.
 
     ``DeviceConnection.request()`` resolves a Get answered by ``R`` to
     ``R | Device.StateUnhandled``, because a device without the capability

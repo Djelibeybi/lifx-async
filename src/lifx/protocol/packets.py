@@ -536,7 +536,7 @@ class Light(Packet):
     """Light category packets."""
 
     @dataclass
-    class GetColor(GetPacket["Light.StateColor"]):
+    class GetColor(CapabilityGetPacket["Light.StateColor"]):
         """Packet type 101."""
 
         PKT_TYPE: ClassVar[int] = 101

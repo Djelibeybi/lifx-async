@@ -260,16 +260,11 @@ async def test_state_unhandled_rejects_light_without_echo_fallback(
     """A purported light that rejects GetColor must not fall back to Echo."""
     events: list[object] = []
     connections: list[SimpleNamespace] = []
-
-    def respond(*_args: object) -> object:
-        # DeviceConnection.request() raises when a light answers GetColor
-        # with StateUnhandled.
-        raise LifxUnsupportedCommandError("Device does not support GetColor")
-
+    response = packets.Device.StateUnhandled(unhandled_type=101)
     monkeypatch.setattr(
         mdns_discovery,
         "DeviceConnection",
-        _connection_factory(respond, connections),
+        _connection_factory(lambda *_args: response, connections),
         raising=False,
     )
     monkeypatch.setattr(

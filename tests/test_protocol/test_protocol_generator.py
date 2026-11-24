@@ -939,7 +939,7 @@ class TestGenerateNestedPacketCode:
         code = generate_nested_packet_code(packets)
         assert "class Light(Packet):" in code
         # Light.Get -> Light.GetColor
-        assert 'class GetColor(GetPacket["Light.StateColor"]):' in code
+        assert 'class GetColor(CapabilityGetPacket["Light.StateColor"]):' in code
         # Light.State -> Light.StateColor
         assert "class StateColor(Packet):" in code
 

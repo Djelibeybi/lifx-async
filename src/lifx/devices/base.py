@@ -584,7 +584,7 @@ class Device(Generic[StateT]):
         result is returned narrowed to its State packet. Any other request
         needs no check, because ``DeviceConnection.request()`` raises
         LifxUnsupportedCommandError itself when the device answers a Set or a
-        Get every light supports with StateUnhandled.
+        Get every LIFX device supports with StateUnhandled.
 
         Args:
             response: The response from connection.request() for a capability Get
