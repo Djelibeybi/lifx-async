@@ -1704,3 +1704,21 @@ class TestWifiQueriesOnThreadDevices:
         firmware = await device.get_wifi_firmware()
 
         assert firmware.version_major == 3
+
+
+class TestRaiseIfUnhandled:
+    """_raise_if_unhandled() narrows a Get result and passes a Set through."""
+
+    def test_returns_state_packet(self) -> None:
+        state = packets.Device.StateLabel(label="Kitchen")
+
+        assert Device._raise_if_unhandled(state) is state
+
+    def test_raises_on_state_unhandled(self) -> None:
+        with pytest.raises(LifxUnsupportedCommandError, match="packet type 23"):
+            Device._raise_if_unhandled(packets.Device.StateUnhandled(unhandled_type=23))
+
+    @pytest.mark.parametrize("acknowledged", [True, False])
+    def test_set_result_returns_none(self, acknowledged: bool) -> None:
+        """A Set's bool never raises here; the call site reads it itself."""
+        assert Device._raise_if_unhandled(acknowledged) is None

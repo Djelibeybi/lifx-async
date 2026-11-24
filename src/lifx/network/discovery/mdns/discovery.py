@@ -1388,7 +1388,9 @@ async def _verify_mdns_candidate(
         request_timeout = min(device_timeout, remaining)
 
         if issubclass(device_class, Light):
-            request: object = packets.Light.GetColor()
+            request: packets.Light.GetColor | packets.Device.EchoRequest = (
+                packets.Light.GetColor()
+            )
         else:
             request = packets.Device.EchoRequest(payload=_ECHO_LIVENESS_PAYLOAD)
 

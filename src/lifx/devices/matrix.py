@@ -539,10 +539,9 @@ class MatrixLight(PaintTracking, Light):
         """
         _LOGGER.debug("Getting device chain for %s", self.label or self.serial)
 
-        response: packets.Tile.StateDeviceChain = await self.connection.request(
-            packets.Tile.GetDeviceChain()
+        response = self._raise_if_unhandled(
+            await self.connection.request(packets.Tile.GetDeviceChain())
         )
-        self._raise_if_unhandled(response)
 
         # Parse tiles from response
         tiles = []
@@ -672,14 +671,15 @@ class MatrixLight(PaintTracking, Light):
             self.label or self.serial,
         )
 
-        response: packets.Tile.State64 = await self.connection.request(
-            packets.Tile.Get64(
-                tile_index=tile_index,
-                length=length,
-                rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
+        response = self._raise_if_unhandled(
+            await self.connection.request(
+                packets.Tile.Get64(
+                    tile_index=tile_index,
+                    length=length,
+                    rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
+                )
             )
         )
-        self._raise_if_unhandled(response)
 
         max_colors = device_chain[0].width * device_chain[0].height
 
@@ -862,7 +862,7 @@ class MatrixLight(PaintTracking, Light):
                 rect=TileBufferRect(fb_index=0, x=0, y=0, width=device_chain[0].width),
             )
         ):
-            self._raise_if_unhandled(response)
+            response = self._raise_if_unhandled(response)
 
             index = response.tile_index
             if not 0 <= index < expected or index in colors_by_index:
@@ -1245,10 +1245,9 @@ class MatrixLight(PaintTracking, Light):
         """
         _LOGGER.debug("Getting matrix effect for %s", self.label or self.serial)
 
-        response: packets.Tile.StateEffect = await self.connection.request(
-            packets.Tile.GetEffect()
+        response = self._raise_if_unhandled(
+            await self.connection.request(packets.Tile.GetEffect())
         )
-        self._raise_if_unhandled(response)
 
         # Convert protocol effect to MatrixEffect
         palette = [

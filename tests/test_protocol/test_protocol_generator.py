@@ -402,7 +402,8 @@ class TestValidateProtocolSpec:
                         "fields": [
                             {"name": "Value", "type": "<MyField>"},
                         ],
-                    }
+                    },
+                    "DeviceState": {"pkt_type": 3, "fields": []},
                 }
             },
         }
@@ -440,7 +441,7 @@ class TestValidateProtocolSpec:
             "unions": {},
             "packets": {
                 "device": {
-                    "DeviceGet": {
+                    "DeviceSet": {
                         "pkt_type": 1,
                         "fields": [
                             {"name": "Value", "type": "<UnknownField>"},
@@ -901,23 +902,30 @@ class TestGenerateNestedPacketCode:
                     ],
                 },
                 "DeviceSet": {"pkt_type": 3, "fields": []},
+                "DeviceState": {"pkt_type": 4, "fields": []},
             }
         }
 
         code = generate_nested_packet_code(packets)
         assert "class Device(Packet):" in code
-        assert "class Get(Packet):" in code
+        assert 'class Get(GetPacket["Device.State"]):' in code
         assert "PKT_TYPE: ClassVar[int] = 2" in code
-        assert "class Set(Packet):" in code
+        assert "class Set(SetPacket):" in code
+        assert "class State(Packet):" in code
 
     def test_generate_nested_packets_multizone_category(self):
         """Test category name conversion for multi_zone."""
-        packets = {"multi_zone": {"MultiZoneGet": {"pkt_type": 502, "fields": []}}}
+        packets = {
+            "multi_zone": {
+                "MultiZoneGet": {"pkt_type": 502, "fields": []},
+                "MultiZoneState": {"pkt_type": 503, "fields": []},
+            }
+        }
 
         code = generate_nested_packet_code(packets)
         # Should convert multi_zone to MultiZone
         assert "class MultiZone(Packet):" in code
-        assert "class Get(Packet):" in code
+        assert 'class Get(GetPacket["MultiZone.State"]):' in code
 
     def test_generate_nested_packets_light_quirks(self):
         """Test Light category quirks (Get -> GetColor)."""
@@ -931,7 +939,7 @@ class TestGenerateNestedPacketCode:
         code = generate_nested_packet_code(packets)
         assert "class Light(Packet):" in code
         # Light.Get -> Light.GetColor
-        assert "class GetColor(Packet):" in code
+        assert 'class GetColor(GetPacket["Light.StateColor"]):' in code
         # Light.State -> Light.StateColor
         assert "class StateColor(Packet):" in code
 
@@ -944,7 +952,8 @@ class TestGenerateNestedPacketCode:
                     "fields": [
                         {"name": "Value", "type": "<Light>"},
                     ],
-                }
+                },
+                "DeviceState": {"pkt_type": 3, "fields": []},
             }
         }
 
@@ -952,6 +961,161 @@ class TestGenerateNestedPacketCode:
         code = generate_nested_packet_code(packets, type_aliases)
         # Should use aliased type name
         assert "LightField" in code
+
+
+class TestResponseTypeBases:
+    """Request packets carry their response type in a generic base."""
+
+    def test_request_packet_uses_request_base(self):
+        """XxxRequest subclasses RequestPacket parameterized by XxxResponse."""
+        packets = {
+            "device": {
+                "DeviceEchoRequest": {"pkt_type": 58, "fields": []},
+                "DeviceEchoResponse": {"pkt_type": 59, "fields": []},
+            }
+        }
+
+        code = generate_nested_packet_code(packets)
+        assert 'class EchoRequest(RequestPacket["Device.EchoResponse"]):' in code
+        assert "STATE_TYPE: ClassVar[int] = 59" in code
+        assert "class EchoResponse(Packet):" in code
+
+    def test_get_color_zones_resolves_to_both_zone_states(self):
+        """GetColorZones is answered by StateMultiZone or, for one zone, StateZone."""
+        packets = {
+            "multi_zone": {
+                "MultiZoneGetColorZones": {"pkt_type": 502, "fields": []},
+                "MultiZoneStateZone": {"pkt_type": 503, "fields": []},
+                "MultiZoneStateMultiZone": {"pkt_type": 506, "fields": []},
+            }
+        }
+
+        code = generate_nested_packet_code(packets)
+        assert (
+            "class GetColorZones("
+            'GetPacket["MultiZone.StateMultiZone | MultiZone.StateZone"]):'
+        ) in code
+        # The runtime pairing still names the multi-zone reply.
+        assert "STATE_TYPE: ClassVar[int] = 506" in code
+
+    def test_copy_frame_buffer_uses_set_base(self):
+        """CopyFrameBuffer is a SET by quirk, so it takes the Set base."""
+        packets = {"tile": {"TileCopyFrameBuffer": {"pkt_type": 716, "fields": []}}}
+
+        code = generate_nested_packet_code(packets)
+        assert "class CopyFrameBuffer(SetPacket):" in code
+
+    def test_state_label_is_typed_as_decoded_str(self):
+        """unpack() decodes State labels, so they are str; Set labels stay bytes."""
+        packets = {
+            "device": {
+                "DeviceGetLabel": {"pkt_type": 23, "fields": []},
+                "DeviceSetLabel": {
+                    "pkt_type": 24,
+                    "fields": [{"name": "Label", "type": "[32]byte", "size_bytes": 32}],
+                },
+                "DeviceStateLabel": {
+                    "pkt_type": 25,
+                    "fields": [{"name": "Label", "type": "[32]byte", "size_bytes": 32}],
+                },
+            }
+        }
+
+        code = generate_nested_packet_code(packets)
+        set_body, state_body = code.split("class StateLabel(Packet):")
+        assert "label: bytes" in set_body
+        assert "label: str" in state_body
+
+    def test_get_without_response_raises(self):
+        """A Get with no resolvable response cannot be generated."""
+        packets = {"device": {"DeviceGetMissing": {"pkt_type": 2, "fields": []}}}
+
+        with pytest.raises(ValueError, match="GetMissing"):
+            generate_nested_packet_code(packets)
+
+    def test_packets_file_imports_request_bases(self):
+        """The generated packets module imports every request base."""
+        code = generate_packets_file(
+            {
+                "device": {
+                    "DeviceGetPower": {"pkt_type": 20, "fields": []},
+                    "DeviceStatePower": {"pkt_type": 22, "fields": []},
+                }
+            },
+            {},
+        )
+        assert (
+            "from lifx.protocol.base import GetPacket, Packet, RequestPacket, "
+            "SetPacket" in code
+        )
+
+
+class TestValidateResponseTypes:
+    """The validator requires a response for every Get and Request packet."""
+
+    @staticmethod
+    def _protocol(packets: dict) -> dict:
+        return {
+            "enums": {},
+            "fields": {},
+            "compound_fields": {},
+            "unions": {},
+            "packets": packets,
+        }
+
+    def test_get_with_state_passes(self):
+        """A Get whose State exists validates, including the Light rename."""
+        protocol = self._protocol(
+            {
+                "light": {
+                    "LightGet": {"pkt_type": 101, "fields": []},
+                    "LightState": {"pkt_type": 107, "fields": []},
+                    "LightGetPower": {"pkt_type": 116, "fields": []},
+                    "LightStatePower": {"pkt_type": 118, "fields": []},
+                }
+            }
+        )
+
+        assert validate_protocol_spec(protocol) == []
+
+    def test_get_without_response_fails(self):
+        """A Get with no matching State is a validation error."""
+        protocol = self._protocol(
+            {"device": {"DeviceGetMissing": {"pkt_type": 2, "fields": []}}}
+        )
+
+        errors = validate_protocol_spec(protocol)
+        assert errors == [
+            "packets.device.DeviceGetMissing: no response packet Device.StateMissing"
+        ]
+
+    def test_request_without_response_fails(self):
+        """A Request with no matching Response is a validation error."""
+        protocol = self._protocol(
+            {"device": {"DeviceEchoRequest": {"pkt_type": 58, "fields": []}}}
+        )
+
+        errors = validate_protocol_spec(protocol)
+        assert errors == [
+            "packets.device.DeviceEchoRequest: no response packet Device.EchoResponse"
+        ]
+
+    def test_get_color_zones_needs_both_states(self):
+        """Both GetColorZones replies must exist, not only the name-paired one."""
+        protocol = self._protocol(
+            {
+                "multi_zone": {
+                    "MultiZoneGetColorZones": {"pkt_type": 502, "fields": []},
+                    "MultiZoneStateMultiZone": {"pkt_type": 506, "fields": []},
+                }
+            }
+        )
+
+        errors = validate_protocol_spec(protocol)
+        assert errors == [
+            "packets.multi_zone.MultiZoneGetColorZones: no response packet "
+            "MultiZone.StateZone"
+        ]
 
 
 class TestGenerateTypesFile:
@@ -1002,7 +1166,12 @@ class TestGeneratePacketsFile:
 
     def test_generate_packets_file_basic(self):
         """Test generating basic packets file."""
-        packets = {"device": {"DeviceGet": {"pkt_type": 2, "fields": []}}}
+        packets = {
+            "device": {
+                "DeviceGet": {"pkt_type": 2, "fields": []},
+                "DeviceState": {"pkt_type": 3, "fields": []},
+            }
+        }
         fields = {}
 
         code = generate_packets_file(packets, fields)
@@ -1031,8 +1200,8 @@ class TestGeneratePacketsFile:
         """Test packets file handles name collisions."""
         packets = {
             "light": {
-                "LightGet": {
-                    "pkt_type": 101,
+                "LightSetColor": {
+                    "pkt_type": 102,
                     "fields": [{"name": "Target", "type": "<Light>"}],
                 }
             }
@@ -1049,6 +1218,7 @@ class TestGeneratePacketsFile:
             "device": {
                 "DeviceGet": {"pkt_type": 2, "fields": []},
                 "DeviceSet": {"pkt_type": 14, "fields": []},
+                "DeviceState": {"pkt_type": 3, "fields": []},
             }
         }
         fields = {}
@@ -1110,7 +1280,7 @@ class TestValidateProtocolSpecAdvanced:
             "unions": {},
             "packets": {
                 "device": {
-                    "DeviceGet": {
+                    "DeviceSet": {
                         "pkt_type": 2,
                         "fields": [{"name": "Value", "type": "<UnknownType>"}],
                     }

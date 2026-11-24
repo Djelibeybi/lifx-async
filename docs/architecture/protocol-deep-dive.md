@@ -261,7 +261,7 @@ uv run python -m lifx.protocol.generator
 ```python
 from lifx.network.connection import DeviceConnection
 from lifx.protocol import packets
-from lifx.protocol.protocol_types import HSBK
+from lifx.protocol.protocol_types import LightHsbk
 
 async def low_level_control():
     # Create connection
@@ -272,12 +272,11 @@ async def low_level_control():
 
     # Create packet
     packet = packets.Light.SetColor(
-        reserved=0,
-        color=HSBK(hue=32768, saturation=65535, brightness=49151, kelvin=3500),
+        color=LightHsbk(hue=32768, saturation=65535, brightness=49151, kelvin=3500),
         duration=1000
     )
 
-    # Send and receive response
+    # Send and wait for the acknowledgement (a bool for a Set packet)
     response = await conn.request(packet)
 
     print(f"Response: {response}")

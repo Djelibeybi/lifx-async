@@ -128,7 +128,7 @@ from lifx.protocol import packets
 async def main():
     try:
         conn = DeviceConnection(serial="d073d5123456", ip="192.168.1.100")
-        response = await conn.request(packets.Light.Get())
+        response = await conn.request(packets.Light.GetColor())
     except LifxTimeoutError:
         print("Device did not respond in time")
         # Device may be offline or unreachable

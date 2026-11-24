@@ -455,7 +455,8 @@ tests/
 ├── test_color.py           # Color utilities and RGB roundtrip
 ├── test_onboard/           # SoftAP onboarding: machine, bulk, TLS client, verification, guide examples
 ├── test_products/          # Product registry
-└── test_utils.py           # General utilities
+├── test_utils.py           # General utilities
+└── typing/                 # Pyright-only fixtures (in pyright's include, never collected by pytest)
 ```
 
 ## Protocol Specification
@@ -478,6 +479,19 @@ The file structure:
 
 Local generator quirks:
 
+- **typed requests**: each Get subclasses `GetPacket["Category.StateXxx"]`, each Set (and
+  `CopyFrameBuffer`) subclasses `SetPacket`, and `EchoRequest` subclasses
+  `RequestPacket["Device.EchoResponse"]` (all in `protocol/base.py`). The bases are for type
+  checkers only: `DeviceConnection.request()` and `request_stream()` overload on them, so a Get
+  resolves to `StateXxx | Device.StateUnhandled`, a Set to `bool` and Echo to `EchoResponse`. The
+  runtime still uses `STATE_TYPE` and `_packet_kind`. `RESPONSE_QUIRKS` holds pairings that are not
+  name-based: `GetColorZones` resolves to `StateMultiZone | StateZone`, because a one-zone request
+  is answered with `StateZone`. The validator rejects any Get or Request without a response packet,
+  so a new mapping that only works by name fails at generation time.
+  `tests/typing/request_types.py` pins the resolved types through pyright
+- **decoded labels**: `Packet.unpack()` decodes `label` and `*_label` fields to `str`
+  (`is_label_field()` in `protocol/base.py`), so State packets declare them as `str`. Set packets
+  keep `bytes`, which is what callers pass in
 - **field name quirks**: Rename fields to avoid Python built-ins and improve readability:
   - `type` -> `effect_type` (type is a Python built-in; effect_type is more semantic for effect fields)
   - Field mappings preserve protocol names: `MultiZoneEffectSettings.effect_type` maps to protocol field `Type`

@@ -8,7 +8,7 @@ import socket
 import time
 from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 if TYPE_CHECKING:
     from typing import Self
@@ -36,6 +36,7 @@ from lifx.network.address import (
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
+from lifx.protocol.base import GetPacket, Packet, RequestPacket, SetPacket
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device, get_packet_class
@@ -73,6 +74,7 @@ def _endpoint_key(address: SocketAddress) -> _EndpointKey:
 
 # Type variable for packet types
 T = TypeVar("T")
+_ResponseT = TypeVar("_ResponseT", bound=Packet)
 
 # Constants for retry logic
 _STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
@@ -1440,6 +1442,27 @@ class DeviceConnection:
         """Check if connection is open."""
         return self._is_open
 
+    @overload
+    def request_stream(
+        self,
+        packet: GetPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT | Device.StateUnhandled, None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: SetPacket,
+        timeout: float | None = None,
+    ) -> AsyncGenerator[bool, None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: RequestPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT, None]: ...
+
     async def request_stream(
         self,
         packet: Any,
@@ -1469,6 +1492,10 @@ class DeviceConnection:
             Unpacked response packet instances (including StateUnhandled if device
             doesn't support the command)
             For SET packets: yields True (acknowledgement) or False (StateUnhandled)
+
+            The yielded type follows the packet: a Get answered by ``R`` yields
+            ``R | Device.StateUnhandled``, a Set yields ``bool`` and
+            ``Device.EchoRequest`` yields ``Device.EchoResponse``.
 
         Raises:
             LifxTimeoutError: If request times out
@@ -1622,6 +1649,21 @@ class DeviceConnection:
                     f"Packet missing PKT_TYPE: {type(packet).__name__}"
                 )
 
+    @overload
+    async def request(
+        self, packet: GetPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT | Device.StateUnhandled: ...
+
+    @overload
+    async def request(
+        self, packet: SetPacket, timeout: float | None = None
+    ) -> bool: ...
+
+    @overload
+    async def request(
+        self, packet: RequestPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT: ...
+
     async def request(self, packet: Any, timeout: float | None = None) -> Any:
         """Send request and get single response (convenience wrapper).
 
@@ -1641,6 +1683,10 @@ class DeviceConnection:
             doesn't support the command)
             For SET packets: True (acknowledgement) or False (StateUnhandled)
 
+            The return type follows the packet: a Get answered by ``R`` returns
+            ``R | Device.StateUnhandled``, a Set returns ``bool`` and
+            ``Device.EchoRequest`` returns ``Device.EchoResponse``.
+
         Raises:
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
@@ -1648,8 +1694,10 @@ class DeviceConnection:
 
         Example:
             ```python
-            # GET request returns unpacked packet
+            # GET request returns unpacked packet (StateColor | StateUnhandled)
             state = await conn.request(packets.Light.GetColor())
+            if isinstance(state, packets.Device.StateUnhandled):
+                raise LifxUnsupportedCommandError()
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 

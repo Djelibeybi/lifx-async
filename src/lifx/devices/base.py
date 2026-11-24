@@ -13,7 +13,16 @@ from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
 from enum import StrEnum
 from math import floor, log10
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -36,6 +45,7 @@ from lifx.network.address import validate_address, validate_port
 from lifx.network.connection import DeviceConnection
 from lifx.products.registry import ProductInfo, get_product
 from lifx.protocol import packets
+from lifx.protocol.base import Packet
 from lifx.protocol.models import (
     MAC_OFFSET_FIRMWARE_MAJOR,
     MAC_OFFSET_FIRMWARE_MIN_MINOR,
@@ -534,6 +544,9 @@ OptionalT = TypeVar("OptionalT")
 #: Result type of a single scheduled state request.
 _T = TypeVar("_T")
 
+#: State packet a Get resolves to once StateUnhandled is ruled out.
+_StateT = TypeVar("_StateT", bound=Packet)
+
 
 class Device(Generic[StateT]):
     """Base class for LIFX devices.
@@ -570,20 +583,41 @@ class Device(Generic[StateT]):
         ```
     """
 
+    @overload
     @staticmethod
-    def _raise_if_unhandled(response: object) -> None:
+    def _raise_if_unhandled(response: bool) -> None: ...
+
+    @overload
+    @staticmethod
+    def _raise_if_unhandled(
+        response: _StateT | packets.Device.StateUnhandled,
+    ) -> _StateT: ...
+
+    @staticmethod
+    def _raise_if_unhandled(response: object) -> object:
         """Raise LifxUnsupportedCommandError if device doesn't support the command.
+
+        The result of a Get is returned narrowed to its State packet. A Set's
+        ``bool`` result returns None and never raises here, ``False``
+        included: a Set the device answered with StateUnhandled passes
+        silently unless the call site checks ``result`` itself.
 
         Args:
             response: The response from connection.request()
 
+        Returns:
+            The response for a Get, or None for a Set
+
         Raises:
-            LifxUnsupportedCommandError: If response is StateUnhandled or False
+            LifxUnsupportedCommandError: If response is StateUnhandled
         """
         if isinstance(response, packets.Device.StateUnhandled):
             raise LifxUnsupportedCommandError(
                 f"Device does not support packet type {response.unhandled_type}"
             )
+        if isinstance(response, bool):
+            return None
+        return response
 
     def __init__(
         self,
@@ -1274,8 +1308,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks and decodes label
-        state = await self.connection.request(packets.Device.GetLabel())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetLabel())
+        )
 
         # Store label
         label_value = state.label
@@ -1364,8 +1399,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetPower())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetPower())
+        )
 
         # Power level is uint16 (0 or 65535)
         power_level = state.level
@@ -1482,8 +1518,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetVersion())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetVersion())
+        )
 
         version = DeviceVersion(
             vendor=state.vendor,
@@ -1524,8 +1561,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetInfo())  # type: ignore
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetInfo())
+        )
 
         info = DeviceInfo(time=state.time, uptime=state.uptime, downtime=state.downtime)
 
@@ -1579,7 +1617,7 @@ class Device(Generic[StateT]):
         else:
             state = await wifi_request
             host_firmware = self._host_firmware
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(state)
 
         # Extract WiFi info from response
         wifi_info = WifiInfo(signal=state.signal, host_firmware=host_firmware)
@@ -1619,8 +1657,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetHostFirmware())  # type: ignore
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetHostFirmware())
+        )
 
         firmware = FirmwareInfo(
             build=state.build,
@@ -1696,8 +1735,9 @@ class Device(Generic[StateT]):
             FirmwareInfo with build timestamp and version
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetWifiFirmware())  # type: ignore
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetWifiFirmware())
+        )
 
         firmware = FirmwareInfo(
             build=state.build,
@@ -1750,8 +1790,9 @@ class Device(Generic[StateT]):
         """
         self._refuse_on_connectivity(Connectivity.WIFI, "get_thread_info")
 
-        state = await self.connection.request(packets.Thread.GetInfo())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Thread.GetInfo())
+        )
 
         link_health = state.link_health
         thread_info = ThreadInfo(
@@ -1856,8 +1897,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetLocation())  # type: ignore
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetLocation())
+        )
 
         location = CollectionInfo(
             uuid=state.location.hex(),
@@ -1944,8 +1986,8 @@ class Device(Generic[StateT]):
 
                     try:
                         # Get location info using new request() API
-                        state_packet = await temp_conn.request(  # type: ignore
-                            packets.Device.GetLocation()
+                        state_packet = self._raise_if_unhandled(
+                            await temp_conn.request(packets.Device.GetLocation())
                         )
 
                         # Check if this device has the target label
@@ -2052,8 +2094,9 @@ class Device(Generic[StateT]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Device.GetGroup())  # type: ignore
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetGroup())
+        )
 
         group = CollectionInfo(
             uuid=state.group.hex(),
@@ -2140,8 +2183,8 @@ class Device(Generic[StateT]):
 
                     try:
                         # Get group info using new request() API
-                        state_packet = await temp_conn.request(  # type: ignore
-                            packets.Device.GetGroup()
+                        state_packet = self._raise_if_unhandled(
+                            await temp_conn.request(packets.Device.GetGroup())
                         )
 
                         # Check if this device has the target label
@@ -2544,8 +2587,9 @@ class Device(Generic[StateT]):
         Returns:
             WiFi signal strength
         """
-        state = await self.connection.request(packets.Device.GetWifiInfo())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Device.GetWifiInfo())
+        )
         return state.signal
 
     def _schedule_common_requests(

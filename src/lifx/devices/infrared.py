@@ -158,8 +158,9 @@ class InfraredLight(Light):
             ```
         """
         # Request infrared state
-        state = await self.connection.request(packets.Light.GetInfrared())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetInfrared())
+        )
 
         # Convert from uint16 (0-65535) to float (0.0-1.0)
         brightness = state.brightness / 65535.0

@@ -192,8 +192,9 @@ class HevLight(Light):
             ```
         """
         # Request HEV cycle state
-        state = await self.connection.request(packets.Light.GetHevCycle())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetHevCycle())
+        )
 
         # Create state object
         cycle_state = HevCycleState(
@@ -294,8 +295,9 @@ class HevLight(Light):
             ```
         """
         # Request HEV configuration
-        state = await self.connection.request(packets.Light.GetHevCycleConfiguration())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetHevCycleConfiguration())
+        )
 
         # Create config object
         config = HevConfig(
@@ -400,8 +402,9 @@ class HevLight(Light):
             ```
         """
         # Request last HEV result
-        state = await self.connection.request(packets.Light.GetLastHevCycleResult())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetLastHevCycleResult())
+        )
 
         # Store cached state
         result = state.result

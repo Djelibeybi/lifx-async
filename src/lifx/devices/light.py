@@ -7,7 +7,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from lifx.animation.animator import Animator
 from lifx.animation.framebuffer import FrameBuffer
@@ -336,7 +336,7 @@ class Light(Device[LightState]):
         colour = HSBK.from_protocol(state.color)
         power = state.power
         # DeviceConnection decodes protocol labels before returning packets.
-        label = cast(str, state.label)
+        label = state.label
 
         self._label = label
         self._discovery_snapshot = _DiscoveryLightSnapshot(
@@ -383,8 +383,9 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response and decodes labels
-        state = await self.connection.request(packets.Light.GetColor())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetColor())
+        )
 
         color, power, label = self._adopt_state_color(state)
 
@@ -677,8 +678,9 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Light.GetPower())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetPower())
+        )
 
         # Power level is uint16 (0 or 65535)
         _LOGGER.debug(
@@ -719,8 +721,9 @@ class Light(Device[LightState]):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.Sensor.GetAmbientLight())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Sensor.GetAmbientLight())
+        )
 
         _LOGGER.debug(
             {

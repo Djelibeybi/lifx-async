@@ -9,7 +9,7 @@ import logging
 import re
 from dataclasses import asdict, dataclass
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -55,6 +55,15 @@ _ARRAY_PATTERN = re.compile(r"\[(\d+)\](.+)")
 _PASCAL_TO_SNAKE = re.compile(r"(?<!^)(?=[A-Z])")
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def is_label_field(name: str) -> bool:
+    """Return True for a field ``Packet.unpack()`` decodes from bytes to str.
+
+    The protocol generator types these fields as ``str`` on State packets, so
+    the rule lives here once for both.
+    """
+    return name == "label" or name.endswith("_label")
 
 
 def _enum_class(type_name: str) -> type[IntEnum] | None:
@@ -362,7 +371,7 @@ class Packet:
 
         for field_info in fields(packet):
             # Check if this looks like a label field
-            if field_info.name == "label" or field_info.name.endswith("_label"):
+            if is_label_field(field_info.name):
                 value = getattr(packet, field_info.name)
                 if isinstance(value, bytes):
                     # Decode: strip null terminator, decode UTF-8
@@ -396,3 +405,34 @@ class Packet:
 
         # Simple type
         return field_type, None, False
+
+
+_ResponseT_co = TypeVar("_ResponseT_co", bound=Packet, covariant=True)
+
+
+@dataclass
+class GetPacket(Packet, Generic[_ResponseT_co]):
+    """Base class for Get packets, parameterized by the State packet that answers.
+
+    ``DeviceConnection.request()`` resolves a Get answered by ``R`` to
+    ``R | Device.StateUnhandled``, because a device that does not support the
+    request answers with ``StateUnhandled`` instead. The parameter exists only
+    for type checkers; the runtime pairing is ``STATE_TYPE``.
+    """
+
+
+@dataclass
+class SetPacket(Packet):
+    """Base class for Set packets, which a device acknowledges.
+
+    ``DeviceConnection.request()`` resolves a Set to ``bool``: ``True`` on
+    acknowledgement and ``False`` when the device answers ``StateUnhandled``.
+    """
+
+
+@dataclass
+class RequestPacket(Packet, Generic[_ResponseT_co]):
+    """Base class for request packets answered only by ``R`` (the Echo request).
+
+    ``DeviceConnection.request()`` resolves one of these to ``R`` itself.
+    """

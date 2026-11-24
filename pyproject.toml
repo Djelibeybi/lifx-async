@@ -110,6 +110,8 @@ pythonVersion = "3.11"
 # means that default dot-directory exclusion never applies here.
 include = [
     "src",
+    # Static pins for typed request() results; pytest does not collect it.
+    "tests/typing/request_types.py",
     "scripts/generate_theme_data.py",
     ".github/patch_coverage_guard.py",
     ".github/check_patch_coverage.py",

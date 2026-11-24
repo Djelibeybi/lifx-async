@@ -1,10 +1,21 @@
 """Tests for generated protocol types and packets."""
 
 import logging
+import typing
 
 import pytest
 
-from lifx.protocol.packets import PACKET_REGISTRY, Device, Light, Sensor, Thread, Wifi
+from lifx.protocol import packets as packets_module
+from lifx.protocol.base import GetPacket, RequestPacket, SetPacket
+from lifx.protocol.packets import (
+    PACKET_REGISTRY,
+    Device,
+    Light,
+    MultiZone,
+    Sensor,
+    Thread,
+    Wifi,
+)
 from lifx.protocol.protocol_types import (
     DeviceService,
     FirmwareEffect,
@@ -361,3 +372,66 @@ class TestWifiSetAccessPointSecrecy:
         assert "<redacted>" in caplog.text
         assert "home" in caplog.text
         assert packet.password == b"hunter2hunter2".ljust(64, b"\0")
+
+
+def _response_types(packet_class: type) -> tuple[type, ...]:
+    """Resolve the response classes named by a request packet's generic base."""
+    for base in getattr(packet_class, "__orig_bases__", ()):
+        origin = typing.get_origin(base)
+        if origin in (GetPacket, RequestPacket):
+            (argument,) = typing.get_args(base)
+            assert isinstance(argument, typing.ForwardRef)
+            resolved = eval(argument.__forward_arg__, vars(packets_module))  # noqa: S307
+            return typing.get_args(resolved) or (resolved,)
+    return ()
+
+
+class TestGeneratedResponseTypes:
+    """Generated request packets carry their response type in a generic base."""
+
+    @pytest.mark.parametrize(
+        "packet_class",
+        [cls for cls in PACKET_REGISTRY.values() if cls._packet_kind == "GET"],
+        ids=lambda cls: cls.__qualname__,
+    )
+    def test_get_packet_base_names_its_state(self, packet_class: type) -> None:
+        """Every Get subclasses GetPacket with the State that STATE_TYPE names."""
+        assert issubclass(packet_class, GetPacket)
+        response_types = _response_types(packet_class)
+        assert response_types
+        assert response_types[0].PKT_TYPE == packet_class.STATE_TYPE
+
+    @pytest.mark.parametrize(
+        "packet_class",
+        [cls for cls in PACKET_REGISTRY.values() if cls._packet_kind == "SET"],
+        ids=lambda cls: cls.__qualname__,
+    )
+    def test_set_packet_uses_set_base(self, packet_class: type) -> None:
+        """Every Set, CopyFrameBuffer included, subclasses SetPacket."""
+        assert issubclass(packet_class, SetPacket)
+        assert not issubclass(packet_class, GetPacket | RequestPacket)
+
+    def test_get_color_zones_resolves_to_both_zone_states(self) -> None:
+        """A single-zone GetColorZones is answered with StateZone."""
+        assert _response_types(MultiZone.GetColorZones) == (
+            MultiZone.StateMultiZone,
+            MultiZone.StateZone,
+        )
+
+    def test_echo_request_resolves_to_echo_response(self) -> None:
+        assert issubclass(Device.EchoRequest, RequestPacket)
+        assert _response_types(Device.EchoRequest) == (Device.EchoResponse,)
+
+    @pytest.mark.parametrize(
+        "packet_class",
+        [
+            cls
+            for cls in PACKET_REGISTRY.values()
+            if cls._packet_kind == "STATE"
+            or cls in (Device.Acknowledgement, Device.EchoResponse)
+        ],
+        ids=lambda cls: cls.__qualname__,
+    )
+    def test_responses_are_plain_packets(self, packet_class: type) -> None:
+        """Responses cannot be sent through request(), so they take no request base."""
+        assert not issubclass(packet_class, GetPacket | SetPacket | RequestPacket)

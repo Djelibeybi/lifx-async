@@ -334,6 +334,7 @@ No.
 ### How do I access low-level protocol?
 
 ```python
+from lifx.network.connection import DeviceConnection
 from lifx.protocol.packets import Light
 from lifx.protocol.protocol_types import LightHsbk
 
@@ -345,8 +346,14 @@ packet = Light.SetColor(
 
 # Send via connection
 async with DeviceConnection(serial, ip) as conn:
-    reply = await conn.request(packet)
+    acknowledged = await conn.request(packet)  # bool for a Set packet
+    state = await conn.request(Light.GetColor())  # StateColor | StateUnhandled
 ```
+
+`request()` is typed by the packet you send. A Get resolves to its State packet or
+`Device.StateUnhandled`, which a device sends when it does not support the request. A Set
+resolves to `bool`, and `Device.EchoRequest` resolves to `Device.EchoResponse`. Check for
+`StateUnhandled` with `isinstance()` before reading fields.
 
 ### How does connection management work?
 

@@ -16,7 +16,7 @@ a Mini as a plain light.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 from lifx.const import (
     UNKNOWN_RANGE_MAX_KELVIN,
@@ -31,6 +31,7 @@ from lifx.products.registry import (
     get_registry,
 )
 from lifx.protocol import packets
+from lifx.protocol.base import GetPacket, Packet
 
 if TYPE_CHECKING:
     from lifx.network.connection import DeviceConnection
@@ -40,6 +41,9 @@ if TYPE_CHECKING:
 #: devices that stay silent instead.
 PROBE_TIMEOUT: float = 2.0
 
+#: State packet a probe expects in answer.
+_StateT = TypeVar("_StateT", bound=Packet)
+
 
 def is_known_product(product_id: int) -> bool:
     """Return True if the product registry lists ``product_id``."""
@@ -47,7 +51,9 @@ def is_known_product(product_id: int) -> bool:
 
 
 async def _answered(
-    connection: DeviceConnection, packet: Any, state_type: type
+    connection: DeviceConnection,
+    packet: GetPacket[_StateT],
+    state_type: type[_StateT],
 ) -> bool:
     """Send a probe and report whether the device answered it with its state."""
     try:
