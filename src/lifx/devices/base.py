@@ -598,9 +598,10 @@ class Device(Generic[StateT]):
         """Raise LifxUnsupportedCommandError if device doesn't support the command.
 
         The result of a Get is returned narrowed to its State packet. A Set's
-        ``bool`` result returns None and never raises here, ``False``
-        included: a Set the device answered with StateUnhandled passes
-        silently unless the call site checks ``result`` itself.
+        ``bool`` result returns None without raising here, ``False`` included.
+        A real unsupported Set never reaches this helper as ``False``:
+        ``DeviceConnection`` raises LifxUnsupportedCommandError when the
+        device answers a Set with StateUnhandled.
 
         Args:
             response: The response from connection.request()

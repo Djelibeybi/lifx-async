@@ -1491,13 +1491,14 @@ class DeviceConnection:
         Yields:
             Unpacked response packet instances (including StateUnhandled if device
             doesn't support the command)
-            For SET packets: yields True (acknowledgement) or False (StateUnhandled)
+            For SET packets: yields True once the device acknowledges
 
             The yielded type follows the packet: a Get answered by ``R`` yields
             ``R | Device.StateUnhandled``, a Set yields ``bool`` and
             ``Device.EchoRequest`` yields ``Device.EchoResponse``.
 
         Raises:
+            LifxUnsupportedCommandError: If a SET is answered with StateUnhandled
             LifxTimeoutError: If request times out
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1510,16 +1511,11 @@ class DeviceConnection:
                 label = state.label  # Already decoded to string
                 break
 
-            # SET request yields True (acknowledgement) or False (StateUnhandled)
+            # SET request yields True on acknowledgement; an unsupported SET
+            # raises LifxUnsupportedCommandError instead
             async for result in conn.request_stream(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             ):
-                if result:
-                    # Acknowledgement received
-                    pass
-                else:
-                    # Device doesn't support this command
-                    pass
                 break
 
             # Multi-response GET - stream all responses
@@ -1681,13 +1677,14 @@ class DeviceConnection:
         Returns:
             Single unpacked response packet (including StateUnhandled if device
             doesn't support the command)
-            For SET packets: True (acknowledgement) or False (StateUnhandled)
+            For SET packets: True once the device acknowledges
 
             The return type follows the packet: a Get answered by ``R`` returns
             ``R | Device.StateUnhandled``, a Set returns ``bool`` and
             ``Device.EchoRequest`` returns ``Device.EchoResponse``.
 
         Raises:
+            LifxUnsupportedCommandError: If a SET is answered with StateUnhandled
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1701,13 +1698,11 @@ class DeviceConnection:
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 
-            # SET request returns True or False
-            success = await conn.request(
+            # SET request returns True on acknowledgement; an unsupported SET
+            # raises LifxUnsupportedCommandError instead
+            acknowledged = await conn.request(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             )
-            if not success:
-                # Device doesn't support this command (returned StateUnhandled)
-                pass
             ```
         """
         async for response in self.request_stream(packet, timeout):

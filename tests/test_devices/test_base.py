@@ -1720,5 +1720,5 @@ class TestRaiseIfUnhandled:
 
     @pytest.mark.parametrize("acknowledged", [True, False])
     def test_set_result_returns_none(self, acknowledged: bool) -> None:
-        """A Set's bool never raises here; the call site reads it itself."""
+        """A Set's bool returns None; DeviceConnection already raised if unsupported."""
         assert Device._raise_if_unhandled(acknowledged) is None
