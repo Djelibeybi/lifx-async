@@ -98,3 +98,49 @@ class TestPacketUnpackLogsNonSensitiveValues:
 
         assert "kitchen" in caplog.text
         assert "<redacted>" not in caplog.text
+
+
+class TestLabelFieldPacking:
+    """State packets type labels as ``str``, so ``pack()`` must accept one."""
+
+    def test_state_label_str_round_trips(self) -> None:
+        packed = packets.Device.StateLabel(label="Kitchen").pack()
+
+        assert packed == b"Kitchen".ljust(32, b"\x00")
+        assert packets.Device.StateLabel.unpack(packed).label == "Kitchen"
+
+    def test_state_group_str_round_trips(self) -> None:
+        group = bytes(range(16))
+        packed = packets.Device.StateGroup(
+            group=group, label="Upstairs", updated_at=42
+        ).pack()
+
+        unpacked = packets.Device.StateGroup.unpack(packed)
+        assert unpacked.group == group
+        assert unpacked.label == "Upstairs"
+        assert unpacked.updated_at == 42
+
+    def test_state_color_str_round_trips(self) -> None:
+        color = packets.Light.StateColor.unpack(bytes(52))
+        color.label = "Desk"
+
+        assert packets.Light.StateColor.unpack(color.pack()).label == "Desk"
+
+    def test_set_label_still_accepts_bytes(self) -> None:
+        packed = packets.Device.SetLabel(label=b"Hall").pack()
+
+        assert packed == b"Hall".ljust(32, b"\x00")
+
+    def test_str_label_is_encoded_as_utf8(self) -> None:
+        packed = packets.Device.StateLabel(label="Café").pack()
+
+        assert packed[:5] == "Café".encode()
+
+    def test_overlong_str_label_truncates_on_a_character_boundary(self) -> None:
+        # 31 ASCII bytes then a 2-byte character: a byte cut at 32 would
+        # split the character and the label could no longer be decoded.
+        label = "a" * 31 + "é"
+        packed = packets.Device.StateLabel(label=label).pack()
+
+        assert len(packed) == 32
+        assert packets.Device.StateLabel.unpack(packed).label == "a" * 31

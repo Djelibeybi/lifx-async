@@ -66,6 +66,18 @@ def is_label_field(name: str) -> bool:
     return name == "label" or name.endswith("_label")
 
 
+def _encode_label(label: str, size_bytes: int) -> bytes:
+    """Encode a decoded label back to UTF-8 for a ``size_bytes`` field.
+
+    An overlong label is cut at the last whole character that fits, so the
+    packed bytes still decode the way ``Packet.unpack()`` reads them.
+    """
+    encoded = label.encode("utf-8")
+    if len(encoded) <= size_bytes:
+        return encoded
+    return encoded[:size_bytes].decode("utf-8", errors="ignore").encode("utf-8")
+
+
 def _enum_class(type_name: str) -> type[IntEnum] | None:
     """Return the generated IntEnum named ``type_name``, or None for a struct.
 
@@ -274,7 +286,10 @@ class Packet:
                     result += item.pack()
                 return result
             elif base_type in ("uint8", "byte"):
-                # Byte array
+                # Byte array. State packets type their labels as str, the
+                # type unpack() decodes them to, so encode one back here.
+                if isinstance(value, str):
+                    value = _encode_label(value, size_bytes)
                 return serializer.pack_bytes(value, size_bytes)
             else:
                 # Array of primitives
