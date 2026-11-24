@@ -259,7 +259,7 @@ RESPONSE_QUIRKS: dict[tuple[str, str], tuple[str, ...]] = {
 }
 
 
-# Gets only some LIFX devices support: a device without the capability answers
+# Gets for a capability some LIFX devices lack: a device without it answers
 # StateUnhandled. These subclass CapabilityGetPacket, so their result is typed
 # R | Device.StateUnhandled. Every other Get subclasses GetPacket and resolves
 # to R, and DeviceConnection raises if one is answered StateUnhandled anyway.

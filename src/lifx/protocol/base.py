@@ -412,23 +412,23 @@ _ResponseT_co = TypeVar("_ResponseT_co", bound=Packet, covariant=True)
 
 @dataclass
 class GetPacket(Packet, Generic[_ResponseT_co]):
-    """Base class for Get packets every LIFX device supports.
+    """Base class for Get packets whose StateUnhandled reply raises.
 
     ``DeviceConnection.request()`` resolves a Get answered by ``R`` to ``R``,
     and raises ``LifxUnsupportedCommandError`` if the device answers
-    ``StateUnhandled`` anyway. The parameter exists only for type checkers;
+    ``StateUnhandled`` instead. The parameter exists only for type checkers;
     the runtime pairing is ``STATE_TYPE``.
     """
 
 
 @dataclass
 class CapabilityGetPacket(Packet, Generic[_ResponseT_co]):
-    """Base class for Get packets only some LIFX devices support.
+    """Base class for Get packets whose StateUnhandled reply reaches the caller.
 
     ``DeviceConnection.request()`` resolves a Get answered by ``R`` to
     ``R | Device.StateUnhandled``, because a device without the capability
-    answers with ``StateUnhandled``. The protocol generator's
-    ``CAPABILITY_GETS`` lists these packets.
+    answers with ``StateUnhandled`` and the caller decides what that means.
+    The protocol generator's ``CAPABILITY_GETS`` lists these packets.
     """
 
 

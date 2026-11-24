@@ -999,7 +999,7 @@ class TestResponseTypeBases:
         assert "STATE_TYPE: ClassVar[int] = 506" in code
 
     def test_universal_get_uses_get_base(self):
-        """A Get every light supports subclasses GetPacket."""
+        """A Get outside CAPABILITY_GETS subclasses GetPacket."""
         packets = {
             "device": {
                 "DeviceGetLabel": {"pkt_type": 23, "fields": []},

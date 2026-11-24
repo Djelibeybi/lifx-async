@@ -351,13 +351,13 @@ async with DeviceConnection(serial, ip) as conn:
     power = await conn.request(Light.GetPower())  # StatePower
 ```
 
-`request()` is typed by the packet you send. A Get that every LIFX device supports, such as
-`Light.GetPower` or `Device.GetLabel`, resolves to its State packet. A Get for a capability only
-some devices have, such as color, infrared, HEV, multizone or matrix, resolves to its State packet
-or `Device.StateUnhandled`, which a device without the capability sends instead. A LIFX Switch,
-for example, answers `GetColor` with `StateUnhandled`. Check for
-`StateUnhandled` with `isinstance()` before reading its fields. A Set resolves to `True` once the
-device acknowledges it. A Set, or a Get every device supports, raises `LifxUnsupportedCommandError`
+`request()` is typed by the packet you send. Most Gets, such as `Light.GetPower` or
+`Device.GetLabel`, resolve to their State packet, and raise `LifxUnsupportedCommandError` if the
+device answers with `StateUnhandled`. A Get for a capability some devices lack, such as color,
+infrared, HEV, multizone or matrix, resolves to its State packet or `Device.StateUnhandled`, which
+a device without the capability sends instead. A LIFX Switch, for example, answers `GetColor` with
+`StateUnhandled`. Check for `StateUnhandled` with `isinstance()` before reading its fields. A Set
+resolves to `True` once the device acknowledges it, and also raises `LifxUnsupportedCommandError`
 if the device answers with `StateUnhandled`. `Device.EchoRequest` resolves to
 `Device.EchoResponse`.
 

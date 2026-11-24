@@ -1569,7 +1569,7 @@ class DeviceConnection:
                 response_packet = packet_class.unpack(payload)
 
                 # Only a CapabilityGetPacket is typed to resolve to
-                # StateUnhandled; every LIFX device supports any other Get.
+                # StateUnhandled; any other Get raises on it instead.
                 if isinstance(
                     response_packet, Device.StateUnhandled
                 ) and not isinstance(packet, CapabilityGetPacket):

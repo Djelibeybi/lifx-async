@@ -1172,7 +1172,7 @@ class TestStateUnhandledResponses:
 
     @pytest.mark.emulator
     async def test_universal_get_raises_for_switch(self, switch_device) -> None:
-        """A Get every light supports raises when answered StateUnhandled.
+        """A plain GetPacket raises when answered StateUnhandled.
 
         Light.GetPower is typed to resolve to StatePower alone, so the
         connection raises LifxUnsupportedCommandError instead of returning
