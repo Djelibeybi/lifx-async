@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v8.1.0 (2026-11-24)
+
+### Documentation
+
+- **network**: State that an unsupported Set raises
+  ([`b100a25`](https://github.com/Djelibeybi/lifx-async/commit/b100a255f3ee85b8a629dd742a63d6f9a23aff29))
+
+- **protocol**: Describe Get bases by their StateUnhandled contract
+  ([`a4e45f5`](https://github.com/Djelibeybi/lifx-async/commit/a4e45f54742bce4221a275f0dfe599bdf9d7f32e))
+
+- **protocol**: State that an unsupported Set raises in SetPacket
+  ([`566e99b`](https://github.com/Djelibeybi/lifx-async/commit/566e99be1ef8d3bb226720d66f5fc9dcec7b0bdb))
+
+### Features
+
+- **network**: Type request() and request_stream() by request packet
+  ([`cb34ef7`](https://github.com/Djelibeybi/lifx-async/commit/cb34ef7c09a13ae0f07a70ea1385dd5248bbfa5f))
+
+
 ## v8.0.3 (2026-11-23)
 
 ### Bug Fixes
