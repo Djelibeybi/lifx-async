@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v8.1.1 (2026-11-24)
+
+### Bug Fixes
+
+- **protocol**: Pack str label fields on State packets
+  ([`0b24b70`](https://github.com/Djelibeybi/lifx-async/commit/0b24b702ce3496c77c415f3bcb390d91062baa97))
+
+
 ## v8.1.0 (2026-11-24)
 
 ### Documentation
