@@ -29,6 +29,8 @@ repos:
   - id: debug-statements
   - id: name-tests-test
     args: [--pytest-test-first]
+    # Pyright-only typing fixtures, deliberately never collected by pytest.
+    exclude: ^tests/typing/
 
   # Conventional commit message with commitizen
 - repo: https://github.com/commitizen-tools/commitizen

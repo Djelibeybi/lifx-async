@@ -8,7 +8,7 @@ import socket
 import time
 from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 
 if TYPE_CHECKING:
     from typing import Self
@@ -36,6 +36,13 @@ from lifx.network.address import (
 from lifx.network.message import create_message, parse_message
 from lifx.network.transport import PeerInfo, UdpTransport
 from lifx.network.utils import allocate_source
+from lifx.protocol.base import (
+    CapabilityGetPacket,
+    GetPacket,
+    Packet,
+    RequestPacket,
+    SetPacket,
+)
 from lifx.protocol.header import LifxHeader
 from lifx.protocol.models import Serial
 from lifx.protocol.packets import Device, get_packet_class
@@ -73,6 +80,7 @@ def _endpoint_key(address: SocketAddress) -> _EndpointKey:
 
 # Type variable for packet types
 T = TypeVar("T")
+_ResponseT = TypeVar("_ResponseT", bound=Packet)
 
 # Constants for retry logic
 _STATE_UNHANDLED_PKT_TYPE: int = 223  # Device.StateUnhandled packet type
@@ -1388,7 +1396,7 @@ class DeviceConnection:
         request: Any,
         timeout: float | None = None,
         max_retries: int | None = None,
-    ) -> AsyncGenerator[bool, None]:
+    ) -> AsyncGenerator[Literal[True], None]:
         """Internal implementation of request_ack_stream with retry logic.
 
         Thin wrapper around ``_transmit_and_listen`` for SET-style requests:
@@ -1440,6 +1448,34 @@ class DeviceConnection:
         """Check if connection is open."""
         return self._is_open
 
+    @overload
+    def request_stream(
+        self,
+        packet: CapabilityGetPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT | Device.StateUnhandled, None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: GetPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT, None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: SetPacket,
+        timeout: float | None = None,
+    ) -> AsyncGenerator[Literal[True], None]: ...
+
+    @overload
+    def request_stream(
+        self,
+        packet: RequestPacket[_ResponseT],
+        timeout: float | None = None,
+    ) -> AsyncGenerator[_ResponseT, None]: ...
+
     async def request_stream(
         self,
         packet: Any,
@@ -1466,11 +1502,18 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Yields:
-            Unpacked response packet instances (including StateUnhandled if device
-            doesn't support the command)
-            For SET packets: yields True (acknowledgement) or False (StateUnhandled)
+            Unpacked response packet instances (including StateUnhandled if the
+            device lacks the capability a CapabilityGetPacket asks about)
+            For SET packets: yields True once the device acknowledges
+
+            The yielded type follows the packet: a Get answered by ``R`` yields
+            ``R``, a capability Get yields ``R | Device.StateUnhandled``, a Set
+            yields ``Literal[True]`` and
+            ``Device.EchoRequest`` yields ``Device.EchoResponse``.
 
         Raises:
+            LifxUnsupportedCommandError: If the device answers a SET packet,
+                or a Get other than a CapabilityGetPacket, with StateUnhandled
             LifxTimeoutError: If request times out
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1483,16 +1526,11 @@ class DeviceConnection:
                 label = state.label  # Already decoded to string
                 break
 
-            # SET request yields True (acknowledgement) or False (StateUnhandled)
-            async for result in conn.request_stream(
+            # SET request yields True once acknowledged, and raises
+            # LifxUnsupportedCommandError if the device returns StateUnhandled
+            async for _ack in conn.request_stream(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             ):
-                if result:
-                    # Acknowledgement received
-                    pass
-                else:
-                    # Device doesn't support this command
-                    pass
                 break
 
             # Multi-response GET - stream all responses
@@ -1529,6 +1567,16 @@ class DeviceConnection:
 
                 # Unpack (labels are automatically decoded by Packet.unpack())
                 response_packet = packet_class.unpack(payload)
+
+                # Only a CapabilityGetPacket is typed to resolve to
+                # StateUnhandled; any other Get raises on it instead.
+                if isinstance(
+                    response_packet, Device.StateUnhandled
+                ) and not isinstance(packet, CapabilityGetPacket):
+                    raise LifxUnsupportedCommandError(
+                        f"Device does not support {type(packet).__name__} "
+                        f"(packet type {response_packet.unhandled_type})"
+                    )
 
                 # Log the request/reply cycle (as_dict is costly — skip
                 # building it unless DEBUG logging is enabled)
@@ -1568,9 +1616,7 @@ class DeviceConnection:
                                 "values": packet.as_dict,
                             },
                             "reply": {
-                                "packet": "Acknowledgement"
-                                if ack_result
-                                else "StateUnhandled",
+                                "packet": "Acknowledgement",
                                 "values": {},
                             },
                             "serial": self.serial,
@@ -1622,6 +1668,26 @@ class DeviceConnection:
                     f"Packet missing PKT_TYPE: {type(packet).__name__}"
                 )
 
+    @overload
+    async def request(
+        self, packet: CapabilityGetPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT | Device.StateUnhandled: ...
+
+    @overload
+    async def request(
+        self, packet: GetPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT: ...
+
+    @overload
+    async def request(
+        self, packet: SetPacket, timeout: float | None = None
+    ) -> Literal[True]: ...
+
+    @overload
+    async def request(
+        self, packet: RequestPacket[_ResponseT], timeout: float | None = None
+    ) -> _ResponseT: ...
+
     async def request(self, packet: Any, timeout: float | None = None) -> Any:
         """Send request and get single response (convenience wrapper).
 
@@ -1637,29 +1703,38 @@ class DeviceConnection:
             timeout: Request timeout in seconds
 
         Returns:
-            Single unpacked response packet (including StateUnhandled if device
-            doesn't support the command)
-            For SET packets: True (acknowledgement) or False (StateUnhandled)
+            Single unpacked response packet (including StateUnhandled if the
+            device lacks the capability a CapabilityGetPacket asks about)
+            For SET packets: True once the device acknowledges
+
+            The return type follows the packet: a Get answered by ``R`` returns
+            ``R``, a capability Get returns ``R | Device.StateUnhandled``, a Set
+            returns ``Literal[True]`` and
+            ``Device.EchoRequest`` returns ``Device.EchoResponse``.
 
         Raises:
+            LifxUnsupportedCommandError: If the device answers a SET packet,
+                or a Get other than a CapabilityGetPacket, with StateUnhandled
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
 
         Example:
             ```python
-            # GET request returns unpacked packet
+            # A capability GET returns StateColor | StateUnhandled, because a
+            # device without color (a LIFX Switch) answers StateUnhandled
             state = await conn.request(packets.Light.GetColor())
+            if isinstance(state, packets.Device.StateUnhandled):
+                raise LifxUnsupportedCommandError()
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 
-            # SET request returns True or False
-            success = await conn.request(
-                packets.Light.SetColor(color=hsbk, duration=1000)
-            )
-            if not success:
-                # Device doesn't support this command (returned StateUnhandled)
-                pass
+            # Any other GET returns its State packet
+            power = await conn.request(packets.Light.GetPower())
+
+            # SET request returns True once acknowledged, and raises
+            # LifxUnsupportedCommandError if the device returns StateUnhandled
+            await conn.request(packets.Light.SetColor(color=hsbk, duration=1000))
             ```
         """
         async for response in self.request_stream(packet, timeout):

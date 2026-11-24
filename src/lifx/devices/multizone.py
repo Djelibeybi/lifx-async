@@ -465,10 +465,11 @@ class MultiZoneLight(PaintTracking, Light):
         # The legacy one-zone request is supported by extended multizone devices
         # too and avoids transferring an entire 82-colour extended response when
         # only the count is needed.
-        state = await self.connection.request(
-            packets.MultiZone.GetColorZones(start_index=0, end_index=0)
+        state = self._raise_if_unhandled(
+            await self.connection.request(
+                packets.MultiZone.GetColorZones(start_index=0, end_index=0)
+            )
         )
-        self._raise_if_unhandled(state)
 
         count = state.count
         self._store_zone_count(count)
@@ -550,7 +551,7 @@ class MultiZoneLight(PaintTracking, Light):
                     start_index=current_start, end_index=current_end
                 )
             ):
-                self._raise_if_unhandled(state)
+                state = self._raise_if_unhandled(state)
                 zone_count = state.count
                 self._store_zone_count(zone_count)
                 end = min(zone_count - 1, end)
@@ -653,7 +654,7 @@ class MultiZoneLight(PaintTracking, Light):
             packets.MultiZone.GetExtendedColorZones()
         ):
             response_received = True
-            self._raise_if_unhandled(packet)
+            packet = self._raise_if_unhandled(packet)
             zone_count = packet.count
             self._store_zone_count(zone_count)
             # Only process valid colors based on colors_count
@@ -799,7 +800,7 @@ class MultiZoneLight(PaintTracking, Light):
         duration_ms = int(duration * 1000)
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.MultiZone.SetColorZones(
                 start_index=start,
                 end_index=end,
@@ -808,7 +809,6 @@ class MultiZoneLight(PaintTracking, Light):
                 apply=apply,
             ),
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
 
         _LOGGER.debug(
@@ -916,8 +916,7 @@ class MultiZoneLight(PaintTracking, Light):
             )
         else:
             # Standard: wait for response and check for errors
-            result = await self.connection.request(packet)
-            self._raise_if_unhandled(result)
+            await self.connection.request(packet)
         self._zones_changed()
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
@@ -973,8 +972,9 @@ class MultiZoneLight(PaintTracking, Light):
             ```
         """
         # Request automatically unpacks response
-        state = await self.connection.request(packets.MultiZone.GetEffect())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.MultiZone.GetEffect())
+        )
 
         settings = state.settings
         effect_type = settings.effect_type
@@ -1063,7 +1063,7 @@ class MultiZoneLight(PaintTracking, Light):
         parameters = parameters[:8]
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.MultiZone.SetEffect(
                 settings=MultiZoneEffectSettings(
                     instanceid=0,  # 0 for new effect
@@ -1083,7 +1083,6 @@ class MultiZoneLight(PaintTracking, Light):
                 ),
             ),
         )
-        self._raise_if_unhandled(result)
 
         self._zones_changed()
 

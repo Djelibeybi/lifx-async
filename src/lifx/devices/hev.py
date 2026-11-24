@@ -192,8 +192,9 @@ class HevLight(Light):
             ```
         """
         # Request HEV cycle state
-        state = await self.connection.request(packets.Light.GetHevCycle())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetHevCycle())
+        )
 
         # Create state object
         cycle_state = HevCycleState(
@@ -252,13 +253,12 @@ class HevLight(Light):
             raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetHevCycle(
                 enable=enable,
                 duration_s=duration_seconds,
             ),
         )
-        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -294,8 +294,9 @@ class HevLight(Light):
             ```
         """
         # Request HEV configuration
-        state = await self.connection.request(packets.Light.GetHevCycleConfiguration())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetHevCycleConfiguration())
+        )
 
         # Create config object
         config = HevConfig(
@@ -348,13 +349,12 @@ class HevLight(Light):
             raise ValueError(f"Duration must be non-negative, got {duration_seconds}")
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetHevCycleConfiguration(
                 indication=indication,
                 duration_s=duration_seconds,
             ),
         )
-        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -366,11 +366,10 @@ class HevLight(Light):
         )
 
         # Update cache and state on acknowledgement
-        if result:
-            hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
-            self._hev_config = hev_config
-            if self._state is not None:
-                self._state.hev_config = hev_config
+        hev_config = HevConfig(indication=indication, duration_s=duration_seconds)
+        self._hev_config = hev_config
+        if self._state is not None:
+            self._state.hev_config = hev_config
 
         # Schedule refresh to validate state
         if self._state is not None:
@@ -400,8 +399,9 @@ class HevLight(Light):
             ```
         """
         # Request last HEV result
-        state = await self.connection.request(packets.Light.GetLastHevCycleResult())
-        self._raise_if_unhandled(state)
+        state = self._raise_if_unhandled(
+            await self.connection.request(packets.Light.GetLastHevCycleResult())
+        )
 
         # Store cached state
         result = state.result

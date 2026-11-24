@@ -539,10 +539,9 @@ class MatrixLight(PaintTracking, Light):
         """
         _LOGGER.debug("Getting device chain for %s", self.label or self.serial)
 
-        response: packets.Tile.StateDeviceChain = await self.connection.request(
-            packets.Tile.GetDeviceChain()
+        response = self._raise_if_unhandled(
+            await self.connection.request(packets.Tile.GetDeviceChain())
         )
-        self._raise_if_unhandled(response)
 
         # Parse tiles from response
         tiles = []
@@ -601,14 +600,13 @@ class MatrixLight(PaintTracking, Light):
             self.label or self.serial,
         )
 
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Tile.SetUserPosition(
                 tile_index=tile_index,
                 user_x=user_x,
                 user_y=user_y,
             )
         )
-        self._raise_if_unhandled(result)
 
     async def get64(
         self,
@@ -672,14 +670,15 @@ class MatrixLight(PaintTracking, Light):
             self.label or self.serial,
         )
 
-        response: packets.Tile.State64 = await self.connection.request(
-            packets.Tile.Get64(
-                tile_index=tile_index,
-                length=length,
-                rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
+        response = self._raise_if_unhandled(
+            await self.connection.request(
+                packets.Tile.Get64(
+                    tile_index=tile_index,
+                    length=length,
+                    rect=TileBufferRect(fb_index=0, x=x, y=y, width=width),
+                )
             )
         )
-        self._raise_if_unhandled(response)
 
         max_colors = device_chain[0].width * device_chain[0].height
 
@@ -862,7 +861,7 @@ class MatrixLight(PaintTracking, Light):
                 rect=TileBufferRect(fb_index=0, x=0, y=0, width=device_chain[0].width),
             )
         ):
-            self._raise_if_unhandled(response)
+            response = self._raise_if_unhandled(response)
 
             index = response.tile_index
             if not 0 <= index < expected or index in colors_by_index:
@@ -1005,7 +1004,7 @@ class MatrixLight(PaintTracking, Light):
         # Acknowledged, so a dropped write is retransmitted and the next write
         # stays off the wire until the device has taken this one: a Ceiling
         # drops a second Set64 that arrives about a millisecond after the first.
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Tile.Set64(
                 tile_index=tile_index,
                 length=length,
@@ -1014,7 +1013,6 @@ class MatrixLight(PaintTracking, Light):
                 colors=proto_colors,
             )
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
 
     async def copy_frame_buffer(
@@ -1095,7 +1093,7 @@ class MatrixLight(PaintTracking, Light):
         tile = self._device_chain[tile_index]
         duration_ms = round(duration * 1000 if duration else 0)
 
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Tile.CopyFrameBuffer(
                 tile_index=tile_index,
                 length=length,
@@ -1110,7 +1108,6 @@ class MatrixLight(PaintTracking, Light):
                 duration=duration_ms,
             )
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
 
     async def set_matrix_colors(
@@ -1245,10 +1242,9 @@ class MatrixLight(PaintTracking, Light):
         """
         _LOGGER.debug("Getting matrix effect for %s", self.label or self.serial)
 
-        response: packets.Tile.StateEffect = await self.connection.request(
-            packets.Tile.GetEffect()
+        response = self._raise_if_unhandled(
+            await self.connection.request(packets.Tile.GetEffect())
         )
-        self._raise_if_unhandled(response)
 
         # Convert protocol effect to MatrixEffect
         palette = [
@@ -1609,10 +1605,7 @@ class MatrixLight(PaintTracking, Light):
             palette=proto_palette,
         )
 
-        result = await self.connection.request(
-            packets.Tile.SetEffect(settings=settings)
-        )
-        self._raise_if_unhandled(result)
+        await self.connection.request(packets.Tile.SetEffect(settings=settings))
         self._tile_effect = effect
         self._zones_changed()
 

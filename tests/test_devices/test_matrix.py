@@ -1630,8 +1630,8 @@ class TestAckedTileWrites:
         self, matrix_light: MatrixLight
     ) -> None:
         """Test a StateUnhandled reply to Set64 surfaces as unsupported."""
-        matrix_light.connection.request.return_value = packets.Device.StateUnhandled(
-            unhandled_type=packets.Tile.Set64.PKT_TYPE
+        matrix_light.connection.request.side_effect = LifxUnsupportedCommandError(
+            "Device does not support this command"
         )
 
         with pytest.raises(LifxUnsupportedCommandError):

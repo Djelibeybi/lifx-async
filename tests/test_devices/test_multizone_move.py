@@ -33,7 +33,6 @@ from lifx.exceptions import (
     LifxTimeoutError,
     LifxUnsupportedCommandError,
 )
-from lifx.protocol import packets
 from lifx.protocol.protocol_types import Direction, FirmwareEffect
 from lifx.theme.generators import MultiZoneGenerator
 from lifx.theme.theme import Theme
@@ -834,8 +833,8 @@ class TestSetMoveEffectErrors:
             return_value=[HSBK(0, 1.0, 1.0, 3500), HSBK(120, 1.0, 1.0, 3500)]
         )
         if outcome == "state_unhandled":
-            multizone_light.connection.request.return_value = (
-                packets.Device.StateUnhandled(unhandled_type=508)
+            multizone_light.connection.request.side_effect = (
+                LifxUnsupportedCommandError("Device does not support this command")
             )
         elif outcome == "timeout":
             multizone_light.connection.request.side_effect = LifxTimeoutError(

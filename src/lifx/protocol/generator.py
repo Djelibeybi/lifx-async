@@ -20,6 +20,7 @@ import yaml
 
 from lifx._upstream import UpstreamCommit, fetch_upstream_commit
 from lifx.const import PROTOCOL_URL
+from lifx.protocol.base import is_label_field
 
 
 def format_generated_files(*paths: Path) -> None:
@@ -224,6 +225,107 @@ def apply_extended_multizone_packet_quirks(
         elif packet_name == "ExtendedStateMultiZone":
             return "StateExtendedColorZones"
     return packet_name
+
+
+def category_class_name(category: str) -> str:
+    """Convert a protocol category to its class name (``multi_zone`` -> ``MultiZone``)."""
+    return "".join(part.capitalize() for part in category.split("_"))
+
+
+def short_packet_name(packet_name: str, category_class: str) -> str:
+    """Return the nested class name of a packet within its category class.
+
+    Strips the category prefix (``DeviceGetLabel`` -> ``GetLabel``) and applies
+    the Light and extended multizone renames.
+    """
+    short_name = packet_name
+    if packet_name.lower().startswith(category_class.lower()):
+        short_name = packet_name[len(category_class) :]
+    # Quirk: Rename Light.Get/State to Light.GetColor/StateColor for clarity
+    # (Set and SetColor are different packets)
+    if category_class == "Light":
+        if short_name == "Get":
+            short_name = "GetColor"
+        elif short_name == "State":
+            short_name = "StateColor"
+    return apply_extended_multizone_packet_quirks(short_name, category_class)
+
+
+# Requests whose replies do not follow the GetXxx -> StateXxx naming. The first
+# name is the reply recorded as STATE_TYPE.
+RESPONSE_QUIRKS: dict[tuple[str, str], tuple[str, ...]] = {
+    # A request covering one zone is answered with StateZone, not StateMultiZone.
+    ("MultiZone", "GetColorZones"): ("StateMultiZone", "StateZone"),
+}
+
+
+# Gets for a capability some LIFX devices lack: a device without it answers
+# StateUnhandled. These subclass CapabilityGetPacket, so their result is typed
+# R | Device.StateUnhandled. Every other Get subclasses GetPacket and resolves
+# to R, and DeviceConnection raises if one is answered StateUnhandled anyway.
+CAPABILITY_GETS: frozenset[tuple[str, str]] = frozenset(
+    {
+        # A LIFX Switch answers GetColor with StateUnhandled, which is how a
+        # GetColor broadcast finds only the lights.
+        ("Light", "GetColor"),
+        ("Light", "GetHevCycle"),
+        ("Light", "GetHevCycleConfiguration"),
+        ("Light", "GetLastHevCycleResult"),
+        ("Light", "GetInfrared"),
+        ("MultiZone", "GetColorZones"),
+        ("MultiZone", "GetExtendedColorZones"),
+        ("MultiZone", "GetEffect"),
+        ("Sensor", "GetAmbientLight"),
+        ("Thread", "GetInfo"),
+        ("Tile", "Get64"),
+        ("Tile", "GetDeviceChain"),
+        ("Tile", "GetEffect"),
+    }
+)
+
+
+def expected_response_names(category_class: str, short_name: str) -> tuple[str, ...]:
+    """Return the nested names of the packets that answer a request.
+
+    Args:
+        category_class: Category class name (e.g., "MultiZone")
+        short_name: Nested packet name (e.g., "GetColorZones")
+
+    Returns:
+        The response names, or an empty tuple if the packet is not a Get or
+        Request packet
+    """
+    quirk = RESPONSE_QUIRKS.get((category_class, short_name))
+    if quirk is not None:
+        return quirk
+    if short_name.startswith("Get"):
+        return (short_name.replace("Get", "State", 1),)
+    if short_name.endswith("Request"):
+        return (short_name.replace("Request", "Response"),)
+    return ()
+
+
+def packet_kind_of(category_class: str, short_name: str) -> str:
+    """Classify a packet as ``GET``, ``SET``, ``STATE`` or ``OTHER`` by name."""
+    # Quirk: CopyFrameBuffer is semantically a SET operation
+    # It modifies device state without returning data
+    if category_class == "Tile" and short_name == "CopyFrameBuffer":
+        return "SET"
+    for prefix in ("Get", "Set", "State"):
+        if short_name.startswith(prefix):
+            return prefix.upper()
+    return "OTHER"
+
+
+def missing_response_names(
+    category_class: str, short_name: str, available: set[str]
+) -> list[str]:
+    """Return the expected response names of a request that ``available`` lacks."""
+    return [
+        name
+        for name in expected_response_names(category_class, short_name)
+        if name not in available
+    ]
 
 
 def apply_tile_effect_parameter_quirk(
@@ -1251,29 +1353,17 @@ def generate_nested_packet_code(
     # Maps (category, short_name) -> pkt_type
     packet_lookup: dict[tuple[str, str], int] = {}
     for category, packets_list in categories.items():
-        parts = category.split("_")
-        category_class = "".join(part.capitalize() for part in parts)
+        category_class = category_class_name(category)
         for packet_name, packet_def in packets_list:
-            short_name = packet_name
-            if packet_name.lower().startswith(category_class.lower()):
-                short_name = packet_name[len(category_class) :]
-            if category_class == "Light":
-                if short_name == "Get":
-                    short_name = "GetColor"
-                elif short_name == "State":
-                    short_name = "StateColor"
-            short_name = apply_extended_multizone_packet_quirks(
-                short_name, category_class
-            )
+            short_name = short_packet_name(packet_name, category_class)
             packet_lookup[(category, short_name)] = packet_def["pkt_type"]
 
     # Generate category classes with nested packet classes
     for category in sorted(categories.keys()):
         # Generate category class
         # Quirk: Convert category names to proper camel case (multi_zone -> MultiZone)
-        # Split on underscores, capitalize each part, then join
-        parts = category.split("_")
-        category_class = "".join(part.capitalize() for part in parts)
+        category_class = category_class_name(category)
+        available = {name for cat, name in packet_lookup if cat == category}
         code.append("")
         code.append(f"class {category_class}(Packet):")
         code.append(f'    """{category_class} category packets."""')
@@ -1284,48 +1374,45 @@ def generate_nested_packet_code(
             pkt_type = packet_def["pkt_type"]
             fields_data = packet_def.get("fields", [])
 
-            # Remove category prefix from packet name (e.g., DeviceGetLabel -> GetLabel)
-            # The packet name format is: CategoryActionTarget (e.g., DeviceGetLabel, LightSetColor)
-            # Use case-insensitive matching to handle multi_zone -> Multizone -> MultiZone
-            short_name = packet_name
-            if packet_name.lower().startswith(category_class.lower()):
-                short_name = packet_name[len(category_class) :]
+            # Remove category prefix and apply rename quirks
+            # (e.g., DeviceGetLabel -> GetLabel, LightGet -> GetColor)
+            short_name = short_packet_name(packet_name, category_class)
+            packet_kind = packet_kind_of(category_class, short_name)
 
-            # Quirk: Rename Light.Get/Set/State to Light.GetColor/SetColor/StateColor
-            # for better clarity (Set and SetColor are different packets)
-            if category_class == "Light":
-                if short_name == "Get":
-                    short_name = "GetColor"
-                elif short_name == "State":
-                    short_name = "StateColor"
-
-            # Quirk: Rename extended multizone packets to follow standard naming convention
-            short_name = apply_extended_multizone_packet_quirks(
-                short_name, category_class
+            # Request packets name their response type in a generic base, so
+            # DeviceConnection.request() resolves each request to its reply.
+            # The State classes may be generated later, so the names are quoted.
+            response_names = expected_response_names(category_class, short_name)
+            missing = missing_response_names(category_class, short_name, available)
+            if missing:
+                raise ValueError(
+                    f"{category_class}.{short_name}: no response packet "
+                    + ", ".join(f"{category_class}.{name}" for name in missing)
+                )
+            response_type = " | ".join(
+                f"{category_class}.{name}" for name in response_names
             )
+            if packet_kind == "GET" and (category_class, short_name) in CAPABILITY_GETS:
+                base_class = f'CapabilityGetPacket["{response_type}"]'
+            elif packet_kind == "GET":
+                base_class = f'GetPacket["{response_type}"]'
+            elif packet_kind == "SET":
+                base_class = "SetPacket"
+            elif response_names:
+                base_class = f'RequestPacket["{response_type}"]'
+            else:
+                base_class = "Packet"
 
             code.append("    @dataclass")
-            code.append(f"    class {short_name}(Packet):")
+            code.append(f"    class {short_name}({base_class}):")
             code.append(f'        """Packet type {pkt_type}."""')
             code.append("")
             code.append(f"        PKT_TYPE: ClassVar[int] = {pkt_type}")
 
-            # Add STATE_TYPE for Get*/Request packets (expected response packet type)
-            state_pkt_type = None
-            if short_name.startswith("Get"):
-                # Special case: GetColorZones → StateMultiZone (not StateColorZones)
-                if category_class == "MultiZone" and short_name == "GetColorZones":
-                    state_pkt_type = packet_lookup.get((category, "StateMultiZone"))
-                else:
-                    # Standard naming: GetXxx → StateXxx
-                    state_name = short_name.replace("Get", "State", 1)
-                    state_pkt_type = packet_lookup.get((category, state_name))
-            elif short_name.endswith("Request"):
-                # XxxRequest → XxxResponse
-                response_name = short_name.replace("Request", "Response")
-                state_pkt_type = packet_lookup.get((category, response_name))
-
-            if state_pkt_type is not None:
+            # Add STATE_TYPE for Get*/Request packets (expected response packet
+            # type). GetColorZones records StateMultiZone, its first response.
+            if response_names:
+                state_pkt_type = packet_lookup[(category, response_names[0])]
                 code.append(f"        STATE_TYPE: ClassVar[int] = {state_pkt_type}")
 
             # Format fields_data - split long lists across multiple lines
@@ -1342,21 +1429,6 @@ def generate_nested_packet_code(
                 code.append(
                     f"        _fields: ClassVar[list[dict[str, Any]]] = {fields_repr}"
                 )
-
-            # Add packet metadata for smart request handling
-            # Classify packet by name pattern: Get*, Set*, State*, or OTHER
-            packet_kind = "OTHER"
-            if short_name.startswith("Get"):
-                packet_kind = "GET"
-            elif short_name.startswith("Set"):
-                packet_kind = "SET"
-            elif short_name.startswith("State"):
-                packet_kind = "STATE"
-
-            # Quirk: CopyFrameBuffer is semantically a SET operation
-            # It modifies device state without returning data
-            if category_class == "Tile" and short_name == "CopyFrameBuffer":
-                packet_kind = "SET"
 
             code.append("")
             code.append("        # Packet metadata for automatic handling")
@@ -1384,6 +1456,15 @@ def generate_nested_packet_code(
                     field_type = field_item["type"]
                     python_name = apply_field_name_quirks(to_snake_case(protocol_name))
                     python_type = convert_type_to_python(field_type, type_aliases)
+                    # Packet.unpack() decodes label fields to str, and only
+                    # State packets are unpacked from a reply, so their labels
+                    # are typed as what callers actually read.
+                    if (
+                        packet_kind == "STATE"
+                        and python_type == "bytes"
+                        and is_label_field(python_name)
+                    ):
+                        python_type = "str"
                     if field_item.get("sensitive"):
                         # Keep secrets out of the dataclass repr
                         code.append(
@@ -1572,9 +1653,7 @@ def generate_packets_file(
         for category in packets.keys():
             if isinstance(packets[category], dict):
                 # Convert category name to class name (same as in generate_nested_packet_code)
-                parts = category.split("_")
-                category_class = "".join(part.capitalize() for part in parts)
-                category_names.add(category_class)
+                category_names.add(category_class_name(category))
 
         # Generate import list with aliases for collisions
         import_items = []
@@ -1620,7 +1699,13 @@ from __future__ import annotations
 {dataclasses_import}
 from typing import Any, ClassVar
 
-from lifx.protocol.base import Packet
+from lifx.protocol.base import (
+    CapabilityGetPacket,
+    GetPacket,
+    Packet,
+    RequestPacket,
+    SetPacket,
+)
 {imports}
 '''
 
@@ -1641,28 +1726,12 @@ from lifx.protocol.base import Packet
             if any(isinstance(v, dict) and "pkt_type" in v for v in value.values()):
                 # New format: grouped by category
                 # Quirk: Convert category names to proper camel case (multi_zone -> MultiZone)
-                parts = category.split("_")
-                category_class = "".join(part.capitalize() for part in parts)
+                category_class = category_class_name(category)
                 for packet_name, packet_def in value.items():
                     pkt_type = packet_def.get("pkt_type")
                     if pkt_type is not None:
-                        # Remove category prefix to get short name
-                        # Use case-insensitive matching to handle multi_zone -> Multizone -> MultiZone
-                        short_name = packet_name
-                        if packet_name.lower().startswith(category_class.lower()):
-                            short_name = packet_name[len(category_class) :]
-
-                        # Quirk: Rename Light.Get/Set/State to Light.GetColor/SetColor/StateColor
-                        if category_class == "Light":
-                            if short_name == "Get":
-                                short_name = "GetColor"
-                            elif short_name == "State":
-                                short_name = "StateColor"
-
-                        # Quirk: Rename extended multizone packets to follow standard naming convention
-                        short_name = apply_extended_multizone_packet_quirks(
-                            short_name, category_class
-                        )
+                        # Same nested name as generate_nested_packet_code
+                        short_name = short_packet_name(packet_name, category_class)
 
                         # Full path: Category.ShortName
                         full_path = f"{category_class}.{short_name}"
@@ -1822,11 +1891,25 @@ def validate_protocol_spec(protocol: dict[str, Any]) -> list[str]:
     # Validate packets
     for category, category_packets in packets.items():
         if isinstance(category_packets, dict):
+            category_class = category_class_name(category)
+            available = {
+                short_packet_name(name, category_class) for name in category_packets
+            }
             for packet_name, packet_def in category_packets.items():
                 if isinstance(packet_def, dict):
                     packet_path = f"packets.{category}.{packet_name}"
                     validate_field_types(packet_path, packet_def)
                     errors.extend(validate_declared_size(packet_path, packet_def))
+                    # Every Get and Request packet must resolve to its response
+                    # type, so a pairing that only works by name fails here
+                    # rather than shipping an untyped request.
+                    short_name = short_packet_name(packet_name, category_class)
+                    errors.extend(
+                        f"{packet_path}: no response packet {category_class}.{name}"
+                        for name in missing_response_names(
+                            category_class, short_name, available
+                        )
+                    )
 
     return errors
 

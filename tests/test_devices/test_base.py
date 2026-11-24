@@ -243,6 +243,18 @@ class TestDevice:
         packet = call_args[0][0]
         assert packet.level == 65535
 
+    async def test_set_power_schedules_refresh_with_state(self, device: Device) -> None:
+        """Test an acknowledged set_power() refreshes initialized state."""
+        device._state = MagicMock()
+        device.connection.request.return_value = True
+
+        with patch.object(
+            device, "_schedule_refresh", new_callable=AsyncMock
+        ) as schedule_refresh:
+            await device.set_power(True)
+
+        schedule_refresh.assert_awaited_once_with()
+
     async def test_set_power_off(self, device: Device) -> None:
         """Test turning device off."""
 
@@ -1704,3 +1716,56 @@ class TestWifiQueriesOnThreadDevices:
         firmware = await device.get_wifi_firmware()
 
         assert firmware.version_major == 3
+
+
+class TestRaiseIfUnhandled:
+    """_raise_if_unhandled() narrows a Get result to its State packet."""
+
+    def test_returns_state_packet(self) -> None:
+        state = packets.Device.StateLabel(label="Kitchen")
+
+        assert Device._raise_if_unhandled(state) is state
+
+    def test_raises_on_state_unhandled(self) -> None:
+        with pytest.raises(LifxUnsupportedCommandError, match="packet type 23"):
+            Device._raise_if_unhandled(packets.Device.StateUnhandled(unhandled_type=23))
+
+
+class TestUnsupportedSetLeavesCache:
+    """An unsupported Set raises from request() before any cache is written."""
+
+    @staticmethod
+    async def _no_devices(*args, **kwargs):
+        return
+        yield  # Makes this an async generator
+
+    async def test_set_label(self, device: Device) -> None:
+        device._label = "Old"
+        device.connection.request.side_effect = LifxUnsupportedCommandError("no")
+
+        with pytest.raises(LifxUnsupportedCommandError):
+            await device.set_label("New")
+
+        assert device.label == "Old"
+
+    async def test_set_location(self, device: Device) -> None:
+        device.connection.request.side_effect = LifxUnsupportedCommandError("no")
+
+        with (
+            patch("lifx.network.discovery.discover_devices", self._no_devices),
+            pytest.raises(LifxUnsupportedCommandError),
+        ):
+            await device.set_location("Kitchen")
+
+        assert device.location is None
+
+    async def test_set_group(self, device: Device) -> None:
+        device.connection.request.side_effect = LifxUnsupportedCommandError("no")
+
+        with (
+            patch("lifx.network.discovery.discover_devices", self._no_devices),
+            pytest.raises(LifxUnsupportedCommandError),
+        ):
+            await device.set_group("Bench")
+
+        assert device.group is None
