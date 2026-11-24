@@ -3,11 +3,15 @@
 Pyright checks this file (it is in ``[tool.pyright] include``) but pytest never
 collects it, because the file name does not start with ``test_``. Every
 ``assert_type`` here fails ``uv run pyright`` if the resolved type drifts.
+The ignore comment at the end fails it too if ``_raise_if_unhandled()`` ever
+accepts a Set's result again.
 """
+
+# pyright: reportUnnecessaryTypeIgnoreComment=true
 
 from __future__ import annotations
 
-from typing import assert_type
+from typing import Literal, assert_type
 
 from lifx.devices.base import Device
 from lifx.network.connection import DeviceConnection
@@ -34,7 +38,7 @@ async def request_types(conn: DeviceConnection) -> None:
                 duration=0,
             )
         ),
-        bool,
+        Literal[True],
     )
     assert_type(
         await conn.request(
@@ -52,7 +56,7 @@ async def request_types(conn: DeviceConnection) -> None:
                 duration=0,
             )
         ),
-        bool,
+        Literal[True],
     )
     assert_type(
         await conn.request(packets.Device.EchoRequest(payload=b"")),
@@ -65,18 +69,16 @@ async def request_stream_types(conn: DeviceConnection) -> None:
     async for state in conn.request_stream(packets.Device.GetLabel()):
         assert_type(state, packets.Device.StateLabel | packets.Device.StateUnhandled)
     async for ack in conn.request_stream(packets.Device.SetLabel(label=b"")):
-        assert_type(ack, bool)
+        assert_type(ack, Literal[True])
     async for echo in conn.request_stream(packets.Device.EchoRequest(payload=b"")):
         assert_type(echo, packets.Device.EchoResponse)
 
 
 async def raise_if_unhandled_types(conn: DeviceConnection) -> None:
-    """_raise_if_unhandled() narrows a Get result and passes a Set through."""
+    """_raise_if_unhandled() narrows a Get result and rejects a Set's result."""
     state = Device._raise_if_unhandled(await conn.request(packets.Light.GetPower()))
     assert_type(state, packets.Light.StatePower)
-    assert_type(
-        Device._raise_if_unhandled(
-            await conn.request(packets.Device.SetPower(level=0))
-        ),
-        None,
+    # A Set raises from request() itself, so its result has nothing to check.
+    Device._raise_if_unhandled(
+        await conn.request(packets.Device.SetPower(level=0))  # pyright: ignore[reportArgumentType]
     )

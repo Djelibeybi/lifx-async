@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from lifx.devices.hev import HevLight, HevLightState
+from lifx.exceptions import LifxTimeoutError
 
 
 class TestHevLightStateManagement:
@@ -263,9 +264,13 @@ class TestHevAcknowledgementBasedStateUpdates:
             initial_config = hev_light._state.hev_config
 
             with patch(
-                "lifx.network.connection.DeviceConnection.request", return_value=False
+                "lifx.network.connection.DeviceConnection.request",
+                side_effect=LifxTimeoutError("no acknowledgement"),
             ):
-                await hev_light.set_hev_config(indication=True, duration_seconds=7200)
+                with pytest.raises(LifxTimeoutError):
+                    await hev_light.set_hev_config(
+                        indication=True, duration_seconds=7200
+                    )
 
                 # State should NOT be updated
                 # Cache should not be updated (stays None or unchanged)

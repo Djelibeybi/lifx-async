@@ -483,7 +483,8 @@ Local generator quirks:
   `CopyFrameBuffer`) subclasses `SetPacket`, and `EchoRequest` subclasses
   `RequestPacket["Device.EchoResponse"]` (all in `protocol/base.py`). The bases are for type
   checkers only: `DeviceConnection.request()` and `request_stream()` overload on them, so a Get
-  resolves to `StateXxx | Device.StateUnhandled`, a Set to `bool` and Echo to `EchoResponse`. The
+  resolves to `StateXxx | Device.StateUnhandled`, a Set to `Literal[True]` and Echo to `EchoResponse`
+  (an unsupported Set raises `LifxUnsupportedCommandError` instead of returning). The
   runtime still uses `STATE_TYPE` and `_packet_kind`. `RESPONSE_QUIRKS` holds pairings that are not
   name-based: `GetColorZones` resolves to `StateMultiZone | StateZone`, because a one-zone request
   is answered with `StateZone`. The validator rejects any Get or Request without a response packet,

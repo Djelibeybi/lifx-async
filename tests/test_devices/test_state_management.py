@@ -1228,13 +1228,13 @@ class TestAcknowledgementBasedStateUpdates:
         # Mock set_label response without ack
         async def set_label_no_ack_mock(packet):
             if isinstance(packet, packets.Device.SetLabel):
-                return False  # No acknowledgement
+                raise LifxTimeoutError("no acknowledgement")
             return None
 
         light.connection.request.side_effect = set_label_no_ack_mock
 
-        # Set label
-        await light.set_label("New Label")
+        with pytest.raises(LifxTimeoutError):
+            await light.set_label("New Label")
 
         # State should NOT be updated
         assert light._label == "Original"
@@ -1330,13 +1330,14 @@ class TestAcknowledgementBasedStateUpdates:
         # Mock set_power response without ack
         async def set_power_no_ack_mock(packet):
             if isinstance(packet, packets.Light.SetPower):
-                return False  # No acknowledgement
+                raise LifxTimeoutError("no acknowledgement")
             return None
 
         light.connection.request.side_effect = set_power_no_ack_mock
 
         # Set power
-        await light.set_power(True)
+        with pytest.raises(LifxTimeoutError):
+            await light.set_power(True)
 
         # State should NOT be updated
         assert light._state.power == 0
@@ -1436,14 +1437,15 @@ class TestAcknowledgementBasedStateUpdates:
         # Mock set_color response without ack
         async def set_color_no_ack_mock(packet):
             if isinstance(packet, packets.Light.SetColor):
-                return False  # No acknowledgement
+                raise LifxTimeoutError("no acknowledgement")
             return None
 
         light.connection.request.side_effect = set_color_no_ack_mock
 
         # Set color
         new_color = HSBK(hue=120, saturation=1.0, brightness=0.5, kelvin=4000)
-        await light.set_color(new_color)
+        with pytest.raises(LifxTimeoutError):
+            await light.set_color(new_color)
 
         # State should NOT be updated
         assert light._state.color.hue == 0

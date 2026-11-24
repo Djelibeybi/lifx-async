@@ -346,14 +346,15 @@ packet = Light.SetColor(
 
 # Send via connection
 async with DeviceConnection(serial, ip) as conn:
-    acknowledged = await conn.request(packet)  # bool for a Set packet
+    await conn.request(packet)  # True once acknowledged
     state = await conn.request(Light.GetColor())  # StateColor | StateUnhandled
 ```
 
 `request()` is typed by the packet you send. A Get resolves to its State packet or
-`Device.StateUnhandled`, which a device sends when it does not support the request. A Set
-resolves to `bool`, and `Device.EchoRequest` resolves to `Device.EchoResponse`. Check for
-`StateUnhandled` with `isinstance()` before reading fields.
+`Device.StateUnhandled`, which a device sends when it does not support the request. Check for
+`StateUnhandled` with `isinstance()` before reading fields. A Set resolves to `True` once the
+device acknowledges it, and raises `LifxUnsupportedCommandError` if the device answers with
+`StateUnhandled`. `Device.EchoRequest` resolves to `Device.EchoResponse`.
 
 ### How does connection management work?
 

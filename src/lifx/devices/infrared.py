@@ -214,10 +214,9 @@ class InfraredLight(Light):
         brightness_u16 = max(0, min(65535, round(brightness * 65535)))
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetInfrared(brightness=brightness_u16),
         )
-        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -229,10 +228,9 @@ class InfraredLight(Light):
         )
 
         # Update cache and state on acknowledgement
-        if result:
-            self._infrared = brightness
-            if self._state is not None:
-                self._state.infrared = brightness
+        self._infrared = brightness
+        if self._state is not None:
+            self._state.infrared = brightness
 
         # Schedule refresh to validate state
         if self._state is not None:

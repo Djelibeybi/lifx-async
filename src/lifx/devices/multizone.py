@@ -800,7 +800,7 @@ class MultiZoneLight(PaintTracking, Light):
         duration_ms = int(duration * 1000)
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.MultiZone.SetColorZones(
                 start_index=start,
                 end_index=end,
@@ -809,7 +809,6 @@ class MultiZoneLight(PaintTracking, Light):
                 apply=apply,
             ),
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
 
         _LOGGER.debug(
@@ -917,8 +916,7 @@ class MultiZoneLight(PaintTracking, Light):
             )
         else:
             # Standard: wait for response and check for errors
-            result = await self.connection.request(packet)
-            self._raise_if_unhandled(result)
+            await self.connection.request(packet)
         self._zones_changed()
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
@@ -1065,7 +1063,7 @@ class MultiZoneLight(PaintTracking, Light):
         parameters = parameters[:8]
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.MultiZone.SetEffect(
                 settings=MultiZoneEffectSettings(
                     instanceid=0,  # 0 for new effect
@@ -1085,7 +1083,6 @@ class MultiZoneLight(PaintTracking, Light):
                 ),
             ),
         )
-        self._raise_if_unhandled(result)
 
         self._zones_changed()
 

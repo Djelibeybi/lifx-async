@@ -8,7 +8,7 @@ import socket
 import time
 from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 
 if TYPE_CHECKING:
     from typing import Self
@@ -1390,7 +1390,7 @@ class DeviceConnection:
         request: Any,
         timeout: float | None = None,
         max_retries: int | None = None,
-    ) -> AsyncGenerator[bool, None]:
+    ) -> AsyncGenerator[Literal[True], None]:
         """Internal implementation of request_ack_stream with retry logic.
 
         Thin wrapper around ``_transmit_and_listen`` for SET-style requests:
@@ -1454,7 +1454,7 @@ class DeviceConnection:
         self,
         packet: SetPacket,
         timeout: float | None = None,
-    ) -> AsyncGenerator[bool, None]: ...
+    ) -> AsyncGenerator[Literal[True], None]: ...
 
     @overload
     def request_stream(
@@ -1494,11 +1494,12 @@ class DeviceConnection:
             For SET packets: yields True once the device acknowledges
 
             The yielded type follows the packet: a Get answered by ``R`` yields
-            ``R | Device.StateUnhandled``, a Set yields ``bool`` and
+            ``R | Device.StateUnhandled``, a Set yields ``Literal[True]`` and
             ``Device.EchoRequest`` yields ``Device.EchoResponse``.
 
         Raises:
-            LifxUnsupportedCommandError: If a SET is answered with StateUnhandled
+            LifxUnsupportedCommandError: If the device answers a SET packet
+                with StateUnhandled
             LifxTimeoutError: If request times out
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1511,9 +1512,9 @@ class DeviceConnection:
                 label = state.label  # Already decoded to string
                 break
 
-            # SET request yields True on acknowledgement; an unsupported SET
-            # raises LifxUnsupportedCommandError instead
-            async for result in conn.request_stream(
+            # SET request yields True once acknowledged, and raises
+            # LifxUnsupportedCommandError if the device returns StateUnhandled
+            async for _ack in conn.request_stream(
                 packets.Light.SetColor(color=hsbk, duration=1000)
             ):
                 break
@@ -1591,9 +1592,7 @@ class DeviceConnection:
                                 "values": packet.as_dict,
                             },
                             "reply": {
-                                "packet": "Acknowledgement"
-                                if ack_result
-                                else "StateUnhandled",
+                                "packet": "Acknowledgement",
                                 "values": {},
                             },
                             "serial": self.serial,
@@ -1653,7 +1652,7 @@ class DeviceConnection:
     @overload
     async def request(
         self, packet: SetPacket, timeout: float | None = None
-    ) -> bool: ...
+    ) -> Literal[True]: ...
 
     @overload
     async def request(
@@ -1680,11 +1679,12 @@ class DeviceConnection:
             For SET packets: True once the device acknowledges
 
             The return type follows the packet: a Get answered by ``R`` returns
-            ``R | Device.StateUnhandled``, a Set returns ``bool`` and
+            ``R | Device.StateUnhandled``, a Set returns ``Literal[True]`` and
             ``Device.EchoRequest`` returns ``Device.EchoResponse``.
 
         Raises:
-            LifxUnsupportedCommandError: If a SET is answered with StateUnhandled
+            LifxUnsupportedCommandError: If the device answers a SET packet
+                with StateUnhandled
             LifxTimeoutError: If no response within timeout
             LifxProtocolError: If response invalid
             LifxConnectionError: If connection fails
@@ -1698,11 +1698,9 @@ class DeviceConnection:
             color = HSBK.from_protocol(state.color)
             label = state.label  # Already decoded to string
 
-            # SET request returns True on acknowledgement; an unsupported SET
-            # raises LifxUnsupportedCommandError instead
-            acknowledged = await conn.request(
-                packets.Light.SetColor(color=hsbk, duration=1000)
-            )
+            # SET request returns True once acknowledged, and raises
+            # LifxUnsupportedCommandError if the device returns StateUnhandled
+            await conn.request(packets.Light.SetColor(color=hsbk, duration=1000))
             ```
         """
         async for response in self.request_stream(packet, timeout):

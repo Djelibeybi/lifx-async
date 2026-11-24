@@ -425,9 +425,9 @@ class GetPacket(Packet, Generic[_ResponseT_co]):
 class SetPacket(Packet):
     """Base class for Set packets, which a device acknowledges.
 
-    ``DeviceConnection.request()`` resolves a Set to ``bool``, which is
-    ``True`` on acknowledgement. A device that answers ``StateUnhandled``
-    makes it raise ``LifxUnsupportedCommandError`` instead.
+    ``DeviceConnection.request()`` resolves a Set to ``Literal[True]`` on
+    acknowledgement, and raises ``LifxUnsupportedCommandError`` when the
+    device answers ``StateUnhandled``.
     """
 
 

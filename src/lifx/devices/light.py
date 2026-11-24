@@ -441,13 +441,12 @@ class Light(Device[LightState]):
         duration_ms = int(duration * 1000)
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetColor(
                 color=protocol_color,
                 duration=duration_ms,
             ),
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
 
         _LOGGER.debug(
@@ -466,7 +465,7 @@ class Light(Device[LightState]):
         )
 
         # Update state on acknowledgement
-        if result and self._state is not None:
+        if self._state is not None:
             self._state.color = color
             await self._schedule_refresh()
 
@@ -779,10 +778,9 @@ class Light(Device[LightState]):
         duration_ms = int(duration * 1000)
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetPower(level=power_level, duration=duration_ms),
         )
-        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -796,7 +794,7 @@ class Light(Device[LightState]):
         self._state_writes += 1
 
         # Update state on acknowledgement
-        if result and self._state is not None:
+        if self._state is not None:
             self._state.power = power_level
 
         # Schedule refresh to validate state
@@ -877,7 +875,7 @@ class Light(Device[LightState]):
         skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetWaveform(
                 transient=bool(transient),
                 color=protocol_color,
@@ -887,7 +885,6 @@ class Light(Device[LightState]):
                 waveform=waveform,
             ),
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
         _LOGGER.debug(
             {
@@ -1004,7 +1001,7 @@ class Light(Device[LightState]):
         skew_ratio_i16 = int(skew_ratio * 65535) - 32768  # Convert to int16 range
 
         # Send request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Light.SetWaveformOptional(
                 transient=bool(transient),
                 color=protocol_color,
@@ -1018,7 +1015,6 @@ class Light(Device[LightState]):
                 set_kelvin=set_kelvin,
             ),
         )
-        self._raise_if_unhandled(result)
         self._zones_changed()
         _LOGGER.debug(
             {
@@ -1044,7 +1040,7 @@ class Light(Device[LightState]):
         )
 
         # Update state on acknowledgement (only if non-transient)
-        if result and not transient and self._state is not None:
+        if not transient and self._state is not None:
             # Create a new color with only the specified components updated
             current = self._state.color
             new_color = HSBK(

@@ -276,7 +276,7 @@ async def low_level_control():
         duration=1000
     )
 
-    # Send and wait for the acknowledgement (a bool for a Set packet)
+    # Send and wait for the acknowledgement (True for a Set packet)
     response = await conn.request(packet)
 
     print(f"Response: {response}")

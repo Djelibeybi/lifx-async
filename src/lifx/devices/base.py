@@ -13,16 +13,7 @@ from contextlib import aclosing
 from dataclasses import InitVar, dataclass, field
 from enum import StrEnum
 from math import floor, log10
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Generic,
-    Literal,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, cast
 
 from lifx.const import (
     DEFAULT_MAX_RETRIES,
@@ -583,31 +574,22 @@ class Device(Generic[StateT]):
         ```
     """
 
-    @overload
-    @staticmethod
-    def _raise_if_unhandled(response: bool) -> None: ...
-
-    @overload
     @staticmethod
     def _raise_if_unhandled(
         response: _StateT | packets.Device.StateUnhandled,
-    ) -> _StateT: ...
-
-    @staticmethod
-    def _raise_if_unhandled(response: object) -> object:
+    ) -> _StateT:
         """Raise LifxUnsupportedCommandError if device doesn't support the command.
 
-        The result of a Get is returned narrowed to its State packet. A Set's
-        ``bool`` result returns None without raising here, ``False`` included.
-        A real unsupported Set never reaches this helper as ``False``:
-        ``DeviceConnection`` raises LifxUnsupportedCommandError when the
-        device answers a Set with StateUnhandled.
+        Only a Get needs this: its result is returned narrowed to its State
+        packet. A Set needs no check, because ``DeviceConnection.request()``
+        raises LifxUnsupportedCommandError itself when the device answers a
+        Set with StateUnhandled, and otherwise returns ``True``.
 
         Args:
-            response: The response from connection.request()
+            response: The response from connection.request() for a Get
 
         Returns:
-            The response for a Get, or None for a Set
+            The response, narrowed to the State packet the Get asked for
 
         Raises:
             LifxUnsupportedCommandError: If response is StateUnhandled
@@ -616,8 +598,6 @@ class Device(Generic[StateT]):
             raise LifxUnsupportedCommandError(
                 f"Device does not support packet type {response.unhandled_type}"
             )
-        if isinstance(response, bool):
-            return None
         return response
 
     def __init__(
@@ -1358,17 +1338,15 @@ class Device(Generic[StateT]):
         label_bytes = label_bytes.ljust(32, b"\x00")
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Device.SetLabel(label=label_bytes),
         )
-        self._raise_if_unhandled(result)
 
-        if result:
-            self._label = label
+        self._label = label
 
-            if self._state is not None:
-                self._state.label = label
-                await self._schedule_refresh()
+        if self._state is not None:
+            self._state.label = label
+            await self._schedule_refresh()
 
         _LOGGER.debug(
             {
@@ -1455,10 +1433,9 @@ class Device(Generic[StateT]):
             power_level = level
 
         # Request automatically handles acknowledgement
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Device.SetPower(level=power_level),
         )
-        self._raise_if_unhandled(result)
 
         _LOGGER.debug(
             {
@@ -1469,7 +1446,7 @@ class Device(Generic[StateT]):
             }
         )
 
-        if result and self._state is not None:
+        if self._state is not None:
             await self._schedule_refresh()
 
     async def ping(self) -> float:
@@ -2042,19 +2019,17 @@ class Device(Generic[StateT]):
         updated_at = int(time.time() * 1e9)
 
         # Update this device
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Device.SetLocation(
                 location=location_uuid_to_use, label=label_bytes, updated_at=updated_at
             ),
         )
-        self._raise_if_unhandled(result)
 
-        if result:
-            self._location = CollectionInfo(
-                uuid=location_uuid_to_use.hex(), label=label, updated_at=updated_at
-            )
+        self._location = CollectionInfo(
+            uuid=location_uuid_to_use.hex(), label=label, updated_at=updated_at
+        )
 
-        if result and self._state is not None:
+        if self._state is not None:
             self._state.location.uuid = location_uuid_to_use.hex()
             self._state.location.label = label
             self._state.location.updated_at = updated_at
@@ -2239,19 +2214,17 @@ class Device(Generic[StateT]):
         updated_at = int(time.time() * 1e9)
 
         # Update this device
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Device.SetGroup(
                 group=group_uuid_to_use, label=label_bytes, updated_at=updated_at
             ),
         )
-        self._raise_if_unhandled(result)
 
-        if result:
-            self._group = CollectionInfo(
-                uuid=group_uuid_to_use.hex(), label=label, updated_at=updated_at
-            )
+        self._group = CollectionInfo(
+            uuid=group_uuid_to_use.hex(), label=label, updated_at=updated_at
+        )
 
-        if result and self._state is not None:
+        if self._state is not None:
             self._state.group.uuid = group_uuid_to_use.hex()
             self._state.group.label = label
             self._state.group.updated_at = updated_at
@@ -2293,10 +2266,9 @@ class Device(Generic[StateT]):
             comes back online and is discoverable again.
         """
         # Send reboot request
-        result = await self.connection.request(
+        await self.connection.request(
             packets.Device.SetReboot(),
         )
-        self._raise_if_unhandled(result)
         _LOGGER.debug(
             {
                 "class": "Device",

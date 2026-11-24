@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from lifx.devices.infrared import InfraredLight, InfraredLightState
+from lifx.exceptions import LifxTimeoutError
 
 
 class TestInfraredLightStateManagement:
@@ -190,10 +191,12 @@ class TestInfraredAcknowledgementBasedStateUpdates:
             initial_ir = infrared_light._state.infrared
 
             with patch(
-                "lifx.network.connection.DeviceConnection.request", return_value=False
+                "lifx.network.connection.DeviceConnection.request",
+                side_effect=LifxTimeoutError("no acknowledgement"),
             ):
                 # Set infrared
-                await infrared_light.set_infrared(0.75)
+                with pytest.raises(LifxTimeoutError):
+                    await infrared_light.set_infrared(0.75)
 
                 # State should NOT be updated
                 assert infrared_light._infrared != 0.75
