@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v8.1.3 (2026-11-28)
+
+### Bug Fixes
+
+- Update upstream product registry
+  ([`c462ea1`](https://github.com/Djelibeybi/lifx-async/commit/c462ea1ff2740b2d26944caa2d268e84ca10b0f0))
+
+
 ## v8.1.2 (2026-11-25)
 
 ### Bug Fixes
