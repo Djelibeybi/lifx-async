@@ -29,7 +29,7 @@ jobs:
         python-version: '3.14'
     - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
-        version: '0.13.9'
+        version: '0.13.10'
     - run: uv sync --frozen --all-packages
     - run: uv run --frozen pytest --tooling tests/test_ci/test_update_products.py --no-cov
     - run: uv run --frozen ruff check .github/update_products.py tests/test_ci/test_update_products.py
@@ -52,7 +52,7 @@ jobs:
         python-version: '3.14'
     - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
-        version: '0.13.9'
+        version: '0.13.10'
     - run: uv sync --frozen --all-packages
     - name: Check and regenerate from the upstream file revision
       env:
